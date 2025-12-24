@@ -1,23 +1,13 @@
 <!DOCTYPE html>
 
-<html> <head> <meta charset="utf-8"> <title>DrivingWeather.ca | Gander Hub</title> <link rel="stylesheet" href="" /> <style> body { margin: 0; padding: 0; background-color: #01579b; font-family: sans-serif; color: white; } .header-bar { height: 60px; line-height: 60px; padding-left: 20px; background: #01579b; font-weight: bold; font-size: 20px; border-bottom: 2px solid white; } #map { height: 600px; width: 100%; background: #222; } .footer { padding: 20px; text-align: center; font-size: 14px; line-height: 1.6; } </style> </head> <body>
-
-<div class="header-bar">🚗 DRIVINGWEATHER.CA | GANDER</div>
-
-<div id="map"></div>
-
-<div class="footer"> <strong>WEonG-Route Project</strong>
+<html> <head> <meta charset="utf-8"> <title>DrivingWeather.ca | Gander Hub</title> <link rel="stylesheet" href="" /> <style> body { margin: 0; padding: 0; background-color: #01579b; font-family: sans-serif; color: white; } .header-bar { height: 60px; line-height: 60px; padding-left: 20px; background: #01579b; font-weight: bold; font-size: 20px; border-bottom: 2px solid white; } #map { height: 600px; width: 100%; background: #222; } .footer { padding: 20px; text-align: center; font-size: 14px; line-height: 1.6; } </style> </head><body> <div class="header-bar">🚗 DRIVINGWEATHER.CA | GANDER</div> <div id="map"></div> <div class="footer"> <strong>WEonG-Route Project</strong>
 
 
 Methodology: Level 3 Exception Trigger (All Elements)
 
 
-Radar: Gander, NL (Live ECCC Geomet) </div>
+Radar: Gander, NL (Live ECCC Geomet) </div><script src=""></script>
 
-<script src=""></script>
-
-<script> window.onload = function() { // 1. Setup the Map var map = L.map('map').setView([48.95, -54.60], 8);
-
-</script>
+<script> window.onload = function() { var map = L.map('map').setView([48.95, -54.60], 8); var baseGrey = L.tileLayer('https://{s}{z}/{x}/{y}{r}.png').addTo(map); var radarLayer = L.tileLayer.wms('?', { layers: 'RADAR_1KM_RRAI', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.8, crs: L.CRS.EPSG3857 }).addTo(map); var roadsLayer = L.tileLayer('https://{s}{z}/{x}/{y}{r}.png').addTo(map); L.marker([48.95, -54.60]).addTo(map).bindPopup("Gander Radar Station").openPopup(); var overlays = { "Radar Imagery": radarLayer, "Roads & Highways": roadsLayer }; L.control.layers(null, overlays, { collapsed: false }).addTo(map); setTimeout(function() { map.invalidateSize(); }, 500); }; </script>
 
 </body> </html>
