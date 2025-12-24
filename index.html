@@ -2,7 +2,7 @@
 
 <html> <head> <meta charset="utf-8"> <title>DrivingWeather.ca</title>
 
-<link rel="stylesheet" href="" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
 
 <style> body { margin: 0; padding: 0; background-color: #01579b; font-family: sans-serif; color: white; } .header-bar { height: 60px; line-height: 60px; padding-left: 20px; background: #01579b; font-weight: bold; font-size: 20px; border-bottom: 2px solid white; } #map { height: 500px; width: 100%; background: #222; } .footer { padding: 20px; text-align: center; font-size: 14px; line-height: 1.6; } </style>
 
@@ -20,8 +20,8 @@ Methodology: Level 3 Exception Trigger (All Elements)
 
 Radar: Gander, NL (Live ECCC Geomet) </div>
 
-<script src=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
-<script> window.onload = function() { var map = L.map('map').setView([48.95, -54.60], 8); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.tileLayer.wms('?', { layers: 'RADAR_1KM_RRAI', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.6 }).addTo(map); L.marker([48.95, -54.60]).addTo(map).bindPopup("Gander Radar Station").openPopup(); setTimeout(function() { map.invalidateSize(); }, 500); }; </script>
+<script> window.onload = function() { var map = L.map('map').setView([48.95, -54.60], 8); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.tileLayer.wms('https://geo.weather.gc.ca/geomet?', { layers: 'RADAR_1KM_RRAI', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.6 }).addTo(map); L.marker([48.95, -54.60]).addTo(map).bindPopup("Gander Radar Station").openPopup(); setTimeout(function() { map.invalidateSize(); }, 500); }; </script>
 
 </body> </html>
