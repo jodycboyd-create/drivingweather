@@ -20,7 +20,6 @@
         .radar-container { background: var(--container-bg); border-radius: 12px; padding: 12px; border: 1px solid #222; }
         #map { height: 750px; border-radius: 8px; background: #000; }
 
-        /* High-Contrast Dynamic Labels */
         .community-label {
             background: #ffffff;
             border: 2px solid var(--accent-blue);
@@ -30,11 +29,11 @@
             font-weight: 900;
             font-size: 14px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            white-space: nowrap;
         }
 
         .leaflet-control-layers { background: #1c1c1e !important; color: white !important; font-weight: bold; }
 
-        /* [weong-route] Cards */
         .forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .card { background: var(--container-bg); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent-blue); }
     </style>
@@ -44,7 +43,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold; letter-spacing: 1px;">[WEONG-ROUTE] STRICT COMMUNITY SNAP</div>
+        <div style="color: var(--accent-blue); font-weight: bold; letter-spacing: 1px;">[WEONG-ROUTE] DEEP COMMUNITY SCAN</div>
     </header>
 
     <section class="radar-container">
@@ -53,14 +52,14 @@
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range Intelligence</h3>
-            <p>Status: Strict Snap Active. <span style="color:#ffcc00">UV Index: 6 (High)</span>.</p>
-            <p><strong>Precipitation:</strong> 20% (Nearest 10%)</p>
+            <h3>Short Range</h3>
+            <p>Status: Localized Snap Active. <span style="color:#ffcc00">UV Index: 4</span>.</p>
+            <p><strong>POP:</strong> 10%</p>
         </div>
         <div class="card">
             <h3>Extended Outlook</h3>
-            <p>Saturday: Cloud increasing. <i>Wind up to 15 km/h.</i></p>
-            <p><strong>POP:</strong> 40% (Rounded)</p>
+            <p>Outlook: Operational clarity. <i>Wind up to 15 km/h.</i></p>
+            <p><strong>POP:</strong> Omitted</p>
         </div>
     </div>
 </div>
@@ -76,37 +75,33 @@
     const overlays = { "Road Infrastructure": roadOverlay, "Weather Radar": radarLayer };
     L.control.layers(null, overlays, { collapsed: false }).addTo(map);
 
-    // STRICT SNAP LOGIC: Rejects "Unincorporated" and generic region names
-    async function snapToNamedCommunity(lat, lng) {
-        const searchZooms = [14, 12, 10, 8]; // Start tight, then expand
+    async function getCommunityData(lat, lng) {
+        // We use addressdetails=1 and layer=address to find specific town/village names
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=13&addressdetails=1&layer=address`;
         
-        for (let zoom of searchZooms) {
-            try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=${zoom}`);
-                const data = await response.json();
-                const addr = data.address;
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            const addr = data.address;
 
-                // Priority list of specific community types
-                const communityName = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb;
-                
-                // If it finds a real community name and it's NOT "Unincorporated", return it
-                if (communityName && !communityName.toLowerCase().includes("unincorporated")) {
-                    return {
-                        name: communityName,
-                        lat: data.lat,
-                        lng: data.lon
-                    };
-                }
-            } catch (e) { console.error("API error"); }
-        }
-        // Fallback to Gander if everything else fails (to avoid unknown locations)
-        return { name: "Nearest Hub (Gander Area)", lat: 48.95, lng: -54.60 };
+            // Strict Filter for community types
+            const name = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb || addr.municipality;
+            
+            if (name && !name.toLowerCase().includes("unincorporated")) {
+                return {
+                    name: name,
+                    lat: data.lat,
+                    lng: data.lon
+                };
+            }
+        } catch (e) { console.error("Geocoding failed."); }
+        return null;
     }
 
     function createSmartPin(labelPrefix, startPos) {
         const marker = L.marker(startPos, { draggable: true }).addTo(map);
         
-        marker.bindTooltip("Initializing...", { 
+        marker.bindTooltip(labelPrefix, { 
             permanent: true, 
             direction: 'top', 
             className: 'community-label',
@@ -114,21 +109,29 @@
         }).openTooltip();
 
         marker.on('dragend', async function() {
-            marker.setTooltipContent("Searching for Community...");
-            const currentPos = marker.getLatLng();
+            const dropPos = marker.getLatLng();
+            marker.setTooltipContent("Scanning...");
             
-            const communityData = await snapToNamedCommunity(currentPos.lat, currentPos.lng);
+            const community = await getCommunityData(dropPos.lat, dropPos.lng);
             
-            // Physically snap the pin to the center of the real community found
-            marker.setLatLng([communityData.lat, communityData.lng]);
-            marker.setTooltipContent(`${labelPrefix}: ${communityData.name}`);
+            if (community) {
+                // Pin jumps to the exact town center
+                marker.setLatLng([community.lat, community.lng]);
+                marker.setTooltipContent(`${labelPrefix}: ${community.name}`);
+            } else {
+                // If no town is found, it stays where you dropped it 
+                // but labels it as a generic coordinate to avoid snapping back to Gander
+                marker.setTooltipContent(`${labelPrefix}: Roadside Segment`);
+            }
         });
 
+        // Initialize markers
         marker.fire('dragend');
     }
 
     createSmartPin('Origin', [48.95, -54.60]);
-    createSmartPin('Destination', [49.10, -54.20]);
+    createSmartPin('Destination', [49.20, -54.80]);
+
 </script>
 
 </body>
