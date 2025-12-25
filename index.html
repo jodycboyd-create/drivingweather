@@ -1,29 +1,83 @@
-<!DOCTYPE html><html> <head> <meta charset="utf-8"> <title>DrivingWeather.ca | Gander Hub</title> <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /> <style> body { margin: 0; padding: 0; background-color: #01579b; font-family: sans-serif; color: white; } .header-bar { height: 60px; line-height: 60px; padding-left: 20px; background: #01579b; font-weight: bold; font-size: 20px; border-bottom: 2px solid white; } #map { height: 600px; width: 100%; background: #222; } .footer { padding: 20px; text-align: center; font-size: 14px; line-height: 1.6; } /* This creates the dark grey 'pavement' look */ .pavement { filter: grayscale(100%) brightness(30%) contrast(150%); } </style> </head> <body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEonG-Bulletin | Weather Intelligence</title>
+    <style>
+        :root {
+            --primary-bg: #1a1a1b;
+            --accent-blue: #0070f3;
+            --text-main: #ffffff;
+            --exception-lvl3: #ff4e42;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+        .short-range, .extended-range {
+            background: #272729;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--accent-blue);
+        }
+        .exception-trigger {
+            border-left-color: var(--exception-lvl3);
+        }
+        .uv-index {
+            font-weight: bold;
+            color: #ffcc00;
+        }
+        .pop-display {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        .wind-info {
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
 
-<div class="header-bar">🚗 DRIVINGWEATHER.CA | GANDER</div> <div id="map"></div> <div class="footer"> <strong>WEonG-Route Project</strong>
+<div class="container">
+    <header>
+        <h1>WEonG-Bulletin</h1>
+        <p>Methodology: <strong>[weong-route] Locked</strong></p>
+    </header>
 
+    <section class="short-range">
+        <h3>Short Range Forecast</h3>
+        <div id="short-range-content">
+            <p>Today: Sunny. <span class="uv-index">UV Index: 6 (High)</span>.</p>
+            <p class="pop-display">Precipitation: 20% (Low probability)</p>
+        </div>
+    </section>
 
-Methodology: Level 3 Exception Trigger (All Elements)
+    <section class="extended-range" id="extended-section">
+        <h3>Extended Outlook</h3>
+        <div id="extended-content">
+            <p>Saturday: Cloud increasing. <span class="wind-info">Wind up to 15 km/h</span>.</p>
+            <p class="pop-display">POP: 40%</p>
+        </div>
+    </section>
 
+    <div id="exception-alert" class="short-range exception-trigger" style="display:none;">
+        <strong>[WEonG-ROUTE] LEVEL 3 EXCEPTION:</strong> Significant weather event detected.
+    </div>
+</div>
 
-Radar: Gander, NL (Live ECCC Geomet) </div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script> window.onload = function() { // 1. Load the Dark Background L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-// 2. Load the Roads (This uses your .pavement CSS to turn them grey) L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { className: 'pavement', zIndex: 10 }).addTo(map);
-
-// 3. Load the Radar (Live ECCC Geomet) L.tileLayer.wms('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { layers: 'RADAR_1KM_RRAI', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.7, zIndex: 5 }).addTo(map);
-
-// 4. Draw the Yellow Dashes (TCH Gander Corridor) var hwyStyle = { color: 'yellow', weight: 3, dashArray: '10, 15', opacity: 1, zIndex: 100 }; var tchCoords = [[48.91, -54.85], [48.95, -54.60], [48.88, -54.25]]; L.polyline(tchCoords, hwyStyle).addTo(map);
-
-// 5. Add the Center Marker L.marker([48.95, -54.60]).addTo(map).bindPopup("Gander Hub").openPopup();
-
-// 6. Force a refresh to ensure it displays immediately setTimeout(function() { map.invalidateSize(); }, 500);
-
-};
-
+<script>
+    // Placeholder for future logic integration
+    console.log("WEonG-Bulletin Methodology Loaded.");
 </script>
 
-</body> </html>
+</body>
+</html>
