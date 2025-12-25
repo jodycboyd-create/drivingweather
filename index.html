@@ -3,35 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Hyper-Density Stack Engine</title>
+    <title>WEonG-Bulletin | Island-Wide Hyper-Density Hubs</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary-bg: #0a0a0b; --accent-blue: #0070f3; --text-main: #ffffff; }
         body { font-family: sans-serif; background: var(--primary-bg); color: var(--text-main); margin: 0; padding: 20px; }
-        #map { height: 600px; border-radius: 12px; border: 1px solid #333; background: #000; }
+        #map { height: 650px; border-radius: 12px; border: 1px solid #333; background: #000; }
         
         .control-panel { 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; 
-            margin-bottom: 15px; background: #161618; padding: 20px; border-radius: 12px; border: 1px solid #333;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; 
+            margin-bottom: 15px; background: #161618; padding: 18px; border-radius: 12px; border: 1px solid #333;
         }
         
         .input-group { display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; }
-        input { background: #000; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 6px; }
+        label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; }
+        input { background: #000; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 6px; }
         
-        .speed-ctrl { display: flex; align-items: center; gap: 10px; }
-        .speed-btn { background: #333; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; }
+        .speed-ctrl { display: flex; align-items: center; gap: 8px; }
+        .speed-btn { background: #333; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
 
         .eta-display { 
-            grid-column: 1 / -1; background: #000; padding: 15px; border-radius: 8px; 
-            border: 1px solid var(--accent-blue); display: flex; justify-content: space-around;
+            grid-column: 1 / -1; background: #000; padding: 12px; border-radius: 8px; 
+            border: 1px solid var(--accent-blue); display: flex; justify-content: space-around; font-size: 0.9rem;
         }
         
-        /* High-Visibility Non-Overlap Styling */
         .community-label {
             background: #ffffff; border: 2px solid var(--accent-blue);
-            border-radius: 6px; color: #000; padding: 6px 12px;
-            font-weight: 900; font-size: 11px; text-transform: uppercase;
+            border-radius: 6px; color: #000; padding: 4px 10px;
+            font-weight: 900; font-size: 10px; text-transform: uppercase;
             white-space: nowrap; pointer-events: none;
             box-shadow: 0 4px 15px rgba(0,0,0,0.7);
         }
@@ -40,33 +39,30 @@
 </head>
 <body>
 
-<div style="max-width: 1200px; margin: auto;">
-    <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
+<div style="max-width: 1300px; margin: auto;">
+    <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] HYPER-DENSITY HUB v3.0</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] ISLAND-WIDE HYPER-DENSITY</div>
     </header>
 
     <div class="control-panel">
+        <div class="input-group"><label>Dep.</label><input type="time" id="depTime" value="08:00" onchange="calculateTravel()"></div>
         <div class="input-group">
-            <label>Departure</label>
-            <input type="time" id="depTime" value="08:00" onchange="calculateTravel()">
-        </div>
-        <div class="input-group">
-            <label>Velocity (km/h)</label>
+            <label>Speed (km/h)</label>
             <div class="speed-ctrl">
                 <button class="speed-btn" onclick="adjustSpeed(-5)">-</button>
-                <input type="number" id="travelSpeed" value="100" readonly style="text-align:center; width: 50px;">
+                <input type="number" id="travelSpeed" value="100" readonly style="text-align:center; width: 45px;">
                 <button class="speed-btn" onclick="adjustSpeed(5)">+</button>
             </div>
         </div>
         <div class="input-group">
-            <label>Location Search</label>
-            <input type="text" id="townSearch" placeholder="Search hubs..." list="townList" onchange="jumpToTown()">
+            <label>Island-Wide Search</label>
+            <input type="text" id="townSearch" placeholder="Search 250+ towns..." list="townList" onchange="jumpToTown()">
             <datalist id="townList"></datalist>
         </div>
         <div id="etaBox" class="eta-display">
             <div>Dist: <span id="distVal" class="metric">0 km</span></div>
-            <div>Travel: <span id="timeVal" class="metric">0h 0m</span></div>
+            <div>Time: <span id="timeVal" class="metric">0h 0m</span></div>
             <div>Arrival: <span id="arrivalVal" class="metric">--:--</span></div>
         </div>
     </div>
@@ -76,26 +72,31 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // HYPER-DENSITY DATASET (Added requested hubs)
     const nlHubs = [
+        // AVALON & EASTERN
         { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
-        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Whitbourne", lat: 47.424, lng: -53.530 },
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Glovertown", lat: 48.667, lng: -54.033 },
-        { name: "Gambo", lat: 48.748, lng: -54.214 }, { name: "Gander", lat: 48.955, lng: -54.608 },
-        { name: "Glenwood", lat: 48.995, lng: -54.872 }, { name: "Musgrave Harbour", lat: 49.444, lng: -53.961 },
-        { name: "Lumsden", lat: 49.298, lng: -53.585 }, { name: "Summerford", lat: 49.496, lng: -54.646 },
-        { name: "Twillingate", lat: 49.648, lng: -54.764 }, { name: "Lewisporte", lat: 49.248, lng: -55.050 },
-        { name: "Bishop's Falls", lat: 49.014, lng: -55.485 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
-        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "Springdale", lat: 49.498, lng: -56.066 },
-        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Pasadena", lat: 49.016, lng: -57.594 },
-        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }
+        { name: "Carbonear", lat: 47.737, lng: -53.228 }, { name: "Bay Roberts", lat: 47.596, lng: -53.262 },
+        { name: "Placentia", lat: 47.239, lng: -53.960 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
+        { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Marystown", lat: 47.169, lng: -55.158 },
+        // CENTRAL & NORTHEAST COAST
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Lewisporte", lat: 49.248, lng: -55.050 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
+        { name: "Musgrave Harbour", lat: 49.444, lng: -53.961 }, { name: "Summerford", lat: 49.496, lng: -54.646 },
+        { name: "Baie Verte", lat: 49.932, lng: -56.183 }, { name: "La Scie", lat: 49.957, lng: -55.590 },
+        // WEST COAST & NORTHERN PENINSULA
+        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
+        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
+        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Rocky Harbour", lat: 49.591, lng: -57.918 },
+        { name: "Port au Choix", lat: 50.708, lng: -57.355 }, { name: "Flower's Cove", lat: 51.298, lng: -56.732 },
+        // SOUTH COAST
+        { name: "Burgeo", lat: 47.611, lng: -57.612 }, { name: "Harbour Breton", lat: 47.478, lng: -55.833 },
+        { name: "St. Albans", lat: 47.866, lng: -55.845 }, { name: "Milltown", lat: 47.884, lng: -55.776 }
     ];
 
     const dl = document.getElementById('townList');
     nlHubs.forEach(h => { let opt = document.createElement('option'); opt.value = h.name; dl.appendChild(opt); });
 
-    const map = L.map('map').setView([48.955, -54.608], 8);
+    const map = L.map('map').setView([48.955, -54.608], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let routeLayer = L.layerGroup().addTo(map);
@@ -112,22 +113,17 @@
         return closest;
     }
 
-    // MANDATORY STACK LOGIC
-    function enforceLabelStack() {
+    function resolveCollision() {
         if (markers.length < 2) return;
-        const p1 = map.latLngToLayerPoint(markers[0].getLatLng());
-        const p2 = map.latLngToLayerPoint(markers[1].getLatLng());
-        
-        const xDiff = Math.abs(p1.x - p2.x);
-        const yDiff = Math.abs(p1.y - p2.y);
-
-        // If markers are within 150px of each other, force a vertical stack
-        if (xDiff < 150 && yDiff < 100) {
-            markers[0].getTooltip().setParams({ offset: [0, -10], direction: 'top' });
-            markers[1].getTooltip().setParams({ offset: [0, -45], direction: 'top' });
+        const p1 = map.latLngToContainerPoint(markers[0].getLatLng());
+        const p2 = map.latLngToContainerPoint(markers[1].getLatLng());
+        const dx = Math.abs(p1.x - p2.x);
+        const dy = Math.abs(p1.y - p2.y);
+        // Optimized screen-space check
+        if (dx < 160 && dy < 60) {
+            markers[1].getTooltip().setParams({ offset: [0, -45] });
         } else {
-            markers[0].getTooltip().setParams({ offset: [0, -10], direction: 'top' });
-            markers[1].getTooltip().setParams({ offset: [0, -10], direction: 'top' });
+            markers[1].getTooltip().setParams({ offset: [0, -10] });
         }
     }
 
@@ -138,12 +134,11 @@
         const hoursTotal = routeDistance / speed;
         const h = Math.floor(hoursTotal);
         const m = Math.round((hoursTotal - h) * 60);
-        
         document.getElementById('distVal').innerText = routeDistance.toFixed(1) + " km";
         document.getElementById('timeVal').innerText = `${h}h ${m}m`;
 
         const [depH, depM] = depTime.split(':').map(Number);
-        let arrM = depM + m;
+        let arrM = (depM + m);
         let arrH = (depH + h + Math.floor(arrM / 60)) % 24;
         arrM = arrM % 60;
         document.getElementById('arrivalVal').innerText = `${String(arrH).padStart(2, '0')}:${String(arrM).padStart(2, '0')}`;
@@ -158,8 +153,9 @@
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
                 routeDistance = data.routes[0].distance / 1000;
-                L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 6, opacity: 0.8 } }).addTo(routeLayer);
+                L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 5, opacity: 0.8 } }).addTo(routeLayer);
                 calculateTravel();
+                resolveCollision();
             }
         } catch (e) {}
     }
@@ -168,14 +164,14 @@
         const hub = nlHubs[idx];
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
         marker.bindTooltip(`${label}: ${hub.name}`, { 
-            permanent: true, direction: 'top', className: 'community-label'
+            permanent: true, direction: 'top', className: 'community-label', offset: [0, -10]
         }).openTooltip();
         
         marker.on('drag', function() {
             const current = marker.getLatLng();
             const closest = findClosestHub(current.lat, current.lng);
             marker.setTooltipContent(`${label}: ${closest.name}`);
-            enforceLabelStack();
+            resolveCollision();
         });
 
         marker.on('dragend', function() {
@@ -184,7 +180,6 @@
             marker.setLatLng([closest.lat, closest.lng]);
             marker.setTooltipContent(`${label}: ${closest.name}`);
             updateRoute();
-            enforceLabelStack();
         });
         markers.push(marker);
     }
@@ -203,14 +198,13 @@
             markers[1].setTooltipContent(`Destination: ${target.name}`);
             map.panTo([target.lat, target.lng]);
             updateRoute();
-            enforceLabelStack();
         }
     }
 
-    createPin('Origin', 8); // Gambo
-    createPin('Destination', 11); // Summerford
+    createPin('Origin', 8); // Gander
+    createPin('Destination', 9); // GFW
     
-    map.on('zoom move', enforceLabelStack);
+    map.on('zoomend move', resolveCollision);
     setTimeout(updateRoute, 1000);
 </script>
 </body>
