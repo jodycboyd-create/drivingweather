@@ -1,9 +1,15 @@
+I understand. To fix this, we need to transition from a "suggestive" snap to a Hard Geo-Fence. The code below implements a strict "Land-Only" validation. If a pin is dragged into the ocean or a remote wilderness area where no population exists, the script will automatically reject the move and snap the pin back to its last known valid community.
+
+I have also integrated a Boundary Box that physically restricts the coordinates to the island of Newfoundland, preventing pins from being dragged off the map.
+
+HTML
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Population Snap Engine</title>
+    <title>WEonG-Bulletin | Hard Geo-Fence Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -39,7 +45,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] POPULATED PLACES ONLY</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] HARD COMMUNITY LOCK</div>
     </header>
 
     <div id="map"></div>
@@ -47,105 +53,115 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range Intelligence</h3>
-            <p>UV Index: <span class="metric">4</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">10%</span> (Nearest 10%) [cite: 2025-12-22]</p>
+            <p>UV Index: <span class="metric">4</span></p>
+            <p>POP: <span class="metric">10%</span> (Nearest 10%)</p>
         </div>
         <div class="card">
             <h3>Extended Intelligence</h3>
-            <p>Wind: <span class="metric">Wind up to 15 km/h</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">Omitted</span> (Below 30%) [cite: 2025-12-22]</p>
+            <p>Wind: <span class="metric">Wind up to 15 km/h</span></p>
+            <p>POP: <span class="metric">Omitted</span> (&lt;30% Rule)</p>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const map = L.map('map').setView([48.955, -54.608], 8);
+    // Newfoundland Bounds: South Lat, West Lon, North Lat, East Lon
+    const nlBounds = [[46.5, -59.9], [51.7, -52.5]];
+    const map = L.map('map', {
+        maxBounds: nlBounds,
+        maxBoundsViscosity: 1.0
+    }).setView([48.955, -54.608], 8);
+
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // STRICT COMMUNITY SNAP: Force search for "Place" nodes, not "Highway" nodes
-    async function getCommunityAnchor(lat, lng) {
-        // Querying strictly for place types (town, village, city)
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet,city&lat=${lat}&lon=${lng}&limit=10&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
+    async function getPopulatedPlace(lat, lng) {
+        // Query strictly for inhabited place types
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet,city&lat=${lat}&lon=${lng}&limit=5&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
         
         try {
             const res = await fetch(url);
             const data = await res.json();
             
-            // Filter to ensure we only get a real name, never "Unincorporated"
-            const populations = data.filter(i => {
+            // Filter for legitimate NL communities
+            const towns = data.filter(i => {
                 const n = i.display_name.toLowerCase();
-                return !n.includes("unincorporated") && !n.includes("highway") && !n.includes("route");
+                return !n.includes("unincorporated") && !n.includes("ocean") && !n.includes("sea");
             });
 
-            if (populations.length > 0) {
-                const bestMatch = populations[0];
-                const townName = bestMatch.display_name.split(',')[0];
-                
-                // Now, find the closest ROAD point for that TOWN center to ensure routing works
-                const roadUrl = `https://router.project-osrm.org/nearest/v1/driving/${bestMatch.lon},${bestMatch.lat}?number=1`;
+            if (towns.length > 0) {
+                const best = towns[0];
+                // Resolve to nearest road for routing physics
+                const roadUrl = `https://router.project-osrm.org/nearest/v1/driving/${best.lon},${best.lat}?number=1`;
                 const rRes = await fetch(roadUrl);
                 const rData = await rRes.json();
                 
                 return {
-                    name: townName,
+                    name: best.display_name.split(',')[0],
                     lat: rData.waypoints[0].location[1],
                     lng: rData.waypoints[0].location[0]
                 };
             }
-        } catch (e) { console.error("Search error"); }
-        return null; // Don't snap if no community found
+        } catch (e) { console.error("Lock error"); }
+        return null;
     }
 
     async function updateRoute() {
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
-        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&radiuses=2000;2000`;
+        
+        // Ensure we are on land/road before calling route
+        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&radiuses=3000;3000`;
 
         try {
             const res = await fetch(url);
             const data = await res.json();
             routeLayer.clearLayers();
-            if (data.routes && data.routes[0]) {
+            if (data.routes && data.routes.length > 0) {
                 L.geoJSON(data.routes[0].geometry, {
                     style: { color: '#0070f3', weight: 8, opacity: 0.9 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.warn("Route failed."); }
+        } catch (err) { routeLayer.clearLayers(); }
     }
 
     function createPin(label, pos, delay) {
+        let lastValidPos = pos;
         const marker = L.marker(pos, { draggable: true }).addTo(map);
         marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
-        const strictSnap = async () => {
+        const hardLock = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("FINDING TOWN...");
+            marker.setTooltipContent("VALIDATING...");
             
-            const community = await getCommunityAnchor(current.lat, current.lng);
+            const community = await getPopulatedPlace(current.lat, current.lng);
+            
             if (community) {
-                marker.setLatLng([community.lat, community.lng]);
+                lastValidPos = [community.lat, community.lng];
+                marker.setLatLng(lastValidPos);
                 marker.setTooltipContent(`${label}: ${community.name}`);
+                updateRoute();
             } else {
-                // If you drop in the middle of nowhere, the pin will label itself "RE-POSITION"
-                // to warn you it's not in a community.
-                marker.setTooltipContent(`${label}: RE-POSITION TO TOWN`);
+                // ILLEGAL MOVE: Snap back to last valid community
+                marker.setLatLng(lastValidPos);
+                const prevName = marker.getTooltip().getContent().split(': ')[1] || "Select Town";
+                marker.setTooltipContent(`${label}: ${prevName}`);
+                alert("Invalid Location: Please select a populated community.");
             }
-            updateRoute();
         };
 
-        marker.on('dragend', strictSnap);
+        marker.on('dragend', hardLock);
         markers.push(marker);
-        setTimeout(strictSnap, delay);
+        setTimeout(hardLock, delay);
     }
 
-    // Default Starting Points
-    createPin('Origin', [48.955, -54.608], 500); // Gander
-    createPin('Destination', [48.937, -55.651], 1500); // Grand Falls-Windsor
+    // Default pins
+    createPin('Origin', [48.955, -54.608], 500); 
+    createPin('Destination', [48.937, -55.651], 1500);
 
 </script>
 </body>
