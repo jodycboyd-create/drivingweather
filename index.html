@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Persistent Routing</title>
+    <title>WEonG-Bulletin | NL-Locked Routing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -38,7 +38,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] PERSISTENT SNAP ENGINE</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] NEWFOUNDLAND REGION LOCK</div>
     </header>
 
     <section class="radar-container">
@@ -48,44 +48,44 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range</h3>
-            <p>Status: Localized Tracking. <span style="color:#ffcc00">UV Index: 4</span>.</p>
-            <p><strong>POP:</strong> 10% (Nearest 10%)</p>
+            <p>UV Index: 4. POP: 10%.</p>
         </div>
         <div class="card">
             <h3>Extended</h3>
-            <p>Outlook: Operational. <i>Wind up to 15 km/h.</i></p>
-            <p><strong>POP:</strong> Omitted (&lt;30%)</p>
+            <p>Wind up to 15 km/h. POP: Omitted.</p>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // Initial view set to Central Newfoundland
     const map = L.map('map').setView([48.955, -54.608], 8);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // HARD-GUARDED SEARCH
-    async function getCommunityData(lat, lng) {
-        // Search for specific community types near the point
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=1`;
+    async function getNLCommunity(lat, lng) {
+        // NL Bounding Box: [westLon, southLat, eastLon, northLat]
+        const viewbox = "-59.8,46.5,-52.0,51.8";
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1&bounded=1&viewbox=${viewbox}`;
         
         try {
             const res = await fetch(url);
             const data = await res.json();
             
-            if (data && data.length > 0) {
-                const c = data[0];
-                const cName = c.display_name.split(',')[0];
-                const nLat = parseFloat(c.lat);
-                const nLng = parseFloat(c.lon);
+            if (!data || !data.address) return null;
 
-                // Validation: Prevent disappearing if result is out of range or malformed
-                if (!isNaN(nLat) && !isNaN(nLng) && !cName.toLowerCase().includes("unincorporated")) {
-                    return { name: cName, lat: nLat, lng: nLng };
-                }
+            // Extract the most relevant name
+            const name = data.address.city || data.address.town || data.address.village || data.address.hamlet || data.address.suburb || data.address.road;
+            
+            const nLat = parseFloat(data.lat);
+            const nLng = parseFloat(data.lon);
+
+            // CRITICAL SAFETY CHECK: Only snap if coordinate is inside NL box
+            if (!isNaN(nLat) && nLat > 46.5 && nLat < 52 && name && !name.toLowerCase().includes("unincorporated")) {
+                return { name: name, lat: nLat, lng: nLng };
             }
         } catch (e) { console.error("API error"); }
         return null;
@@ -96,8 +96,8 @@
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
         
-        // Final safety check: ensure coordinates exist before calling route
-        if (!s || !e || isNaN(s.lat) || isNaN(e.lat)) return;
+        // Prevent route call if coordinates are invalid
+        if (isNaN(s.lat) || isNaN(e.lat)) return;
 
         const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
 
@@ -119,19 +119,16 @@
         
         const snapAction = async () => {
             const current = marker.getLatLng();
+            marker.setTooltipContent("Locking...");
             
-            // Safety: If for some reason the marker lost its position, don't proceed
-            if (!current) return;
-
-            marker.setTooltipContent("Finding Community...");
-            const comm = await getCommunityData(current.lat, current.lng);
+            const comm = await getNLCommunity(current.lat, current.lng);
             
             if (comm) {
-                // Only move the pin if we found a valid community
+                // Only move if valid NL community found
                 marker.setLatLng([comm.lat, comm.lng]);
                 marker.setTooltipContent(`${label}: ${comm.name}`);
             } else {
-                // If no community found, stay EXACTLY where dropped to prevent disappearing
+                // STAY PUT if result is "undefined" or out of province
                 marker.setTooltipContent(`${label}: Segment Selected`);
             }
             updateRoute();
@@ -139,14 +136,12 @@
 
         marker.on('dragend', snapAction);
         markers.push(marker);
-
-        // Staggered trigger for initial placement
         setTimeout(snapAction, delay);
     }
 
-    // Initial pins: Gander and Clarenville area
+    // Default Starting Points: Gander and Gambo
     createPin('Origin', [48.955, -54.608], 500); 
-    createPin('Destination', [48.16, -53.96], 1500);
+    createPin('Destination', [49.10, -54.20], 1500);
 
 </script>
 </body>
