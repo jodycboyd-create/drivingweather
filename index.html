@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Stable Routing</title>
+    <title>WEonG-Bulletin | Smart Community Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -39,7 +39,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] STABLE COMMUNITY SNAP</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] RADIUS PROBE ACTIVE</div>
     </header>
 
     <section class="radar-container">
@@ -48,12 +48,14 @@
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range Intelligence</h3>
-            <p>UV Index: 4. POP: 10%.</p>
+            <h3>Short Range</h3>
+            <p>Status: Monitoring local infrastructure. <span style="color:#ffcc00">UV Index: 4</span>.</p>
+            <p><strong>POP:</strong> 10%</p>
         </div>
         <div class="card">
-            <h3>Extended Outlook</h3>
-            <p>Wind up to 15 km/h. POP: Omitted.</p>
+            <h3>Extended</h3>
+            <p>Outlook: Operational clarity. <i>Wind up to 15 km/h.</i></p>
+            <p><strong>POP:</strong> Omitted</p>
         </div>
     </div>
 </div>
@@ -66,50 +68,47 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    async function getNearestCommunity(lat, lng) {
-        // NL Bounding Box and specific town/village search
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=1&bounded=1&viewbox=-56.5,48.0,-53.0,50.0`;
+    // IMPROVED RADIUS SEARCH
+    async function findClosestCommunity(lat, lng) {
+        // Search specifically for named settlements in a wider buffer
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=settlement&lat=${lat}&lon=${lng}&limit=10`;
         
         try {
             const response = await fetch(url);
             const data = await response.json();
             
-            if (data && data.length > 0) {
-                const c = data[0];
-                const newLat = parseFloat(c.lat);
-                const newLng = parseFloat(c.lon);
+            // Find the first result that is a town, village, or hamlet
+            const community = data.find(c => 
+                c.type === 'town' || c.type === 'village' || c.type === 'hamlet' || c.type === 'city'
+            );
 
-                // Safety check: ensure coordinates are valid numbers
-                if (!isNaN(newLat) && !isNaN(newLng)) {
-                    return {
-                        name: c.display_name.split(',')[0],
-                        lat: newLat,
-                        lng: newLng
-                    };
-                }
+            if (community) {
+                return {
+                    name: community.display_name.split(',')[0],
+                    lat: parseFloat(community.lat),
+                    lng: parseFloat(community.lon)
+                };
             }
-        } catch (e) { console.error("Search failed", e); }
+        } catch (e) { console.error("Search failed"); }
         return null;
     }
 
     async function updateDrivingRoute() {
         if (markers.length < 2) return;
-        
-        const start = markers[0].getLatLng();
-        const end = markers[1].getLatLng();
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+        const s = markers[0].getLatLng();
+        const e = markers[1].getLatLng();
+        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
 
         try {
-            const response = await fetch(osrmUrl);
-            const data = await response.json();
-            
+            const res = await fetch(url);
+            const data = await res.json();
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
                 L.geoJSON(data.routes[0].geometry, {
                     style: { color: '#0070f3', weight: 6, opacity: 0.8 }
                 }).addTo(routeLayer);
             }
-        } catch (e) { console.error("Routing error", e); }
+        } catch (err) { console.error("OSRM Error"); }
     }
 
     function createSmartPin(labelPrefix, startPos) {
@@ -117,33 +116,33 @@
         marker.bindTooltip(labelPrefix, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
 
         marker.on('dragend', async function() {
+            marker.setTooltipContent("Snapping...");
             const currentPos = marker.getLatLng();
-            marker.setTooltipContent("Searching...");
             
-            const community = await getNearestCommunity(currentPos.lat, currentPos.lng);
+            const community = await findClosestCommunity(currentPos.lat, currentPos.lng);
             
             if (community) {
+                // SUCCESS: Physical snap to community center
                 marker.setLatLng([community.lat, community.lng]);
                 marker.setTooltipContent(`${labelPrefix}: ${community.name}`);
             } else {
-                // If search fails, stay where dropped to avoid disappearing
-                marker.setTooltipContent(`${labelPrefix}: Custom Point`);
+                // SECONDARY FALLBACK: Search for any named location if strict community fails
+                const fallbackUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentPos.lat}&lon=${currentPos.lng}&zoom=14`;
+                const fbRes = await fetch(fallbackUrl);
+                const fbData = await fbRes.json();
+                const fbName = fbData.address.road || fbData.address.suburb || "Route 1 Corridor";
+                
+                marker.setTooltipContent(`${labelPrefix}: ${fbName}`);
             }
             updateDrivingRoute();
         });
 
         markers.push(marker);
-        
-        // Use a slight delay for initial snap to ensure API is ready
-        setTimeout(() => {
-            marker.fire('dragend');
-        }, 500);
+        setTimeout(() => marker.fire('dragend'), 500);
     }
 
-    // Default positions: Gander and Gambo
-    createSmartPin('Origin', [48.955, -54.608]);
-    createSmartPin('Destination', [49.10, -54.20]);
-
+    createSmartPin('Origin', [48.955, -54.608]); // Gander
+    createSmartPin('Destination', [48.922, -55.637]); // Grand Falls area
 </script>
 </body>
 </html>
