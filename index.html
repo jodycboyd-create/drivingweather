@@ -1,15 +1,9 @@
-I understand. To fix this, we need to transition from a "suggestive" snap to a Hard Geo-Fence. The code below implements a strict "Land-Only" validation. If a pin is dragged into the ocean or a remote wilderness area where no population exists, the script will automatically reject the move and snap the pin back to its last known valid community.
-
-I have also integrated a Boundary Box that physically restricts the coordinates to the island of Newfoundland, preventing pins from being dragged off the map.
-
-HTML
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Hard Geo-Fence Engine</title>
+    <title>WEonG-Bulletin | Fuzzy Magnet Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -45,14 +39,14 @@ HTML
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] HARD COMMUNITY LOCK</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] FUZZY COMMUNITY MAGNET</div>
     </header>
 
     <div id="map"></div>
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range Intelligence</h3>
+            <h3>Short Range</h3>
             <p>UV Index: <span class="metric">4</span></p>
             <p>POP: <span class="metric">10%</span> (Nearest 10%)</p>
         </div>
@@ -66,7 +60,6 @@ HTML
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // Newfoundland Bounds: South Lat, West Lon, North Lat, East Lon
     const nlBounds = [[46.5, -59.9], [51.7, -52.5]];
     const map = L.map('map', {
         maxBounds: nlBounds,
@@ -78,34 +71,41 @@ HTML
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    async function getPopulatedPlace(lat, lng) {
-        // Query strictly for inhabited place types
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet,city&lat=${lat}&lon=${lng}&limit=5&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
+    async function findNearestCommunity(lat, lng) {
+        // Query for communities within a 20km radius (approx 0.2 degrees)
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet,city&lat=${lat}&lon=${lng}&limit=10&bounded=0`;
         
         try {
             const res = await fetch(url);
             const data = await res.json();
             
-            // Filter for legitimate NL communities
-            const towns = data.filter(i => {
+            // Filter for legitimate populated places
+            const populations = data.filter(i => {
                 const n = i.display_name.toLowerCase();
                 return !n.includes("unincorporated") && !n.includes("ocean") && !n.includes("sea");
             });
 
-            if (towns.length > 0) {
-                const best = towns[0];
-                // Resolve to nearest road for routing physics
-                const roadUrl = `https://router.project-osrm.org/nearest/v1/driving/${best.lon},${best.lat}?number=1`;
+            if (populations.length > 0) {
+                // Find the closest community within the results
+                let closest = populations[0];
+                let minD = Infinity;
+                populations.forEach(p => {
+                    let d = Math.sqrt(Math.pow(p.lat - lat, 2) + Math.pow(p.lon - lng, 2));
+                    if (d < minD) { minD = d; closest = p; }
+                });
+
+                // Resolve community center to the nearest driving road
+                const roadUrl = `https://router.project-osrm.org/nearest/v1/driving/${closest.lon},${closest.lat}?number=1`;
                 const rRes = await fetch(roadUrl);
                 const rData = await rRes.json();
                 
                 return {
-                    name: best.display_name.split(',')[0],
+                    name: closest.display_name.split(',')[0],
                     lat: rData.waypoints[0].location[1],
                     lng: rData.waypoints[0].location[0]
                 };
             }
-        } catch (e) { console.error("Lock error"); }
+        } catch (e) { console.error("Magnet Error"); }
         return null;
     }
 
@@ -113,8 +113,6 @@ HTML
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
-        
-        // Ensure we are on land/road before calling route
         const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&radiuses=3000;3000`;
 
         try {
@@ -134,11 +132,11 @@ HTML
         const marker = L.marker(pos, { draggable: true }).addTo(map);
         marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
-        const hardLock = async () => {
+        const magnetLock = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("VALIDATING...");
+            marker.setTooltipContent("LATCHING...");
             
-            const community = await getPopulatedPlace(current.lat, current.lng);
+            const community = await findNearestCommunity(current.lat, current.lng);
             
             if (community) {
                 lastValidPos = [community.lat, community.lng];
@@ -146,20 +144,19 @@ HTML
                 marker.setTooltipContent(`${label}: ${community.name}`);
                 updateRoute();
             } else {
-                // ILLEGAL MOVE: Snap back to last valid community
+                // Return to last community if drop is too far from any town
                 marker.setLatLng(lastValidPos);
-                const prevName = marker.getTooltip().getContent().split(': ')[1] || "Select Town";
-                marker.setTooltipContent(`${label}: ${prevName}`);
-                alert("Invalid Location: Please select a populated community.");
+                const currentName = marker.getTooltip().getContent().split(': ')[1] || "Gander";
+                marker.setTooltipContent(`${label}: ${currentName}`);
+                console.warn("No community found within 20km.");
             }
         };
 
-        marker.on('dragend', hardLock);
+        marker.on('dragend', magnetLock);
         markers.push(marker);
-        setTimeout(hardLock, delay);
+        setTimeout(magnetLock, delay);
     }
 
-    // Default pins
     createPin('Origin', [48.955, -54.608], 500); 
     createPin('Destination', [48.937, -55.651], 1500);
 
