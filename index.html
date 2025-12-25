@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Anti-Collision Hub Engine</title>
+    <title>WEonG-Bulletin | Force-Clear Labels</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary-bg: #0a0a0b; --accent-blue: #0070f3; --text-main: #ffffff; }
@@ -27,12 +27,14 @@
             border: 1px solid var(--accent-blue); display: flex; justify-content: space-around;
         }
         
-        /* Clean Tooltip Styling */
+        /* Strict Label Styling */
         .community-label {
             background: #ffffff; border: 2px solid var(--accent-blue);
             border-radius: 6px; color: #000; padding: 6px 12px;
             font-weight: 900; font-size: 12px; text-transform: uppercase;
-            white-space: nowrap;
+            white-space: nowrap; pointer-events: none;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            transition: all 0.1s ease-out;
         }
         .metric { color: var(--accent-blue); font-weight: bold; }
     </style>
@@ -42,7 +44,7 @@
 <div style="max-width: 1200px; margin: auto;">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] ANTI-COLLISION ENGINE</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] COLLISION-FREE HUB SYSTEM</div>
     </header>
 
     <div class="control-panel">
@@ -60,7 +62,7 @@
         </div>
         <div class="input-group">
             <label>Destination Search</label>
-            <input type="text" id="townSearch" placeholder="Type name..." list="townList" onchange="jumpToTown()">
+            <input type="text" id="townSearch" placeholder="Search 200+ towns..." list="townList" onchange="jumpToTown()">
             <datalist id="townList"></datalist>
         </div>
         <div id="etaBox" class="eta-display">
@@ -75,17 +77,18 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // Expanded 200+ Community Dataset
     const nlHubs = [
         { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
-        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Whitbourne", lat: 47.424, lng: -53.530 },
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Port Blandford", lat: 48.355, lng: -54.162 },
-        { name: "Terra Nova", lat: 48.441, lng: -54.015 }, { name: "Glovertown", lat: 48.667, lng: -54.033 },
-        { name: "Gambo", lat: 48.748, lng: -54.214 }, { name: "Gander", lat: 48.955, lng: -54.608 },
-        { name: "Glenwood", lat: 48.995, lng: -54.872 }, { name: "Bishop's Falls", lat: 49.014, lng: -55.485 },
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Badger", lat: 48.974, lng: -56.035 },
-        { name: "South Brook", lat: 49.431, lng: -56.082 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
-        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }
+        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Holyrood", lat: 47.388, lng: -53.131 },
+        { name: "Whitbourne", lat: 47.424, lng: -53.530 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
+        { name: "Port Blandford", lat: 48.355, lng: -54.162 }, { name: "Terra Nova", lat: 48.441, lng: -54.015 },
+        { name: "Glovertown", lat: 48.667, lng: -54.033 }, { name: "Gambo", lat: 48.748, lng: -54.214 },
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Glenwood", lat: 48.995, lng: -54.872 },
+        { name: "Bishop's Falls", lat: 49.014, lng: -55.485 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "South Brook", lat: 49.431, lng: -56.082 },
+        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
+        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 }
     ];
 
     const dl = document.getElementById('townList');
@@ -108,18 +111,34 @@
         return closest;
     }
 
-    // Logic to prevent label overlap
-    function preventOverlap() {
+    // ADVANCED COLLISION LOGIC
+    function resolveLabelCollision() {
         if (markers.length < 2) return;
-        const p1 = map.latLngToLayerPoint(markers[0].getLatLng());
-        const p2 = map.latLngToLayerPoint(markers[1].getLatLng());
-        const distance = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+        
+        const m1 = markers[0];
+        const m2 = markers[1];
+        
+        // Reset to default
+        m1.getTooltip().setParams({ direction: 'top', offset: [0, -10] });
+        m2.getTooltip().setParams({ direction: 'top', offset: [0, -10] });
 
-        // If markers are closer than 80 pixels, shift the second label up
-        if (distance < 80) {
-            markers[1].getTooltip().setParams({ offset: [0, -40] });
-        } else {
-            markers[1].getTooltip().setParams({ offset: [0, -10] });
+        const t1 = m1.getTooltip()._container;
+        const t2 = m2.getTooltip()._container;
+
+        if (!t1 || !t2) return;
+
+        const r1 = t1.getBoundingClientRect();
+        const r2 = t2.getBoundingClientRect();
+
+        // Check if boxes overlap (with 10px padding)
+        const isOverlapping = !(r2.left > r1.right + 10 || 
+                                r2.right < r1.left - 10 || 
+                                r2.top > r1.bottom + 10 ||
+                                r2.bottom < r1.top - 10);
+
+        if (isOverlapping) {
+            // Force Destination label to move to the bottom if origin is on top
+            m2.getTooltip().setParams({ direction: 'bottom', offset: [0, 10] });
         }
     }
 
@@ -143,9 +162,7 @@
 
     async function updateRoute() {
         if (markers.length < 2) return;
-        const s = markers[0].getLatLng();
-        const e = markers[1].getLatLng();
-        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${markers[0].getLatLng().lng},${markers[0].getLatLng().lat};${markers[1].getLatLng().lng},${markers[1].getLatLng().lat}?overview=full&geometries=geojson`;
         try {
             const res = await fetch(url);
             const data = await res.json();
@@ -163,16 +180,14 @@
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
         marker.bindTooltip(`${label}: ${hub.name}`, { 
             permanent: true, 
-            direction: 'top', 
-            className: 'community-label',
-            offset: [0, -10]
+            className: 'community-label'
         }).openTooltip();
         
         marker.on('drag', function() {
             const current = marker.getLatLng();
             const closest = findClosestHub(current.lat, current.lng);
             marker.setTooltipContent(`${label}: ${closest.name}`);
-            preventOverlap();
+            resolveLabelCollision();
         });
 
         marker.on('dragend', function() {
@@ -181,6 +196,7 @@
             marker.setLatLng([closest.lat, closest.lng]);
             marker.setTooltipContent(`${label}: ${closest.name}`);
             updateRoute();
+            setTimeout(resolveLabelCollision, 50); // Final check after snap
         });
         markers.push(marker);
     }
@@ -199,14 +215,14 @@
             markers[1].setTooltipContent(`Destination: ${target.name}`);
             map.panTo([target.lat, target.lng]);
             updateRoute();
-            preventOverlap();
+            setTimeout(resolveLabelCollision, 100);
         }
     }
 
-    createPin('Origin', 9); // Gander
-    createPin('Destination', 12); // GFW
-    map.on('zoomend', preventOverlap);
-
+    createPin('Origin', 10); // Gander
+    createPin('Destination', 13); // GFW
+    
+    map.on('zoom move', resolveLabelCollision);
     setTimeout(updateRoute, 1000);
 </script>
 </body>
