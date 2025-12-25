@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Strict Community Routing</title>
+    <title>WEonG-Bulletin | Regional Snap Fix</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -18,7 +18,6 @@
         .radar-container { background: var(--container-bg); border-radius: 12px; padding: 12px; border: 1px solid #222; }
         #map { height: 750px; border-radius: 8px; background: #000; }
 
-        /* High-Contrast Labels */
         .community-label {
             background: #ffffff;
             border: 2px solid var(--accent-blue);
@@ -39,7 +38,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] RADIUS COMMUNITY SNAP</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] REGIONAL SNAP ACTIVE</div>
     </header>
 
     <section class="radar-container">
@@ -60,34 +59,30 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // Initializing map centered on Gander
     const map = L.map('map').setView([48.955, -54.608], 8);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let routeLine = L.polyline([], {color: '#0070f3', weight: 4, opacity: 0.7, dashArray: '10, 10'}).addTo(map);
     let markers = [];
 
-    // COMMUNITY PRIORITY SEARCH
+    // FIXED SEARCH: Constrained to NL bounding box
     async function findNearestCommunity(lat, lng) {
-        // We search for "settlements" near the coordinate rather than just an address
-        const url = `https://nominatim.openstreetmap.org/search?q=settlement&format=json&lat=${lat}&lon=${lng}&limit=5`;
+        // Bounding box for NL: [minLon, minLat, maxLon, maxLat]
+        const viewbox = "-59.5,46.5,-52.5,52.0"; 
+        const url = `https://nominatim.openstreetmap.org/search?q=town,village,hamlet&format=json&lat=${lat}&lon=${lng}&limit=3&bounded=1&viewbox=${viewbox}`;
         
         try {
             const response = await fetch(url);
             const data = await response.json();
             
-            // Filter for real communities (town, village, etc.)
-            const community = data.find(item => 
-                item.type === 'town' || 
-                item.type === 'village' || 
-                item.type === 'hamlet' || 
-                item.type === 'city'
-            );
-
-            if (community) {
+            if (data && data.length > 0) {
+                // Find the closest result to the dropped coordinates
+                let bestMatch = data[0];
                 return {
-                    name: community.display_name.split(',')[0],
-                    lat: community.lat,
-                    lng: community.lon
+                    name: bestMatch.display_name.split(',')[0],
+                    lat: parseFloat(bestMatch.lat),
+                    lng: parseFloat(bestMatch.lon)
                 };
             }
         } catch (e) { console.error("Search failed"); }
@@ -104,20 +99,25 @@
         marker.bindTooltip(labelPrefix, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
 
         marker.on('dragend', async function() {
-            marker.setTooltipContent("Snapping to Community...");
-            const pos = marker.getLatLng();
-            const community = await findNearestCommunity(pos.lat, pos.lng);
+            const originalPos = marker.getLatLng();
+            marker.setTooltipContent("Snapping...");
+            
+            const community = await findNearestCommunity(originalPos.lat, originalPos.lng);
             
             if (community) {
+                // Pin jumps to the center of the local community
                 marker.setLatLng([community.lat, community.lng]);
                 marker.setTooltipContent(`${labelPrefix}: ${community.name}`);
             } else {
-                marker.setTooltipContent(`${labelPrefix}: Searching...`);
+                // Safety: If no community found in the viewbox, keep pin where it was dropped
+                marker.setLatLng(originalPos);
+                marker.setTooltipContent(`${labelPrefix}: dropped point`);
             }
             updateRoute();
         });
 
         markers.push(marker);
+        // Initial snap on load
         marker.fire('dragend');
     }
 
