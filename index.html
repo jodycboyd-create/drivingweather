@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Coastline Persistent View</title>
+    <title>WEonG-Bulletin | Contrast Intelligence</title>
     <style>
         :root {
-            --primary-bg: #0f0f10;
-            --container-bg: #1c1c1e;
+            --primary-bg: #0a0a0b;
+            --container-bg: #161618;
             --accent-blue: #0070f3;
             --text-main: #ffffff;
-            --text-dim: #a0a0a0;
+            --text-dim: #bbbbbb;
+            --uv-gold: #ffcc00;
         }
 
         body {
@@ -29,7 +30,7 @@
             margin-bottom: 20px;
         }
 
-        /* RADAR CONTAINER */
+        /* RADAR SECTION - Optimized for Coastline Contrast */
         .radar-container {
             background: var(--container-bg);
             border-radius: 12px;
@@ -43,16 +44,15 @@
             border-radius: 8px;
             overflow: hidden;
             background: #000;
-            height: 700px; 
+            height: 700px;
+            /* This filter forces white vectors (coast/names) to glow against the blue radar */
+            filter: contrast(1.4) brightness(1.1);
         }
 
-        /* THE FIX: Hybrid view (m=4) + High contrast scheme (color=6) 
-           We also apply a brightness filter to make the coastline pop */
         iframe {
             width: 100%;
             height: 100%;
             border: none;
-            filter: brightness(1.1) contrast(1.3);
         }
 
         /* [weong-route] Forecast Cards */
@@ -69,7 +69,7 @@
             border-left: 4px solid var(--accent-blue);
         }
 
-        .uv-tag { color: #ffcc00; font-weight: bold; }
+        .uv-tag { color: var(--uv-gold); font-weight: bold; }
         .wind-tag { font-style: italic; color: var(--text-dim); }
         .pop-tag { color: #88aaff; font-weight: bold; }
     </style>
@@ -79,18 +79,18 @@
 <div class="container">
     <header>
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-size: 0.8rem; font-weight: bold;">
-            [WEONG-ROUTE] METHODOLOGY LOCKED
+        <div style="color: var(--accent-blue); font-size: 0.8rem; font-weight: bold; text-transform: uppercase;">
+            [WEONG-ROUTE] Methodology Locked
         </div>
     </header>
 
     <section class="radar-container">
-        <h3 style="margin-left: 10px; text-transform: uppercase; font-size: 0.9rem; color: var(--text-dim);">
-            Infrastructure & Coastline Intelligence (High Contrast)
+        <h3 style="margin-left: 10px; text-transform: uppercase; font-size: 0.85rem; color: var(--text-dim);">
+            Infrastructure & Coastline Contrast View
         </h3>
         <div class="map-wrapper">
             <iframe 
-                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,8&control=1&precip=1&menu=0&monitor=1&color=6&logo=0&osh=1&m=4" 
+                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,9&control=1&precip=1&menu=0&monitor=1&color=2&logo=0&osh=1&m=3" 
                 allowfullscreen>
             </iframe>
         </div>
@@ -98,16 +98,16 @@
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range</h3>
-            <p>Today: Coastline monitoring active. <span class="uv-tag">UV Index: 4</span>.</p>
-            <p><span class="pop-tag">Precipitation:</span> 10% (Nearest 10%)</p>
+            <h3>Short Range Forecast</h3>
+            <p>Today: High-contrast monitoring. <span class="uv-tag">UV Index: 6 (High)</span>.</p>
+            <p><span class="pop-tag">Precipitation:</span> 20% (Nearest 10%)</p>
         </div>
 
         <div class="card">
             <h3>Extended Outlook</h3>
-            <p>Outlook: Operational clarity maintained.</p>
+            <p>Saturday: System movement tracking.</p>
             <p><span class="wind-tag">Wind up to 15 km/h.</span></p>
-            <p><span class="pop-tag">POP:</span> Omitted (&lt;30%)</p>
+            <p><span class="pop-tag">POP:</span> 40%</p>
         </div>
     </div>
 </div>
