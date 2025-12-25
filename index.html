@@ -1,15 +1,9 @@
-Here is the updated, complete index.html.
-
-To give you the professional "Roads" layout we discussed, I have switched the map engine to a high-contrast dark-mode provider that highlights the road network (highways and major arteries) while keeping the radar overlay functional. I have also kept the enlarged height (650px) and the integrated [weong-route] methodology.
-
-HTML
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Command Center (Roads View)</title>
+    <title>WEonG-Bulletin | Command Center (Roads & Coastline View)</title>
     <style>
         :root {
             --primary-bg: #1a1a1b;
@@ -32,7 +26,7 @@ HTML
         }
 
         .container {
-            max-width: 1200px; /* Widened to support the enlarged map and roads view */
+            max-width: 1200px;
             margin: auto;
         }
 
@@ -59,7 +53,7 @@ HTML
             font-weight: bold;
         }
 
-        /* ENLARGED RADAR SECTION WITH ROADS FOCUS */
+        /* ENLARGED RADAR SECTION WITH COASTLINE VISIBILITY */
         .radar-container {
             background: var(--container-bg);
             border-radius: 8px;
@@ -73,8 +67,8 @@ HTML
             border-radius: 6px;
             overflow: hidden;
             background: #121212;
-            /* Filter slightly adjusted to make road lines "pop" in high contrast */
-            filter: grayscale(0.1) brightness(0.9) contrast(1.1);
+            /* Filter tuned for coastline 'bleed-through' */
+            filter: grayscale(0.1) brightness(0.95) contrast(1.15);
         }
 
         /* Content Sections */
@@ -128,11 +122,8 @@ HTML
             padding-bottom: 2rem;
         }
 
-        /* Mobile optimization */
         @media (max-width: 768px) {
-            .forecast-grid {
-                grid-template-columns: 1fr;
-            }
+            .forecast-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -142,16 +133,16 @@ HTML
     <header>
         <div>
             <h1>WEonG-Bulletin</h1>
-            <div style="color: #666; font-size: 0.9rem;">Intelligence Center</div>
+            <div style="color: #666; font-size: 0.9rem;">Coastline & Infrastructure Intelligence</div>
         </div>
         <span class="methodology-tag">[weong-route] Methodology Locked</span>
     </header>
 
     <section class="radar-container">
-        <h3>Live Infrastructure & Radar Intelligence</h3>
+        <h3>Live Maritime & Radar Intelligence</h3>
         <div class="map-wrapper">
             <iframe 
-                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,8&control=1&precip=1&menu=0&monitor=1&color=6&logo=0&osh=1" 
+                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,8&control=1&precip=1&menu=0&monitor=1&color=2&logo=0&osh=1" 
                 width="100%" 
                 height="650" 
                 frameborder="0" 
@@ -165,37 +156,34 @@ HTML
         <section class="forecast-card" id="short-range-card">
             <h3>Short Range (0-48h)</h3>
             <div id="short-range-data">
-                <p><strong>Today:</strong> Clear roads. <span class="uv-index">UV Index: 4 (Moderate)</span>.</p>
-                <p><span class="pop-label">Precipitation:</span> 10% (Low Probability)</p>
+                <p><strong>Today:</strong> Clear coastline views. <span class="uv-index">UV Index: 3 (Low)</span>.</p>
+                <p><span class="pop-label">Precipitation:</span> 10%</p>
             </div>
         </section>
 
         <section class="forecast-card" id="extended-range-card">
             <h3>Extended Outlook</h3>
             <div id="extended-data">
-                <p><strong>Saturday:</strong> High pressure continues.</p>
+                <p><strong>Saturday:</strong> Offshore winds developing.</p>
                 <p><span class="wind-info">Wind up to 15 km/h.</span></p>
-                <p><span class="pop-label">POP:</span> Omitted (&lt;30%)</p>
+                <p><span class="pop-label">POP:</span> Omitted</p>
             </div>
         </section>
     </div>
 
     <div id="level3-alert" class="forecast-card exception-trigger" style="display:none;">
-        <strong>[WEonG-ROUTE] CRITICAL:</strong> Level 3 Exception Triggered across all infrastructure elements.
+        <strong>[WEonG-ROUTE] CRITICAL:</strong> Level 3 Exception Active.
     </div>
 
     <footer>
-        System Time: 2025-12-25 | Professional Weather & Road Analytics
+        System Time: 2025-12-25 | Professional Maritime & Road Analytics
     </footer>
 </div>
 
 <script>
-    // System logic for Level 3 Exception Trigger
     const level3Active = false; 
     if (level3Active) {
         document.getElementById('level3-alert').style.display = 'block';
-        document.getElementById('short-range-card').classList.add('exception-trigger');
-        document.getElementById('extended-range-card').classList.add('exception-trigger');
     }
 </script>
 
