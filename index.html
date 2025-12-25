@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Stable Routing Engine</title>
+    <title>WEonG-Bulletin | Intelligent Community Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -38,7 +38,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] STABLE SNAP & ROUTE</div>
+        <div style="color: var(--accent-blue); font-weight: bold; letter-spacing: 1px;">[WEONG-ROUTE] SMART-HIERARCHY SNAP</div>
     </header>
 
     <section class="radar-container">
@@ -48,42 +48,46 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range</h3>
-            <p>UV Index: 4. POP: 10%.</p>
+            <p>Status: Localized Infrastructure Tracking. <span style="color:#ffcc00">UV Index: 4</span>.</p>
+            <p><strong>POP:</strong> 10% (Nearest 10%)</p>
         </div>
         <div class="card">
-            <h3>Extended</h3>
-            <p>Wind up to 15 km/h. POP: Omitted.</p>
+            <h3>Extended Outlook</h3>
+            <p>Outlook: Operational clarity. <i>Wind up to 15 km/h.</i></p>
+            <p><strong>POP:</strong> Omitted (&lt;30%)</p>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // NL Central Focus
     const map = L.map('map').setView([48.955, -54.608], 8);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    async function getSafeCommunity(lat, lng) {
+    // SMART HIERARCHY SEARCH
+    async function getBestLocationName(lat, lng) {
         try {
-            // Search specifically for named towns/villages
-            const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=1`;
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`;
             const res = await fetch(url);
             const data = await res.json();
+            const a = data.address;
+
+            // 1. Check for community names first
+            const community = a.city || a.town || a.village || a.hamlet || a.suburb || a.neighbourhood;
             
-            if (data && data.length > 0) {
-                const c = data[0];
-                const nLat = parseFloat(c.lat);
-                const nLng = parseFloat(c.lon);
-                // Validation: Ensure the result isn't halfway across the world
-                if (!isNaN(nLat) && Math.abs(nLat - lat) < 1) {
-                    return { name: c.display_name.split(',')[0], lat: nLat, lng: nLng };
-                }
-            }
-        } catch (e) { console.error("API error"); }
-        return null;
+            // 2. Check for road name if no community is found
+            const road = a.road || a.highway;
+
+            // 3. Coordinate check for snapping
+            return {
+                name: community || road || "Trans-Canada Segment",
+                lat: parseFloat(data.lat),
+                lng: parseFloat(data.lon)
+            };
+        } catch (e) { return null; }
     }
 
     async function updateRoute() {
@@ -98,40 +102,39 @@
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
                 L.geoJSON(data.routes[0].geometry, {
-                    style: { color: '#0070f3', weight: 5, opacity: 0.8 }
+                    style: { color: '#0070f3', weight: 6, opacity: 0.8 }
                 }).addTo(routeLayer);
             }
         } catch (err) { console.warn("Routing API error"); }
     }
 
-    function createPin(label, pos, delay) {
+    function createSmartPin(label, pos, delay) {
         const marker = L.marker(pos, { draggable: true }).addTo(map);
         marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
-        const snapFunction = async () => {
+        const snapAction = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("Snapping...");
-            const comm = await getSafeCommunity(current.lat, current.lng);
+            marker.setTooltipContent("Locating...");
             
-            if (comm) {
-                marker.setLatLng([comm.lat, comm.lng]);
-                marker.setTooltipContent(`${label}: ${comm.name}`);
-            } else {
-                marker.setTooltipContent(`${label}: Drop Point`);
+            const locData = await getBestLocationName(current.lat, current.lng);
+            
+            if (locData && !isNaN(locData.lat)) {
+                // Physical snap to the recognized location
+                marker.setLatLng([locData.lat, locData.lng]);
+                marker.setTooltipContent(`${label}: ${locData.name}`);
             }
             updateRoute();
         };
 
-        marker.on('dragend', snapFunction);
+        marker.on('dragend', snapAction);
         markers.push(marker);
 
-        // STAGGERED INITIAL LOAD
-        setTimeout(snapFunction, delay);
+        // Staggered load to prevent API timeout
+        setTimeout(snapAction, delay);
     }
 
-    // Origin starts first, Destination waits 1.2s to prevent API errors
-    createPin('Origin', [48.955, -54.608], 500); 
-    createPin('Destination', [49.10, -54.20], 1500);
+    createSmartPin('Origin', [48.955, -54.608], 500); 
+    createSmartPin('Destination', [49.10, -54.20], 1500);
 
 </script>
 </body>
