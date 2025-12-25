@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Paved Road Lock</title>
+    <title>WEonG-Bulletin | Dual-Anchor Logic</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -26,7 +26,6 @@
             font-weight: 900;
             font-size: 14px;
             box-shadow: 0 5px 25px rgba(0,0,0,0.9);
-            text-transform: uppercase;
         }
 
         .forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
@@ -39,21 +38,21 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] HIGHWAY-CLASS LOCK</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] DUAL-ANCHOR ACTIVE</div>
     </header>
 
     <div id="map"></div>
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range Intelligence</h3>
+            <h3>Short Range</h3>
             <p>UV Index: <span class="metric">4</span> [cite: 2025-12-22]</p>
             <p>POP: <span class="metric">10%</span> (Nearest 10%) [cite: 2025-12-22]</p>
         </div>
         <div class="card">
-            <h3>Extended Intelligence</h3>
+            <h3>Extended Outlook</h3>
             <p>Wind: <span class="metric">Wind up to 15 km/h</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">Omitted</span> (Under 30%) [cite: 2025-12-22]</p>
+            <p>POP: <span class="metric">Omitted</span> (&lt;30% Rule) [cite: 2025-12-22]</p>
         </div>
     </div>
 </div>
@@ -66,42 +65,31 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // STRICT ROAD SNAP: Forcing points onto major thoroughfares
-    async function getLegalRoadPoint(lat, lng) {
-        // We use the OSRM Match or Nearest with a hint to avoid tracks
-        const url = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=3`;
+    // STAGE 1: Find the nearest named community center
+    async function findCommunity(lat, lng) {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=5&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
         try {
             const res = await fetch(url);
             const data = await res.json();
-            if (data.waypoints && data.waypoints.length > 0) {
-                // Try to find the first result that isn't an empty name (often indicating woods)
-                const bestSnap = data.waypoints.find(w => w.name !== "") || data.waypoints[0];
-                return {
-                    lat: bestSnap.location[1],
-                    lng: bestSnap.location[0],
-                    roadName: bestSnap.name || "Main Highway"
-                };
-            }
+            const valid = data.filter(i => !i.display_name.toLowerCase().includes("unincorporated"));
+            return valid.length > 0 ? valid[0] : null;
         } catch (e) { return null; }
     }
 
-    async function getCommunityName(lat, lng) {
-        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12`;
+    // STAGE 2: Find the nearest road intersection to that community center
+    async function snapToPavedRoad(lat, lng) {
+        const url = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=1`;
         try {
             const res = await fetch(url);
             const data = await res.json();
-            const a = data.address;
-            // Hierarchy: Town > Suburb > Hamlet > Road
-            return a.city || a.town || a.village || a.hamlet || a.suburb || a.road || "NL Route";
-        } catch (e) { return "Active Route"; }
+            return data.waypoints[0].location;
+        } catch (e) { return [lng, lat]; }
     }
 
     async function updateRoute() {
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
-        
-        // OSRM Request with continue_straight to force highway logic
         const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&continue_straight=true`;
 
         try {
@@ -110,7 +98,7 @@
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
                 L.geoJSON(data.routes[0].geometry, {
-                    style: { color: '#0070f3', weight: 8, opacity: 0.9 }
+                    style: { color: '#0070f3', weight: 7, opacity: 0.9 }
                 }).addTo(routeLayer);
             }
         } catch (err) { console.warn("Routing failed"); }
@@ -120,22 +108,33 @@
         const marker = L.marker(pos, { draggable: true }).addTo(map);
         marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
-        const snapAction = async () => {
+        const dualAnchor = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("LOCKING TO ROAD...");
+            marker.setTooltipContent("ANCHORING...");
             
-            const road = await getLegalRoadPoint(current.lat, current.lng);
-            if (road) {
-                marker.setLatLng([road.lat, road.lng]);
-                const name = await getCommunityName(road.lat, road.lng);
-                marker.setTooltipContent(`${label}: ${name}`);
+            // Step 1: Find the Town
+            const comm = await findCommunity(current.lat, current.lng);
+            let targetLat = current.lat;
+            let targetLng = current.lng;
+            let name = "Highway Segment";
+
+            if (comm) {
+                targetLat = parseFloat(comm.lat);
+                targetLng = parseFloat(comm.lon);
+                name = comm.display_name.split(',')[0];
             }
+
+            // Step 2: Snap that town's location to the nearest road
+            const roadPos = await snapToPavedRoad(targetLat, targetLng);
+            marker.setLatLng([roadPos[1], roadPos[0]]);
+            marker.setTooltipContent(`${label}: ${name}`);
+            
             updateRoute();
         };
 
-        marker.on('dragend', snapAction);
+        marker.on('dragend', dualAnchor);
         markers.push(marker);
-        setTimeout(snapAction, delay);
+        setTimeout(dualAnchor, delay);
     }
 
     createPin('Origin', [48.955, -54.608], 500); 
