@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Professional Community Routing</title>
+    <title>WEonG-Bulletin | Stable Routing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -39,7 +39,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] RADIUS COMMUNITY SNAP</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] STABLE COMMUNITY SNAP</div>
     </header>
 
     <section class="radar-container">
@@ -48,14 +48,12 @@
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range</h3>
-            <p>Status: Community Locked. <span style="color:#ffcc00">UV Index: 4</span>.</p>
-            <p><strong>POP:</strong> 10% (Nearest 10%)</p>
+            <h3>Short Range Intelligence</h3>
+            <p>UV Index: 4. POP: 10%.</p>
         </div>
         <div class="card">
-            <h3>Extended</h3>
-            <p>Outlook: Operational. <i>Wind up to 15 km/h.</i></p>
-            <p><strong>POP:</strong> Omitted (&lt;30%)</p>
+            <h3>Extended Outlook</h3>
+            <p>Wind up to 15 km/h. POP: Omitted.</p>
         </div>
     </div>
 </div>
@@ -68,28 +66,29 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // SEARCH FOR ACTUAL NAMED SETTLEMENTS
     async function getNearestCommunity(lat, lng) {
-        // Search for towns/villages near the drop point
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=settlement&lat=${lat}&lon=${lng}&limit=5`;
+        // NL Bounding Box and specific town/village search
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=1&bounded=1&viewbox=-56.5,48.0,-53.0,50.0`;
         
         try {
             const response = await fetch(url);
             const data = await response.json();
             
-            // Filter for real communities only
-            const community = data.find(c => 
-                c.type === 'town' || c.type === 'village' || c.type === 'hamlet' || c.type === 'city'
-            );
+            if (data && data.length > 0) {
+                const c = data[0];
+                const newLat = parseFloat(c.lat);
+                const newLng = parseFloat(c.lon);
 
-            if (community) {
-                return {
-                    name: community.display_name.split(',')[0],
-                    lat: parseFloat(community.lat),
-                    lng: parseFloat(community.lon)
-                };
+                // Safety check: ensure coordinates are valid numbers
+                if (!isNaN(newLat) && !isNaN(newLng)) {
+                    return {
+                        name: c.display_name.split(',')[0],
+                        lat: newLat,
+                        lng: newLng
+                    };
+                }
             }
-        } catch (e) { console.error("Search failed"); }
+        } catch (e) { console.error("Search failed", e); }
         return null;
     }
 
@@ -110,7 +109,7 @@
                     style: { color: '#0070f3', weight: 6, opacity: 0.8 }
                 }).addTo(routeLayer);
             }
-        } catch (e) { console.error("Routing error"); }
+        } catch (e) { console.error("Routing error", e); }
     }
 
     function createSmartPin(labelPrefix, startPos) {
@@ -118,29 +117,32 @@
         marker.bindTooltip(labelPrefix, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
 
         marker.on('dragend', async function() {
+            const currentPos = marker.getLatLng();
             marker.setTooltipContent("Searching...");
-            const pos = marker.getLatLng();
             
-            const community = await getNearestCommunity(pos.lat, pos.lng);
+            const community = await getNearestCommunity(currentPos.lat, currentPos.lng);
             
             if (community) {
-                // SUCCESS: Physical snap to town center
                 marker.setLatLng([community.lat, community.lng]);
                 marker.setTooltipContent(`${labelPrefix}: ${community.name}`);
             } else {
-                // FALLBACK: If no town nearby, keep location but mark as custom point
-                marker.setTooltipContent(`${labelPrefix}: Drop Point`);
+                // If search fails, stay where dropped to avoid disappearing
+                marker.setTooltipContent(`${labelPrefix}: Custom Point`);
             }
             updateDrivingRoute();
         });
 
         markers.push(marker);
-        marker.fire('dragend');
+        
+        // Use a slight delay for initial snap to ensure API is ready
+        setTimeout(() => {
+            marker.fire('dragend');
+        }, 500);
     }
 
-    // Default start/end points
-    createSmartPin('Origin', [48.95, -54.60]); // Gander
-    createSmartPin('Destination', [49.10, -54.20]); // Gambo area
+    // Default positions: Gander and Gambo
+    createSmartPin('Origin', [48.955, -54.608]);
+    createSmartPin('Destination', [49.10, -54.20]);
 
 </script>
 </body>
