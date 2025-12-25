@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Wide-Area Community Snap</title>
+    <title>WEonG-Bulletin | Absolute Community Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -39,21 +39,21 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] 100KM RADIUS SNAP</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] ABSOLUTE COMMUNITY LOCK</div>
     </header>
 
     <div id="map"></div>
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range</h3>
-            <p>UV Index: <span class="metric">4</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">10%</span> (Nearest 10%) [cite: 2025-12-22]</p>
+            <h3>Short Range Intelligence</h3>
+            <p>UV Index: <span class="metric">4</span></p>
+            <p>POP: <span class="metric">10%</span> (Nearest 10%)</p>
         </div>
         <div class="card">
-            <h3>Extended Range</h3>
-            <p>Wind: <span class="metric">Wind up to 15 km/h</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">Omitted</span> (&lt;30% Rule) [cite: 2025-12-22]</p>
+            <h3>Extended Intelligence</h3>
+            <p>Wind: <span class="metric">Wind up to 15 km/h</span></p>
+            <p>POP: <span class="metric">Omitted</span> (Under 30%)</p>
         </div>
     </div>
 </div>
@@ -71,36 +71,37 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    async function findCommunity(lat, lng) {
-        // Wide 100km search specifically for named places
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet,city&lat=${lat}&lon=${lng}&limit=15&bounded=0`;
+    // AGGRESSIVE SEARCH: Finds the literal closest named place anywhere in NL
+    async function forceSnapToCommunity(lat, lng) {
+        // Broad search for any named populated place
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet,city&lat=${lat}&lon=${lng}&limit=20&bounded=0`;
         
         try {
             const res = await fetch(url);
             const data = await res.json();
             
-            // Filter out generics
+            // Filter for legitimate NL communities (no unincorporated/regions)
             const valid = data.filter(i => {
                 const n = i.display_name.toLowerCase();
-                return !n.includes("unincorporated") && !n.includes("ocean") && !n.includes("sea");
+                return !n.includes("unincorporated") && !n.includes("ocean") && !n.includes("sea") && !n.includes("region");
             });
 
             if (valid.length > 0) {
-                // Get the closest community to the drop coordinate
-                let closest = valid[0];
-                let minD = Infinity;
+                // Determine the mathematically closest town from the list
+                let best = valid[0];
+                let minDistance = Infinity;
                 valid.forEach(v => {
                     let d = Math.sqrt(Math.pow(v.lat - lat, 2) + Math.pow(v.lon - lng, 2));
-                    if (d < minD) { minD = d; closest = v; }
+                    if (d < minDistance) { minDistance = d; best = v; }
                 });
 
-                // Find the nearest road point to the town center
-                const rUrl = `https://router.project-osrm.org/nearest/v1/driving/${closest.lon},${closest.lat}?number=1`;
+                // Get the closest driving road point for the town center
+                const rUrl = `https://router.project-osrm.org/nearest/v1/driving/${best.lon},${best.lat}?number=1`;
                 const rRes = await fetch(rUrl);
                 const rData = await rRes.json();
                 
                 return {
-                    name: closest.display_name.split(',')[0],
+                    name: best.display_name.split(',')[0],
                     lat: rData.waypoints[0].location[1],
                     lng: rData.waypoints[0].location[0]
                 };
@@ -113,6 +114,7 @@
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
+        // Wider radius for routing connectivity
         const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&radiuses=5000;5000`;
 
         try {
@@ -124,37 +126,32 @@
                     style: { color: '#0070f3', weight: 8, opacity: 0.9 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.error("Route error"); }
+        } catch (err) { console.error("Routing error"); }
     }
 
     function createPin(label, pos, delay) {
-        let lastKnown = pos;
-        let lastName = label === "Origin" ? "Gander" : "Grand Falls-Windsor";
-        
         const marker = L.marker(pos, { draggable: true }).addTo(map);
-        marker.bindTooltip(`${label}: ${lastName}`, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
+        marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
-        const processMove = async () => {
+        const absoluteSnap = async () => {
             const current = marker.getLatLng();
             marker.setTooltipContent("LATCHING...");
             
-            const comm = await findCommunity(current.lat, current.lng);
+            const result = await forceSnapToCommunity(current.lat, current.lng);
             
-            if (comm) {
-                lastKnown = [comm.lat, comm.lng];
-                lastName = comm.name;
-                marker.setLatLng(lastKnown);
-                marker.setTooltipContent(`${label}: ${lastName}`);
+            if (result) {
+                marker.setLatLng([result.lat, result.lng]);
+                marker.setTooltipContent(`${label}: ${result.name}`);
                 updateRoute();
             } else {
-                // If totally lost, stay at current position but warn
-                marker.setTooltipContent(`${label}: DROP NEAR TOWN`);
+                // If it fails, keep the current name but try to update the route
+                updateRoute();
             }
         };
 
-        marker.on('dragend', processMove);
+        marker.on('dragend', absoluteSnap);
         markers.push(marker);
-        setTimeout(updateRoute, delay);
+        if (delay === 1500) setTimeout(updateRoute, 1600);
     }
 
     createPin('Origin', [48.955, -54.608], 500); 
