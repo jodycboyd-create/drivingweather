@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Magnet Snap Engine</title>
+    <title>WEonG-Bulletin | Hard Community Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -26,6 +26,7 @@
             font-weight: 900;
             font-size: 14px;
             box-shadow: 0 5px 25px rgba(0,0,0,0.9);
+            text-transform: uppercase;
         }
 
         .forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
@@ -38,21 +39,21 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] MAGNET SNAP ACTIVE</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] HARD-PRIORITY SNAP</div>
     </header>
 
     <div id="map"></div>
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range Intelligence</h3>
+            <h3>Short Range</h3>
             <p>UV Index: <span class="metric">4</span></p>
             <p>POP: <span class="metric">10%</span> (Nearest 10%)</p>
         </div>
         <div class="card">
             <h3>Extended Intelligence</h3>
             <p>Wind: <span class="metric">Wind up to 15 km/h</span></p>
-            <p>POP: <span class="metric">Omitted</span> (Under 30%)</p>
+            <p>POP: <span class="metric">Omitted</span> (Below 30%)</p>
         </div>
     </div>
 </div>
@@ -65,40 +66,45 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    async function getMagnetLocation(lat, lng) {
-        // 1. Search for named towns within a wide radius (Magnet logic)
-        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=5&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
+    // HARD-PRIORITY SEARCH
+    async function getSnapPoint(lat, lng) {
+        // Step 1: Broad search for actual town/village points only
+        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=10&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
         
         try {
-            const sRes = await fetch(searchUrl);
-            const sData = await sRes.json();
+            const res = await fetch(searchUrl);
+            const data = await res.json();
             
-            // Filter out generic "Unincorporated" results
-            const filtered = sData.filter(i => !i.display_name.toLowerCase().includes("unincorporated"));
+            // Filter out "Unincorporated" or "Newfoundland" generic results
+            const towns = data.filter(i => {
+                const n = i.display_name.toLowerCase();
+                return !n.includes("unincorporated") && !n.includes("labrador") && i.addresstype !== "state";
+            });
 
-            if (filtered.length > 0) {
-                const best = filtered[0];
-                const roadUrl = `https://router.project-osrm.org/nearest/v1/driving/${best.lon},${best.lat}?number=1`;
-                const rRes = await fetch(roadUrl);
-                const rData = await rRes.json();
-                
+            if (towns.length > 0) {
+                // Find the mathematically closest town to the drop point
+                let closest = towns[0];
+                let minD = Infinity;
+                towns.forEach(t => {
+                    let d = Math.sqrt(Math.pow(t.lat - lat, 2) + Math.pow(t.lon - lng, 2));
+                    if (d < minD) { minD = d; closest = t; }
+                });
+
                 return {
-                    name: best.display_name.split(',')[0],
-                    lat: rData.waypoints[0].location[1],
-                    lng: rData.waypoints[0].location[0]
+                    name: closest.display_name.split(',')[0],
+                    lat: parseFloat(closest.lat),
+                    lng: parseFloat(closest.lon)
                 };
             }
 
-            // 2. HARD ROAD LOCK: If no town is found, force to nearest paved road
-            const forceUrl = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=1`;
-            const fRes = await fetch(forceUrl);
-            const fData = await fRes.json();
-            const roadName = fData.waypoints[0].name || "NL Route Corridor";
-
+            // Step 2: Fallback to Road only if no town exists within reasonable distance
+            const roadUrl = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=1`;
+            const rRes = await fetch(roadUrl);
+            const rData = await rRes.json();
             return {
-                name: roadName,
-                lat: fData.waypoints[0].location[1],
-                lng: fData.waypoints[0].location[0]
+                name: rData.waypoints[0].name || "Highway Route",
+                lat: rData.waypoints[0].location[1],
+                lng: rData.waypoints[0].location[0]
             };
         } catch (e) { return null; }
     }
@@ -118,32 +124,33 @@
                     style: { color: '#0070f3', weight: 8, opacity: 0.9 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.warn("Routing failed"); }
+        } catch (err) { console.warn("Route calculation failed."); }
     }
 
     function createPin(label, pos, delay) {
         const marker = L.marker(pos, { draggable: true }).addTo(map);
         marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
-        const snapAction = async () => {
+        const hardSnap = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("MAGNET LOCKING...");
+            marker.setTooltipContent("SNAPPING...");
             
-            const result = await getMagnetLocation(current.lat, current.lng);
-            if (result) {
-                marker.setLatLng([result.lat, result.lng]);
-                marker.setTooltipContent(`${label}: ${result.name}`);
+            const dest = await getSnapPoint(current.lat, current.lng);
+            if (dest) {
+                marker.setLatLng([dest.lat, dest.lng]);
+                marker.setTooltipContent(`${label}: ${dest.name}`);
             }
             updateRoute();
         };
 
-        marker.on('dragend', snapAction);
+        marker.on('dragend', hardSnap);
         markers.push(marker);
-        setTimeout(snapAction, delay);
+        setTimeout(hardSnap, delay);
     }
 
     createPin('Origin', [48.955, -54.608], 500); 
     createPin('Destination', [48.922, -55.637], 1500);
+
 </script>
 </body>
 </html>
