@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Instant Local Snap</title>
+    <title>WEonG-Bulletin | 30-Point Hub Lock</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -36,14 +36,14 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] INSTANT TOWN LOCK</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] 30-HUB AGGRESSIVE LOCK</div>
     </header>
 
     <div id="map"></div>
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range (Level 3)</h3>
+            <h3>Short Range Intelligence</h3>
             <p>UV Index: <span class="metric">4</span></p>
             <p>POP: <span class="metric">10%</span> (Nearest 10%)</p>
         </div>
@@ -57,17 +57,38 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // HARD-CODED COMMUNITY HUB DATABASE (Instant, No API delay)
+    // 30 PRIMARY NL COMMUNITY HUBS
     const nlHubs = [
         { name: "St. John's", lat: 47.5615, lng: -52.7126 },
-        { name: "Clarenville", lat: 48.1650, lng: -53.9550 },
-        { name: "Gander", lat: 48.9550, lng: -54.6080 },
-        { name: "Grand Falls-Windsor", lat: 48.9370, lng: -55.6510 },
-        { name: "Badger", lat: 48.9740, lng: -56.0350 },
-        { name: "Deer Lake", lat: 49.1710, lng: -57.4330 },
-        { name: "Corner Brook", lat: 48.9480, lng: -57.9420 },
-        { name: "Stephenville", lat: 48.5520, lng: -58.5710 },
-        { name: "Port aux Basques", lat: 47.5720, lng: -59.1360 }
+        { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
+        { name: "Conception Bay South", lat: 47.528, lng: -52.998 },
+        { name: "Bay Roberts", lat: 47.596, lng: -53.262 },
+        { name: "Whitbourne", lat: 47.424, lng: -53.530 },
+        { name: "Clarenville", lat: 48.165, lng: -53.955 },
+        { name: "Bonavista", lat: 48.649, lng: -53.114 },
+        { name: "Terra Nova", lat: 48.513, lng: -54.218 },
+        { name: "Glovertown", lat: 48.667, lng: -54.033 },
+        { name: "Gander", lat: 48.955, lng: -54.608 },
+        { name: "New-Wes-Valley", lat: 49.124, lng: -53.585 },
+        { name: "Twillingate", lat: 49.648, lng: -54.764 },
+        { name: "Lewisporte", lat: 49.248, lng: -55.050 },
+        { name: "Bishop's Falls", lat: 49.014, lng: -55.485 },
+        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Badger", lat: 48.974, lng: -56.035 },
+        { name: "Buchans", lat: 48.823, lng: -56.858 },
+        { name: "Springdale", lat: 49.498, lng: -56.066 },
+        { name: "Baie Verte", lat: 49.932, lng: -56.183 },
+        { name: "Deer Lake", lat: 49.171, lng: -57.433 },
+        { name: "Pasadena", lat: 49.016, lng: -57.594 },
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 },
+        { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "St. George's", lat: 48.428, lng: -58.483 },
+        { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
+        { name: "St. Anthony", lat: 51.363, lng: -55.577 },
+        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 },
+        { name: "Burgeo", lat: 47.611, lng: -57.612 },
+        { name: "Marystown", lat: 47.169, lng: -55.158 },
+        { name: "Fortune", lat: 47.073, lng: -55.828 }
     ];
 
     const map = L.map('map').setView([48.955, -54.608], 8);
@@ -76,7 +97,7 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    function getInstantSnap(lat, lng) {
+    function findClosestHub(lat, lng) {
         let closest = nlHubs[0];
         let minD = Infinity;
         nlHubs.forEach(hub => {
@@ -90,7 +111,7 @@
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
-        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&radiuses=3000;3000`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&radiuses=5000;5000`;
         
         try {
             const res = await fetch(url);
@@ -101,29 +122,29 @@
                     style: { color: '#0070f3', weight: 8, opacity: 0.9 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.error("Route calculation error"); }
+        } catch (err) { console.error("Route calculation failed."); }
     }
 
-    function createPin(label, pos, isOrigin) {
-        const initialHub = isOrigin ? nlHubs[2] : nlHubs[3]; // Gander & GFW
-        const marker = L.marker([initialHub.lat, initialHub.lng], { draggable: true }).addTo(map);
-        marker.bindTooltip(`${label}: ${initialHub.name}`, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
+    function createPin(label, initialHubIndex) {
+        const hub = nlHubs[initialHubIndex];
+        const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
+        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
         marker.on('dragend', function() {
             const current = marker.getLatLng();
-            const hub = getInstantSnap(current.lat, current.lng);
+            const closest = findClosestHub(current.lat, current.lng);
             
-            // Physical Teleport to Hub
-            marker.setLatLng([hub.lat, hub.lng]);
-            marker.setTooltipContent(`${label}: ${hub.name}`);
+            // Instant Teleport
+            marker.setLatLng([closest.lat, closest.lng]);
+            marker.setTooltipContent(`${label}: ${closest.name}`);
             updateRoute();
         });
 
         markers.push(marker);
     }
 
-    createPin('Origin', null, true); 
-    createPin('Destination', null, false);
+    createPin('Origin', 9); // Gander
+    createPin('Destination', 14); // Grand Falls-Windsor
     setTimeout(updateRoute, 1000);
 
 </script>
