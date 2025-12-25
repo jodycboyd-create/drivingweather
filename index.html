@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Command Center (Roads & Coastline View)</title>
+    <title>WEonG-Bulletin | High-Contrast Coastline Command</title>
     <style>
         :root {
-            --primary-bg: #1a1a1b;
-            --container-bg: #272729;
+            --primary-bg: #0f0f10; /* Darker background for better contrast */
+            --container-bg: #1c1c1e;
             --accent-blue: #0070f3;
-            --accent-grey: #555555;
             --text-main: #ffffff;
-            --text-dim: #bbbbbb;
+            --text-dim: #a0a0a0;
             --exception-lvl3: #ff4e42;
             --uv-gold: #ffcc00;
         }
@@ -22,170 +21,99 @@
             color: var(--text-main);
             margin: 0;
             padding: 20px;
-            line-height: 1.5;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: auto;
-        }
+        .container { max-width: 1200px; margin: auto; }
 
         header {
-            margin-bottom: 2rem;
-            border-bottom: 1px solid #3d3d3f;
-            padding-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
         }
 
-        header h1 {
-            margin: 0;
-            font-size: 2rem;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        .methodology-tag {
-            font-size: 0.85rem;
-            color: var(--accent-blue);
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-
-        /* ENLARGED RADAR SECTION WITH COASTLINE VISIBILITY */
+        /* RADAR CONTAINER WITH COASTLINE PERSISTENCE */
         .radar-container {
             background: var(--container-bg);
-            border-radius: 8px;
-            padding: 1.2rem;
-            margin-bottom: 1.5rem;
-            border-left: 4px solid var(--accent-grey);
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
         }
 
         .map-wrapper {
-            border: 1px solid #3d3d3f;
-            border-radius: 6px;
+            position: relative;
+            border-radius: 8px;
             overflow: hidden;
-            background: #121212;
-            /* Filter tuned for coastline 'bleed-through' */
-            filter: grayscale(0.1) brightness(0.95) contrast(1.15);
+            background: #000;
+            height: 700px; /* Increased height */
         }
 
-        /* Content Sections */
+        /* This filter ensures the white coastline/roads "pop" through the blue radar */
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            filter: saturate(1.2) contrast(1.2) brightness(1.1);
+        }
+
+        /* FORECAST CARDS - [weong-route] Standards */
         .forecast-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
+            gap: 20px;
         }
 
-        .forecast-card {
+        .card {
             background: var(--container-bg);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
+            padding: 20px;
+            border-radius: 12px;
             border-left: 4px solid var(--accent-blue);
         }
 
-        .exception-trigger {
-            border-left-color: var(--exception-lvl3) !important;
-            background: #2d1a1a;
-        }
+        .uv-tag { color: var(--uv-gold); font-weight: bold; }
+        .wind-tag { font-style: italic; color: var(--text-dim); }
+        .pop-tag { color: #88aaff; font-weight: bold; }
 
-        h3 {
-            margin-top: 0;
-            color: var(--text-dim);
-            font-size: 1.1rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .uv-index {
-            color: var(--uv-gold);
-            font-weight: bold;
-        }
-
-        .wind-info {
-            font-style: italic;
-            color: #a0a0a0;
-        }
-
-        .pop-label {
-            font-weight: bold;
-            color: #88aaff;
-        }
-
-        footer {
-            text-align: center;
-            font-size: 0.75rem;
-            color: #555;
-            margin-top: 2rem;
-            padding-bottom: 2rem;
-        }
-
-        @media (max-width: 768px) {
-            .forecast-grid { grid-template-columns: 1fr; }
-        }
+        @media (max-width: 768px) { .forecast-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <div>
-            <h1>WEonG-Bulletin</h1>
-            <div style="color: #666; font-size: 0.9rem;">Coastline & Infrastructure Intelligence</div>
+        <h1>WEonG-Bulletin</h1>
+        <div style="color: var(--accent-blue); font-size: 0.8rem; font-weight: bold;">
+            [WEONG-ROUTE] METHODOLOGY LOCKED
         </div>
-        <span class="methodology-tag">[weong-route] Methodology Locked</span>
     </header>
 
     <section class="radar-container">
-        <h3>Live Maritime & Radar Intelligence</h3>
+        <h3 style="margin-left: 10px; text-transform: uppercase; font-size: 0.9rem; color: var(--text-dim);">
+            Live Infrastructure & Coastline Intelligence
+        </h3>
         <div class="map-wrapper">
             <iframe 
-                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,8&control=1&precip=1&menu=0&monitor=1&color=2&logo=0&osh=1" 
-                width="100%" 
-                height="650" 
-                frameborder="0" 
-                style="border:0;" 
+                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,8&control=1&precip=1&menu=0&monitor=1&color=4&logo=0&osh=1&m=1" 
                 allowfullscreen>
             </iframe>
         </div>
     </section>
 
     <div class="forecast-grid">
-        <section class="forecast-card" id="short-range-card">
-            <h3>Short Range (0-48h)</h3>
-            <div id="short-range-data">
-                <p><strong>Today:</strong> Clear coastline views. <span class="uv-index">UV Index: 3 (Low)</span>.</p>
-                <p><span class="pop-label">Precipitation:</span> 10%</p>
-            </div>
-        </section>
+        <div class="card">
+            <h3>Short Range</h3>
+            <p>Conditions: Sunny intervals. <span class="uv-tag">UV Index: 4 (Moderate)</span>.</p>
+            <p><span class="pop-tag">Precipitation:</span> 10% (Nearest 10%)</p>
+        </div>
 
-        <section class="forecast-card" id="extended-range-card">
+        <div class="card">
             <h3>Extended Outlook</h3>
-            <div id="extended-data">
-                <p><strong>Saturday:</strong> Offshore winds developing.</p>
-                <p><span class="wind-info">Wind up to 15 km/h.</span></p>
-                <p><span class="pop-label">POP:</span> Omitted</p>
-            </div>
-        </section>
+            <p>Outlook: High pressure building.</p>
+            <p><span class="wind-tag">Wind up to 15 km/h.</span></p>
+            <p><span class="pop-tag">POP:</span> Omitted (&lt;30%)</p>
+        </div>
     </div>
-
-    <div id="level3-alert" class="forecast-card exception-trigger" style="display:none;">
-        <strong>[WEonG-ROUTE] CRITICAL:</strong> Level 3 Exception Active.
-    </div>
-
-    <footer>
-        System Time: 2025-12-25 | Professional Maritime & Road Analytics
-    </footer>
 </div>
-
-<script>
-    const level3Active = false; 
-    if (level3Active) {
-        document.getElementById('level3-alert').style.display = 'block';
-    }
-</script>
 
 </body>
 </html>
