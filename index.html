@@ -3,45 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Weather Intelligence</title>
+    <title>WEonG-Bulletin | Command Center</title>
     <style>
         :root {
             --primary-bg: #1a1a1b;
+            --container-bg: #272729;
             --accent-blue: #0070f3;
+            --accent-grey: #555555;
             --text-main: #ffffff;
+            --text-dim: #bbbbbb;
             --exception-lvl3: #ff4e42;
+            --uv-gold: #ffcc00;
         }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--primary-bg);
             color: var(--text-main);
             margin: 0;
             padding: 20px;
+            line-height: 1.5;
         }
+
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: auto;
         }
-        .short-range, .extended-range {
-            background: #272729;
+
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #3d3d3f;
+            padding-bottom: 10px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .methodology-tag {
+            font-size: 0.8rem;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+        }
+
+        /* Radar Section */
+        .radar-container {
+            background: var(--container-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--accent-grey);
+        }
+
+        .map-wrapper {
+            border: 1px solid #3d3d3f;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #121212;
+            /* Filter to achieve the professional grey look while keeping radar active */
+            filter: grayscale(0.3) brightness(0.9) contrast(1.1);
+        }
+
+        /* Content Sections */
+        .forecast-card {
+            background: var(--container-bg);
             border-radius: 8px;
             padding: 1.5rem;
             margin-bottom: 1rem;
             border-left: 4px solid var(--accent-blue);
         }
+
         .exception-trigger {
-            border-left-color: var(--exception-lvl3);
+            border-left-color: var(--exception-lvl3) !important;
+            background: #2d1a1a;
         }
+
+        h3 {
+            margin-top: 0;
+            color: var(--text-dim);
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
         .uv-index {
+            color: var(--uv-gold);
             font-weight: bold;
-            color: #ffcc00;
         }
-        .pop-display {
-            font-size: 0.9rem;
-            opacity: 0.8;
-        }
+
         .wind-info {
             font-style: italic;
+            color: #a0a0a0;
+        }
+
+        .pop-label {
+            font-weight: bold;
+            color: #88aaff;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #555;
+            margin-top: 2rem;
         }
     </style>
 </head>
@@ -50,33 +117,55 @@
 <div class="container">
     <header>
         <h1>WEonG-Bulletin</h1>
-        <p>Methodology: <strong>[weong-route] Locked</strong></p>
+        <span class="methodology-tag">[weong-route] Methodology Locked</span>
     </header>
 
-    <section class="short-range">
-        <h3>Short Range Forecast</h3>
-        <div id="short-range-content">
-            <p>Today: Sunny. <span class="uv-index">UV Index: 6 (High)</span>.</p>
-            <p class="pop-display">Precipitation: 20% (Low probability)</p>
+    <section class="radar-container">
+        <h3>Live Radar Intelligence</h3>
+        <div class="map-wrapper">
+            <iframe 
+                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,6&control=1&precip=1&menu=0&monitor=1&color=6&logo=0&osh=1" 
+                width="100%" 
+                height="450" 
+                frameborder="0" 
+                style="border:0;" 
+                allowfullscreen>
+            </iframe>
         </div>
     </section>
 
-    <section class="extended-range" id="extended-section">
+    <section class="forecast-card">
+        <h3>Short Range (0-48h)</h3>
+        <div id="short-range-data">
+            <p><strong>Today:</strong> Mostly cloudy with sunny breaks. <span class="uv-index">UV Index: 4 (Moderate)</span>.</p>
+            <p><span class="pop-label">POP:</span> 20% (Low Probability)</p>
+        </div>
+    </section>
+
+    <section class="forecast-card">
         <h3>Extended Outlook</h3>
-        <div id="extended-content">
-            <p>Saturday: Cloud increasing. <span class="wind-info">Wind up to 15 km/h</span>.</p>
-            <p class="pop-display">POP: 40%</p>
+        <div id="extended-data">
+            <p><strong>Saturday:</strong> High pressure dominates.</p>
+            <p><span class="wind-info">Wind up to 15 km/h.</span></p>
+            <p><span class="pop-label">POP:</span> 40%</p>
         </div>
     </section>
 
-    <div id="exception-alert" class="short-range exception-trigger" style="display:none;">
-        <strong>[WEonG-ROUTE] LEVEL 3 EXCEPTION:</strong> Significant weather event detected.
+    <div id="level3-alert" class="forecast-card exception-trigger" style="display:none;">
+        <strong>CRITICAL:</strong> Level 3 Exception Triggered for all elements.
     </div>
+
+    <footer>
+        System Time: 2025-12-25 | WEonG-Bulletin 2.0
+    </footer>
 </div>
 
 <script>
-    // Placeholder for future logic integration
-    console.log("WEonG-Bulletin Methodology Loaded.");
+    // Logic to toggle Level 3 Alert if criteria met
+    const level3Active = false; // Set to true to trigger red alert status
+    if (level3Active) {
+        document.getElementById('level3-alert').style.display = 'block';
+    }
 </script>
 
 </body>
