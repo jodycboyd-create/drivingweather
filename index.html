@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Fixed Draggable Routing</title>
+    <title>WEonG-Bulletin | Persistent Routing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -38,7 +38,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] RADIUS SEARCH ACTIVE</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] PERSISTENT SNAP ENGINE</div>
     </header>
 
     <section class="radar-container">
@@ -48,11 +48,13 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range</h3>
-            <p>UV Index: 4. POP: 10%.</p>
+            <p>Status: Localized Tracking. <span style="color:#ffcc00">UV Index: 4</span>.</p>
+            <p><strong>POP:</strong> 10% (Nearest 10%)</p>
         </div>
         <div class="card">
             <h3>Extended</h3>
-            <p>Wind up to 15 km/h. POP: Omitted.</p>
+            <p>Outlook: Operational. <i>Wind up to 15 km/h.</i></p>
+            <p><strong>POP:</strong> Omitted (&lt;30%)</p>
         </div>
     </div>
 </div>
@@ -65,9 +67,9 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // Searches specifically for a community name within the vicinity of the drop
-    async function findCommunityNear(lat, lng) {
-        // We search for "settlement" near the coordinate
+    // HARD-GUARDED SEARCH
+    async function getCommunityData(lat, lng) {
+        // Search for specific community types near the point
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=1`;
         
         try {
@@ -77,17 +79,15 @@
             if (data && data.length > 0) {
                 const c = data[0];
                 const cName = c.display_name.split(',')[0];
-                
-                // Ensure it's not a generic "Unincorporated" name
-                if (!cName.toLowerCase().includes("unincorporated")) {
-                    return {
-                        name: cName,
-                        lat: parseFloat(c.lat),
-                        lng: parseFloat(c.lon)
-                    };
+                const nLat = parseFloat(c.lat);
+                const nLng = parseFloat(c.lon);
+
+                // Validation: Prevent disappearing if result is out of range or malformed
+                if (!isNaN(nLat) && !isNaN(nLng) && !cName.toLowerCase().includes("unincorporated")) {
+                    return { name: cName, lat: nLat, lng: nLng };
                 }
             }
-        } catch (e) { console.error("Search error"); }
+        } catch (e) { console.error("API error"); }
         return null;
     }
 
@@ -95,18 +95,22 @@
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
+        
+        // Final safety check: ensure coordinates exist before calling route
+        if (!s || !e || isNaN(s.lat) || isNaN(e.lat)) return;
+
         const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
 
         try {
             const res = await fetch(url);
             const data = await res.json();
-            routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
+                routeLayer.clearLayers();
                 L.geoJSON(data.routes[0].geometry, {
                     style: { color: '#0070f3', weight: 6, opacity: 0.8 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.warn("Routing API error"); }
+        } catch (err) { console.warn("Routing failed"); }
     }
 
     function createPin(label, pos, delay) {
@@ -115,32 +119,34 @@
         
         const snapAction = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("Scanning...");
             
-            const community = await findCommunityNear(current.lat, current.lng);
+            // Safety: If for some reason the marker lost its position, don't proceed
+            if (!current) return;
+
+            marker.setTooltipContent("Finding Community...");
+            const comm = await getCommunityData(current.lat, current.lng);
             
-            if (community) {
-                // If a real town is found nearby, snap to it
-                marker.setLatLng([community.lat, community.lng]);
-                marker.setTooltipContent(`${label}: ${community.name}`);
+            if (comm) {
+                // Only move the pin if we found a valid community
+                marker.setLatLng([comm.lat, comm.lng]);
+                marker.setTooltipContent(`${label}: ${comm.name}`);
             } else {
-                // FALLBACK: Keep the pin exactly where it was dropped to prevent it getting stuck
-                // Label with coordinates so the user knows no community was found
-                marker.setTooltipContent(`${label}: Segment (${current.lat.toFixed(2)}, ${current.lng.toFixed(2)})`);
+                // If no community found, stay EXACTLY where dropped to prevent disappearing
+                marker.setTooltipContent(`${label}: Segment Selected`);
             }
             updateRoute();
         };
 
-        // Standard draggable events
         marker.on('dragend', snapAction);
         markers.push(marker);
 
-        // Initial setup
+        // Staggered trigger for initial placement
         setTimeout(snapAction, delay);
     }
 
+    // Initial pins: Gander and Clarenville area
     createPin('Origin', [48.955, -54.608], 500); 
-    createPin('Destination', [49.10, -54.20], 1500);
+    createPin('Destination', [48.16, -53.96], 1500);
 
 </script>
 </body>
