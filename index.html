@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | Hyper-Density Forecast Engine</title>
+    <title>WEonG-Bulletin | Dynamic Hub Sync</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --carbon: #121212; --accent: #0070f3; --text: #f0f0f0; --panel: #1c1c1e; }
         body { font-family: 'Inter', sans-serif; background: #000; color: var(--text); margin: 0; padding: 20px; }
-        #map { height: 550px; border-radius: 8px; border: 1px solid #333; background: #000; }
+        #map { height: 550px; border-radius: 8px; border: 1px solid #444; background: #000; }
         
         .control-panel { 
             display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; 
@@ -18,23 +18,18 @@
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: 900; }
         input { background: #000; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 4px; }
         
-        .btn-launch { 
-            grid-column: 1 / -1; background: var(--accent); color: white; border: none; padding: 15px; 
-            border-radius: 6px; font-weight: 800; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
-        }
-
-        /* [weong-route] Forecast Display */
-        #forecastOutput {
-            margin-top: 20px; padding: 20px; background: #fff; color: #000; 
-            border-radius: 8px; display: none; font-family: 'Courier New', monospace;
-        }
-
         .community-label {
             background: #ffffff; border: 2px solid #000; border-radius: 4px;
             color: #000; padding: 4px 8px; font-weight: 900; font-size: 11px;
             text-transform: uppercase; white-space: nowrap; pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.8);
         }
         
+        #forecastOutput {
+            margin-top: 20px; padding: 20px; background: #fff; color: #000; 
+            border-radius: 8px; display: none; font-family: 'Courier New', monospace; white-space: pre-wrap;
+        }
+
         .leaflet-tile-pane { filter: grayscale(100%) brightness(0.4) contrast(1.4); }
     </style>
 </head>
@@ -43,14 +38,14 @@
 <div style="max-width: 1400px; margin: auto;">
     <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <h2 style="margin:0; letter-spacing:-1px;">WEonG <span style="color:var(--accent)">ROUTE</span></h2>
-        <div style="font-size: 11px; color: #666;">METHODOLOGY LOCKED | LEVEL 3 TRIGGER</div>
+        <div style="font-size: 11px; color: #666;">DRAG-SYNC ACTIVE | LEVEL 3 TRIGGER</div>
     </header>
 
     <div class="control-panel">
         <div class="input-group"><label>Origin</label><input type="text" id="originIn" readonly></div>
         <div class="input-group"><label>Destination</label><input type="text" id="destIn" readonly></div>
         <div class="input-group"><label>Departure</label><input type="time" id="depTime" value="09:00"></div>
-        <button class="btn-launch" onclick="generateForecast()">Generate [weong-route] Bulletin</button>
+        <button style="grid-column: 1 / -1; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="generateForecast()">GENERATE [WEONG-ROUTE] BULLETIN</button>
     </div>
 
     <div id="map"></div>
@@ -61,16 +56,26 @@
 <script>
     // FULL COMPREHENSIVE COMMUNITY DATABASE [cite: 2025-12-23]
     const nlHubs = [
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Carbonear", lat: 47.737, lng: -53.228 },
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Gander", lat: 48.955, lng: -54.608 },
-        { name: "Summerford", lat: 49.496, lng: -54.646 }, { name: "Musgrave Harbour", lat: 49.444, lng: -53.961 },
-        { name: "Twillingate", lat: 49.648, lng: -54.764 }, { name: "Baie Verte", lat: 49.932, lng: -56.183 },
-        { name: "La Scie", lat: 49.957, lng: -55.590 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
-        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Burgeo", lat: 47.611, lng: -57.612 }
+        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
+        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Carbonear", lat: 47.737, lng: -53.228 },
+        { name: "Bay Roberts", lat: 47.596, lng: -53.262 }, { name: "Placentia", lat: 47.239, lng: -53.960 },
+        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Bonavista", lat: 48.649, lng: -53.114 },
+        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Gander", lat: 48.955, lng: -54.608 },
+        { name: "Glenwood", lat: 48.995, lng: -54.872 }, { name: "Gambo", lat: 48.748, lng: -54.214 },
+        { name: "Glovertown", lat: 48.667, lng: -54.033 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Bishop's Falls", lat: 49.014, lng: -55.485 }, { name: "Badger", lat: 48.974, lng: -56.035 },
+        { name: "Baie Verte", lat: 49.932, lng: -56.183 }, { name: "La Scie", lat: 49.957, lng: -55.590 },
+        { name: "Pacquet", lat: 49.983, lng: -55.866 }, { name: "Springdale", lat: 49.498, lng: -56.066 },
+        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Pasadena", lat: 49.016, lng: -57.594 },
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 },
+        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Port au Choix", lat: 50.708, lng: -57.355 },
+        { name: "Flower's Cove", lat: 51.298, lng: -56.732 }, { name: "Burgeo", lat: 47.611, lng: -57.612 },
+        { name: "Harbour Breton", lat: 47.478, lng: -55.833 }, { name: "Summerford", lat: 49.496, lng: -54.646 },
+        { name: "Musgrave Harbour", lat: 49.444, lng: -53.961 }, { name: "Twillingate", lat: 49.648, lng: -54.764 }
     ];
 
-    const map = L.map('map').setView([48.9, -55.5], 7);
+    const map = L.map('map', { background: '#000' }).setView([48.9, -55.5], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png').addTo(map);
 
     let markers = [];
@@ -90,7 +95,10 @@
         if (markers.length < 2) return;
         const p1 = map.latLngToContainerPoint(markers[0].getLatLng());
         const p2 = map.latLngToContainerPoint(markers[1].getLatLng());
-        if (Math.abs(p1.x - p2.x) < 170 && Math.abs(p1.y - p2.y) < 50) {
+        const dx = Math.abs(p1.x - p2.x);
+        const dy = Math.abs(p1.y - p2.y);
+        
+        if (dx < 175 && dy < 55) {
             markers[1].getTooltip().setParams({ offset: [0, -50] });
         } else {
             markers[1].getTooltip().setParams({ offset: [0, -10] });
@@ -102,24 +110,36 @@
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
         const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
-        const data = await res.json();
-        routeLayer.clearLayers();
-        if (data.routes) {
-            L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 6 } }).addTo(routeLayer);
-        }
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            routeLayer.clearLayers();
+            if (data.routes && data.routes[0]) {
+                L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 6, opacity: 0.9 } }).addTo(routeLayer);
+            }
+        } catch (err) { console.error("Route Sync Failed", err); }
     }
 
     function createMarker(idx, label) {
         const hub = nlHubs[idx];
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
-        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label' });
+        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label', offset: [0, -10] }).openTooltip();
+        
+        // RESTORED: Label updates as the pin is dragged
+        marker.on('drag', function() {
+            const temp = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
+            marker.setTooltipContent(`${label}: ${temp.name}`);
+            resolveCollision();
+        });
+
+        // RESTORED: Hard-snapping and route update on release
         marker.on('dragend', function() {
             const snap = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
             marker.setLatLng([snap.lat, snap.lng]);
             document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = snap.name;
             updateRoute();
         });
+
         markers.push(marker);
         document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = hub.name;
     }
@@ -129,22 +149,24 @@
         const dest = document.getElementById('destIn').value;
         const out = document.getElementById('forecastOutput');
         out.style.display = 'block';
-        out.innerHTML = `
-            <strong>[WEONG-ROUTE] BULLETIN</strong><br>
-            ------------------------------------<br>
-            ROUTE: ${origin} > ${dest}<br>
-            EXCEPTIONS: Level 3 Active [cite: 2025-12-23]<br><br>
-            SHORT RANGE:<br>
-            - POP: 30% (Nearest 10%) [cite: 2025-12-22]<br>
-            - UV Index included for daytime periods [cite: 2025-12-22]<br><br>
-            EXTENDED RANGE:<br>
-            - Wind: "Wind up to 15 km/h" (Speed < 20km/h) [cite: 2025-12-22]<br>
-            - POP: Omitted if < 30% [cite: 2025-12-22]
-        `;
+        out.innerHTML = `<strong>[WEONG-ROUTE] BULLETIN | ${new Date().toLocaleDateString()}</strong>
+------------------------------------------------------------------
+<strong>ROUTE:</strong> ${origin.toUpperCase()} to ${dest.toUpperCase()}
+<strong>METHODOLOGY:</strong> Locked v3.4 [cite: 2025-12-23]
+<strong>PRIMARY TRIGGER:</strong> Level 3 for all elements [cite: 2025-12-23]
+
+<strong>SHORT-RANGE (0-48h):</strong>
+- UV Index: Integrated into all daytime periods [cite: 2025-12-22].
+- POP: Reported to nearest 10%. POP < 30% omitted per pubpro [cite: 2025-12-22].
+
+<strong>EXTENDED RANGE:</strong>
+- Wind: If speed < 20km/h: "Wind up to 15 km/h" [cite: 2025-12-22].
+- POP: Omitted if under 30% [cite: 2025-12-22].`;
     }
 
-    createMarker(3, 'Origin');    // Gander
-    createMarker(9, 'Destination'); // GFW
+    createMarker(9, 'Origin');      // Gander
+    createMarker(13, 'Destination'); // GFW
+    
     map.on('zoomend move', resolveCollision);
     setTimeout(updateRoute, 500);
 </script>
