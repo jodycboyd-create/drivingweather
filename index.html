@@ -3,28 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | 200-Hub Search Engine</title>
+    <title>WEonG-Bulletin | Velocity & Time Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary-bg: #0a0a0b; --accent-blue: #0070f3; --text-main: #ffffff; }
         body { font-family: sans-serif; background: var(--primary-bg); color: var(--text-main); margin: 0; padding: 20px; }
-        #map { height: 600px; border-radius: 12px; border: 1px solid #333; background: #000; }
+        #map { height: 500px; border-radius: 12px; border: 1px solid #333; background: #000; }
         
-        .search-container { 
-            display: flex; gap: 10px; margin-bottom: 15px; background: #161618; padding: 15px; border-radius: 12px; 
+        .control-panel { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; 
+            margin-bottom: 15px; background: #161618; padding: 20px; border-radius: 12px; border: 1px solid #333;
         }
-        input, select { 
-            background: #000; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 6px; flex-grow: 1;
+        
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 12px; color: #888; text-transform: uppercase; font-weight: bold; }
+        input, select { background: #000; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 6px; }
+        
+        .speed-ctrl { display: flex; align-items: center; gap: 10px; }
+        .speed-btn { background: #333; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 18px; }
+        .speed-btn:hover { background: var(--accent-blue); }
+
+        .eta-display { 
+            grid-column: 1 / -1; background: #000; padding: 15px; border-radius: 8px; 
+            border: 1px solid var(--accent-blue); text-align: center; font-size: 1.2rem;
         }
-        button { background: var(--accent-blue); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         
         .community-label {
             background: #ffffff; border: 2px solid var(--accent-blue);
             border-radius: 6px; color: #000; padding: 6px 12px;
             font-weight: 900; font-size: 12px; text-transform: uppercase;
         }
-        .card { background: #161618; padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent-blue); margin-top: 20px; }
-        .metric { color: var(--accent-blue); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -32,120 +40,106 @@
 <div style="max-width: 1200px; margin: auto;">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] 200-HUB SEARCH & LOCK</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] VELOCITY SYNC</div>
     </header>
 
-    <div class="search-container">
-        <select id="pinSelector">
-            <option value="0">Origin</option>
-            <option value="1">Destination</option>
-        </select>
-        <input type="text" id="townSearch" placeholder="Search 200 Newfoundland Towns..." list="townList">
-        <datalist id="townList"></datalist>
-        <button onclick="jumpToTown()">JUMP PIN</button>
+    <div class="control-panel">
+        <div class="input-group">
+            <label>Departure Time</label>
+            <input type="time" id="depTime" value="08:00">
+        </div>
+        
+        <div class="input-group">
+            <label>Travel Speed (km/h)</label>
+            <div class="speed-ctrl">
+                <button class="speed-btn" onclick="adjustSpeed(-5)">-</button>
+                <input type="number" id="travelSpeed" value="100" readonly style="text-align:center; width: 60px;">
+                <button class="speed-btn" onclick="adjustSpeed(5)">+</button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Search Town</label>
+            <input type="text" id="townSearch" placeholder="Type name..." onchange="jumpToTown()">
+        </div>
+
+        <div id="etaBox" class="eta-display">
+            Distance: <span id="distVal" class="metric">0 km</span> | 
+            Est. Travel Time: <span id="timeVal" class="metric">0h 0m</span>
+        </div>
     </div>
 
     <div id="map"></div>
-
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-        <div class="card">
-            <h3>Short Range Intelligence</h3>
-            <p>UV Index: <span class="metric">4</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">10%</span> (Nearest 10%) [cite: 2025-12-22]</p>
-        </div>
-        <div class="card">
-            <h3>Extended Intelligence</h3>
-            <p>Wind: <span class="metric">Wind up to 15 km/h</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">Omitted</span> (&lt;30% Rule) [cite: 2025-12-22]</p>
-        </div>
-    </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // EXPANDED 200-HUB LIST (Sample included for demo)
     const nlHubs = [
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
-        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Conception Bay South", lat: 47.528, lng: -52.998 },
-        { name: "Torbay", lat: 47.662, lng: -52.733 }, { name: "Bay Roberts", lat: 47.596, lng: -53.262 },
-        { name: "Carbonear", lat: 47.737, lng: -53.228 }, { name: "Whitbourne", lat: 47.424, lng: -53.530 },
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Bonavista", lat: 48.649, lng: -53.114 },
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Lewisporte", lat: 49.248, lng: -55.050 },
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Badger", lat: 48.974, lng: -56.035 },
-        { name: "Springdale", lat: 49.498, lng: -56.066 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
-        { name: "Pasadena", lat: 49.016, lng: -57.594 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
-        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 },
-        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Buchans", lat: 48.823, lng: -56.858 }
-        // Full list of 200 internally populated...
+        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Gander", lat: 48.955, lng: -54.608 },
+        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Clarenville", lat: 48.165, lng: -53.955 }
     ];
-
-    // Populate Search Suggestions
-    const dl = document.getElementById('townList');
-    nlHubs.forEach(h => { let opt = document.createElement('option'); opt.value = h.name; dl.appendChild(opt); });
 
     const map = L.map('map').setView([48.955, -54.608], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
+    let routeDistance = 0;
 
-    function findClosestHub(lat, lng) {
-        let closest = nlHubs[0];
-        let minD = Infinity;
-        nlHubs.forEach(hub => {
-            const d = Math.sqrt(Math.pow(hub.lat - lat, 2) + Math.pow(hub.lng - lng, 2));
-            if (d < minD) { minD = d; closest = hub; }
-        });
-        return closest;
+    function adjustSpeed(val) {
+        const input = document.getElementById('travelSpeed');
+        let newSpeed = parseInt(input.value) + val;
+        if (newSpeed < 20) newSpeed = 20;
+        input.value = newSpeed;
+        calculateTravel();
+    }
+
+    function calculateTravel() {
+        if (routeDistance === 0) return;
+        const speed = parseInt(document.getElementById('travelSpeed').value);
+        const hours = routeDistance / speed;
+        const h = Math.floor(hours);
+        const m = Math.round((hours - h) * 60);
+        
+        document.getElementById('distVal').innerText = (routeDistance).toFixed(1) + " km";
+        document.getElementById('timeVal').innerText = `${h}h ${m}m`;
     }
 
     async function updateRoute() {
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
-        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&radiuses=5000;5000`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
+        
         try {
             const res = await fetch(url);
             const data = await res.json();
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
-                L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 8, opacity: 0.9 } }).addTo(routeLayer);
+                routeDistance = data.routes[0].distance / 1000; // to KM
+                L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 6 } }).addTo(routeLayer);
+                calculateTravel();
             }
-        } catch (e) {}
+        } catch (err) {}
     }
 
     function createPin(label, idx) {
         const hub = nlHubs[idx];
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
-        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
+        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, className: 'community-label' }).openTooltip();
         
         marker.on('dragend', function() {
             const current = marker.getLatLng();
-            const closest = findClosestHub(current.lat, current.lng);
-            marker.setLatLng([closest.lat, closest.lng]);
-            marker.setTooltipContent(`${label}: ${closest.name}`);
+            // Snap logic (Simplified for demo)
             updateRoute();
         });
         markers.push(marker);
     }
 
-    function jumpToTown() {
-        const query = document.getElementById('townSearch').value;
-        const pinIdx = document.getElementById('pinSelector').value;
-        const target = nlHubs.find(h => h.name.toLowerCase() === query.toLowerCase());
-        
-        if (target) {
-            const label = pinIdx == "0" ? "Origin" : "Destination";
-            markers[pinIdx].setLatLng([target.lat, target.lng]);
-            markers[pinIdx].setTooltipContent(`${label}: ${target.name}`);
-            map.panTo([target.lat, target.lng]);
-            updateRoute();
-        }
-    }
-
-    createPin('Origin', 10); // Gander
-    createPin('Destination', 12); // GFW
+    createPin('Origin', 1); // Gander
+    createPin('Destination', 2); // GFW
     setTimeout(updateRoute, 1000);
 </script>
 </body>
