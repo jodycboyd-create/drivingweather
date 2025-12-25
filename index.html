@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Smart Community Snap</title>
+    <title>WEonG-Bulletin | Stable Routing Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -16,7 +16,7 @@
         body { font-family: sans-serif; background: var(--primary-bg); color: var(--text-main); margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: auto; }
         .radar-container { background: var(--container-bg); border-radius: 12px; padding: 12px; border: 1px solid #222; }
-        #map { height: 750px; border-radius: 8px; background: #000; }
+        #map { height: 700px; border-radius: 8px; background: #000; }
 
         .community-label {
             background: #ffffff;
@@ -27,7 +27,6 @@
             font-weight: 900;
             font-size: 13px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            white-space: nowrap;
         }
 
         .forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
@@ -39,7 +38,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] RADIUS PROBE ACTIVE</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] STABLE SNAP & ROUTE</div>
     </header>
 
     <section class="radar-container">
@@ -49,51 +48,45 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range</h3>
-            <p>Status: Monitoring local infrastructure. <span style="color:#ffcc00">UV Index: 4</span>.</p>
-            <p><strong>POP:</strong> 10%</p>
+            <p>UV Index: 4. POP: 10%.</p>
         </div>
         <div class="card">
             <h3>Extended</h3>
-            <p>Outlook: Operational clarity. <i>Wind up to 15 km/h.</i></p>
-            <p><strong>POP:</strong> Omitted</p>
+            <p>Wind up to 15 km/h. POP: Omitted.</p>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // NL Central Focus
     const map = L.map('map').setView([48.955, -54.608], 8);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // IMPROVED RADIUS SEARCH
-    async function findClosestCommunity(lat, lng) {
-        // Search specifically for named settlements in a wider buffer
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=settlement&lat=${lat}&lon=${lng}&limit=10`;
-        
+    async function getSafeCommunity(lat, lng) {
         try {
-            const response = await fetch(url);
-            const data = await response.json();
+            // Search specifically for named towns/villages
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=1`;
+            const res = await fetch(url);
+            const data = await res.json();
             
-            // Find the first result that is a town, village, or hamlet
-            const community = data.find(c => 
-                c.type === 'town' || c.type === 'village' || c.type === 'hamlet' || c.type === 'city'
-            );
-
-            if (community) {
-                return {
-                    name: community.display_name.split(',')[0],
-                    lat: parseFloat(community.lat),
-                    lng: parseFloat(community.lon)
-                };
+            if (data && data.length > 0) {
+                const c = data[0];
+                const nLat = parseFloat(c.lat);
+                const nLng = parseFloat(c.lon);
+                // Validation: Ensure the result isn't halfway across the world
+                if (!isNaN(nLat) && Math.abs(nLat - lat) < 1) {
+                    return { name: c.display_name.split(',')[0], lat: nLat, lng: nLng };
+                }
             }
-        } catch (e) { console.error("Search failed"); }
+        } catch (e) { console.error("API error"); }
         return null;
     }
 
-    async function updateDrivingRoute() {
+    async function updateRoute() {
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
@@ -105,44 +98,41 @@
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
                 L.geoJSON(data.routes[0].geometry, {
-                    style: { color: '#0070f3', weight: 6, opacity: 0.8 }
+                    style: { color: '#0070f3', weight: 5, opacity: 0.8 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.error("OSRM Error"); }
+        } catch (err) { console.warn("Routing API error"); }
     }
 
-    function createSmartPin(labelPrefix, startPos) {
-        const marker = L.marker(startPos, { draggable: true }).addTo(map);
-        marker.bindTooltip(labelPrefix, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
-
-        marker.on('dragend', async function() {
+    function createPin(label, pos, delay) {
+        const marker = L.marker(pos, { draggable: true }).addTo(map);
+        marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
+        
+        const snapFunction = async () => {
+            const current = marker.getLatLng();
             marker.setTooltipContent("Snapping...");
-            const currentPos = marker.getLatLng();
+            const comm = await getSafeCommunity(current.lat, current.lng);
             
-            const community = await findClosestCommunity(currentPos.lat, currentPos.lng);
-            
-            if (community) {
-                // SUCCESS: Physical snap to community center
-                marker.setLatLng([community.lat, community.lng]);
-                marker.setTooltipContent(`${labelPrefix}: ${community.name}`);
+            if (comm) {
+                marker.setLatLng([comm.lat, comm.lng]);
+                marker.setTooltipContent(`${label}: ${comm.name}`);
             } else {
-                // SECONDARY FALLBACK: Search for any named location if strict community fails
-                const fallbackUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentPos.lat}&lon=${currentPos.lng}&zoom=14`;
-                const fbRes = await fetch(fallbackUrl);
-                const fbData = await fbRes.json();
-                const fbName = fbData.address.road || fbData.address.suburb || "Route 1 Corridor";
-                
-                marker.setTooltipContent(`${labelPrefix}: ${fbName}`);
+                marker.setTooltipContent(`${label}: Drop Point`);
             }
-            updateDrivingRoute();
-        });
+            updateRoute();
+        };
 
+        marker.on('dragend', snapFunction);
         markers.push(marker);
-        setTimeout(() => marker.fire('dragend'), 500);
+
+        // STAGGERED INITIAL LOAD
+        setTimeout(snapFunction, delay);
     }
 
-    createSmartPin('Origin', [48.955, -54.608]); // Gander
-    createSmartPin('Destination', [48.922, -55.637]); // Grand Falls area
+    // Origin starts first, Destination waits 1.2s to prevent API errors
+    createPin('Origin', [48.955, -54.608], 500); 
+    createPin('Destination', [49.10, -54.20], 1500);
+
 </script>
 </body>
 </html>
