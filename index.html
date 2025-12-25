@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Elastic Snap Engine</title>
+    <title>WEonG-Bulletin | Road-Locked Routing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -39,7 +39,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] ELASTIC COMMUNITY SNAP</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] ROAD-NETWORK LOCK</div>
     </header>
 
     <div id="map"></div>
@@ -52,8 +52,8 @@
         </div>
         <div class="card">
             <h3>Extended Outlook</h3>
-            <p>Wind: <span class="metric">Up to 15 km/h</span> (Light Wind Logic)</p>
-            <p>POP: <span class="metric">Omitted</span> (&lt;30% Rule)</p>
+            <p>Wind: <span class="metric">Wind up to 15 km/h</span></p>
+            <p>POP: <span class="metric">Omitted</span> (Below 30%)</p>
         </div>
     </div>
 </div>
@@ -66,50 +66,32 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // ELASTIC SEARCH: Finds named communities with a large fallback radius
-    async function findBestCommunity(lat, lng) {
-        // Query for actual place entities within the NL Viewbox
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=10&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
-        
+    // OSRM NEAREST: Snaps any coordinate to the literal nearest road
+    async function snapToRoad(lat, lng) {
+        const url = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=1`;
         try {
             const res = await fetch(url);
             const data = await res.json();
-            
-            // Filter out generic region names and "unincorporated"
-            const valid = data.filter(item => {
-                const n = item.display_name.toLowerCase();
-                return !n.includes("unincorporated") && !n.includes("newfoundland and labrador");
-            });
-
-            if (valid.length > 0) {
-                // Find the closest one within a reasonable "snap" distance (approx 40km)
-                let closest = valid[0];
-                let minDist = Infinity;
-
-                valid.forEach(c => {
-                    const d = Math.sqrt(Math.pow(c.lat - lat, 2) + Math.pow(c.lon - lng, 2));
-                    if (d < minDist) { minDist = d; closest = c; }
-                });
-
-                if (minDist < 0.4) { // Roughly 40km snapping radius
-                    return {
-                        name: closest.display_name.split(',')[0],
-                        lat: parseFloat(closest.lat),
-                        lng: parseFloat(closest.lon)
-                    };
-                }
+            if (data.waypoints && data.waypoints.length > 0) {
+                return {
+                    lat: data.waypoints[0].location[1],
+                    lng: data.waypoints[0].location[0],
+                    name: data.waypoints[0].name || "Road Segment"
+                };
             }
+        } catch (e) { console.error("Road snap failed"); }
+        return null;
+    }
 
-            // FINAL FALLBACK: Reverse lookup for a local place name if no "center" found
-            const revUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`;
-            const revRes = await fetch(revUrl);
-            const revData = await revRes.json();
-            const a = revData.address;
-            const fallbackName = a.suburb || a.neighbourhood || a.village || a.road || "Route 1 Segment";
-            
-            return { name: fallbackName, lat: lat, lng: lng };
-
-        } catch (e) { return null; }
+    // COMMUNITY SEARCH: Secondary layer to find the name of the nearest town
+    async function getTownName(lat, lng) {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12`;
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            const a = data.address;
+            return a.city || a.town || a.village || a.hamlet || a.suburb || "Highway Route";
+        } catch (e) { return "Active Route"; }
     }
 
     async function updateRoute() {
@@ -127,7 +109,7 @@
                     style: { color: '#0070f3', weight: 6, opacity: 0.8 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.warn("Routing error"); }
+        } catch (err) { console.warn("Routing failed"); }
     }
 
     function createPin(label, pos, delay) {
@@ -136,13 +118,17 @@
         
         const snapAction = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("SNAP-LOCKING...");
+            marker.setTooltipContent("SNAPPING TO ROAD...");
             
-            const result = await findBestCommunity(current.lat, current.lng);
+            // 1. Force the pin onto a real road
+            const roadPoint = await snapToRoad(current.lat, current.lng);
             
-            if (result) {
-                marker.setLatLng([result.lat, result.lng]);
-                marker.setTooltipContent(`${label}: ${result.name}`);
+            if (roadPoint) {
+                marker.setLatLng([roadPoint.lat, roadPoint.lng]);
+                
+                // 2. Identify the nearest town for the label
+                const townName = await getTownName(roadPoint.lat, roadPoint.lng);
+                marker.setTooltipContent(`${label}: ${townName}`);
             }
             updateRoute();
         };
