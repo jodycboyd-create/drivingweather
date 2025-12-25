@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Intelligent Community Snap</title>
+    <title>WEonG-Bulletin | Robust Community Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -38,7 +38,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold; letter-spacing: 1px;">[WEONG-ROUTE] SMART-HIERARCHY SNAP</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] DEBOUNCED SNAP ENGINE</div>
     </header>
 
     <section class="radar-container">
@@ -48,13 +48,11 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range</h3>
-            <p>Status: Localized Infrastructure Tracking. <span style="color:#ffcc00">UV Index: 4</span>.</p>
-            <p><strong>POP:</strong> 10% (Nearest 10%)</p>
+            <p>UV Index: 4. POP: 10%.</p>
         </div>
         <div class="card">
-            <h3>Extended Outlook</h3>
-            <p>Outlook: Operational clarity. <i>Wind up to 15 km/h.</i></p>
-            <p><strong>POP:</strong> Omitted (&lt;30%)</p>
+            <h3>Extended</h3>
+            <p>Wind up to 15 km/h. POP: Omitted.</p>
         </div>
     </div>
 </div>
@@ -66,28 +64,32 @@
 
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
+    let debounceTimer;
 
-    // SMART HIERARCHY SEARCH
-    async function getBestLocationName(lat, lng) {
+    // REFINED SEARCH WITH NL BOUNDS
+    async function getCommunityCenter(lat, lng) {
+        // NL Bounding Box logic to keep pins in-province
+        const viewbox = "-59.5,46.5,-52.5,52.0";
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1&bounded=1&viewbox=${viewbox}`;
+        
         try {
-            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`;
             const res = await fetch(url);
+            if (!res.ok) return null;
             const data = await res.json();
             const a = data.address;
 
-            // 1. Check for community names first
-            const community = a.city || a.town || a.village || a.hamlet || a.suburb || a.neighbourhood;
+            // Prioritize named towns/villages
+            const name = a.city || a.town || a.village || a.hamlet || a.suburb || a.neighbourhood || a.road;
             
-            // 2. Check for road name if no community is found
-            const road = a.road || a.highway;
-
-            // 3. Coordinate check for snapping
-            return {
-                name: community || road || "Trans-Canada Segment",
-                lat: parseFloat(data.lat),
-                lng: parseFloat(data.lon)
-            };
+            // Validate coordinates - must be within Newfoundland region
+            const nLat = parseFloat(data.lat);
+            const nLng = parseFloat(data.lon);
+            
+            if (!isNaN(nLat) && nLat > 46 && nLat < 52) {
+                return { name: name, lat: nLat, lng: nLng };
+            }
         } catch (e) { return null; }
+        return null;
     }
 
     async function updateRoute() {
@@ -108,33 +110,38 @@
         } catch (err) { console.warn("Routing API error"); }
     }
 
-    function createSmartPin(label, pos, delay) {
+    function createPin(label, pos, initialDelay) {
         const marker = L.marker(pos, { draggable: true }).addTo(map);
         marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
         const snapAction = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("Locating...");
+            marker.setTooltipContent("Locking...");
             
-            const locData = await getBestLocationName(current.lat, current.lng);
+            const loc = await getCommunityCenter(current.lat, current.lng);
             
-            if (locData && !isNaN(locData.lat)) {
-                // Physical snap to the recognized location
-                marker.setLatLng([locData.lat, locData.lng]);
-                marker.setTooltipContent(`${label}: ${locData.name}`);
+            if (loc) {
+                marker.setLatLng([loc.lat, loc.lng]);
+                marker.setTooltipContent(`${label}: ${loc.name}`);
+            } else {
+                // If API fails, just label it as current coordinate to prevent disappearing
+                marker.setTooltipContent(`${label}: Dropped Point`);
             }
             updateRoute();
         };
 
-        marker.on('dragend', snapAction);
-        markers.push(marker);
+        // Debounce: Wait 500ms after move stops before calling API
+        marker.on('dragend', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(snapAction, 500);
+        });
 
-        // Staggered load to prevent API timeout
-        setTimeout(snapAction, delay);
+        markers.push(marker);
+        setTimeout(snapAction, initialDelay);
     }
 
-    createSmartPin('Origin', [48.955, -54.608], 500); 
-    createSmartPin('Destination', [49.10, -54.20], 1500);
+    createPin('Origin', [48.955, -54.608], 500); 
+    createPin('Destination', [49.10, -54.20], 1500);
 
 </script>
 </body>
