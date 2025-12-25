@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Hyper-Density Real-Time Snap</title>
+    <title>WEonG-Bulletin | Anti-Collision Hub Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary-bg: #0a0a0b; --accent-blue: #0070f3; --text-main: #ffffff; }
@@ -27,10 +27,12 @@
             border: 1px solid var(--accent-blue); display: flex; justify-content: space-around;
         }
         
+        /* Clean Tooltip Styling */
         .community-label {
             background: #ffffff; border: 2px solid var(--accent-blue);
             border-radius: 6px; color: #000; padding: 6px 12px;
             font-weight: 900; font-size: 12px; text-transform: uppercase;
+            white-space: nowrap;
         }
         .metric { color: var(--accent-blue); font-weight: bold; }
     </style>
@@ -40,7 +42,7 @@
 <div style="max-width: 1200px; margin: auto;">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] REAL-TIME DYNAMIC SNAP</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] ANTI-COLLISION ENGINE</div>
     </header>
 
     <div class="control-panel">
@@ -57,7 +59,7 @@
             </div>
         </div>
         <div class="input-group">
-            <label>Find Community</label>
+            <label>Destination Search</label>
             <input type="text" id="townSearch" placeholder="Type name..." list="townList" onchange="jumpToTown()">
             <datalist id="townList"></datalist>
         </div>
@@ -73,28 +75,23 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // HYPER-DENSITY HUB DATABASE (Expanded Subset)
     const nlHubs = [
         { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
-        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "CBS", lat: 47.528, lng: -52.998 },
-        { name: "Holyrood", lat: 47.388, lng: -53.131 }, { name: "Whitbourne", lat: 47.424, lng: -53.530 },
-        { name: "Arnold's Cove", lat: 47.755, lng: -53.926 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
-        { name: "Port Blandford", lat: 48.355, lng: -54.162 }, { name: "Glovertown", lat: 48.667, lng: -54.033 },
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Glenwood", lat: 48.995, lng: -54.872 },
-        { name: "Bishop's Falls", lat: 49.014, lng: -55.485 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
-        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "South Brook", lat: 49.431, lng: -56.082 },
-        { name: "Sheppardville", lat: 49.435, lng: -56.321 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
-        { name: "Pasadena", lat: 49.016, lng: -57.594 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "St. George's", lat: 48.428, lng: -58.483 },
-        { name: "Doyles", lat: 47.838, lng: -59.177 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
-        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }
-        // Full 200-hub density loaded into production search
+        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Whitbourne", lat: 47.424, lng: -53.530 },
+        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Port Blandford", lat: 48.355, lng: -54.162 },
+        { name: "Terra Nova", lat: 48.441, lng: -54.015 }, { name: "Glovertown", lat: 48.667, lng: -54.033 },
+        { name: "Gambo", lat: 48.748, lng: -54.214 }, { name: "Gander", lat: 48.955, lng: -54.608 },
+        { name: "Glenwood", lat: 48.995, lng: -54.872 }, { name: "Bishop's Falls", lat: 49.014, lng: -55.485 },
+        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Badger", lat: 48.974, lng: -56.035 },
+        { name: "South Brook", lat: 49.431, lng: -56.082 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }
     ];
 
     const dl = document.getElementById('townList');
     nlHubs.forEach(h => { let opt = document.createElement('option'); opt.value = h.name; dl.appendChild(opt); });
 
-    const map = L.map('map').setView([48.955, -54.608], 7);
+    const map = L.map('map').setView([48.955, -54.608], 8);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let routeLayer = L.layerGroup().addTo(map);
@@ -109,6 +106,21 @@
             if (d < minD) { minD = d; closest = hub; }
         });
         return closest;
+    }
+
+    // Logic to prevent label overlap
+    function preventOverlap() {
+        if (markers.length < 2) return;
+        const p1 = map.latLngToLayerPoint(markers[0].getLatLng());
+        const p2 = map.latLngToLayerPoint(markers[1].getLatLng());
+        const distance = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+
+        // If markers are closer than 80 pixels, shift the second label up
+        if (distance < 80) {
+            markers[1].getTooltip().setParams({ offset: [0, -40] });
+        } else {
+            markers[1].getTooltip().setParams({ offset: [0, -10] });
+        }
     }
 
     function calculateTravel() {
@@ -149,20 +161,23 @@
     function createPin(label, idx) {
         const hub = nlHubs[idx];
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
-        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, className: 'community-label' }).openTooltip();
+        marker.bindTooltip(`${label}: ${hub.name}`, { 
+            permanent: true, 
+            direction: 'top', 
+            className: 'community-label',
+            offset: [0, -10]
+        }).openTooltip();
         
-        // REAL-TIME DRAG LOGIC
         marker.on('drag', function() {
             const current = marker.getLatLng();
             const closest = findClosestHub(current.lat, current.lng);
-            // Update tooltip text LIVE while dragging
-            marker.setTooltipContent(`${label}: ${closest.name} (Snapping...)`);
+            marker.setTooltipContent(`${label}: ${closest.name}`);
+            preventOverlap();
         });
 
         marker.on('dragend', function() {
             const current = marker.getLatLng();
             const closest = findClosestHub(current.lat, current.lng);
-            // Final Snap to Hub Coordinates
             marker.setLatLng([closest.lat, closest.lng]);
             marker.setTooltipContent(`${label}: ${closest.name}`);
             updateRoute();
@@ -184,11 +199,14 @@
             markers[1].setTooltipContent(`Destination: ${target.name}`);
             map.panTo([target.lat, target.lng]);
             updateRoute();
+            preventOverlap();
         }
     }
 
-    createPin('Origin', 10); // Gander
-    createPin('Destination', 13); // GFW
+    createPin('Origin', 9); // Gander
+    createPin('Destination', 12); // GFW
+    map.on('zoomend', preventOverlap);
+
     setTimeout(updateRoute, 1000);
 </script>
 </body>
