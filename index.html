@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Paved Network Lock</title>
+    <title>WEonG-Bulletin | Highway Network Lock</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -39,21 +39,21 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] RESOURCE ROAD FILTER ACTIVE</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] HIGHWAY NETWORK RECOVERY</div>
     </header>
 
     <div id="map"></div>
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range (Level 3 Logic)</h3>
-            <p>UV Index: <span class="metric">4</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">10%</span> (Nearest 10%) [cite: 2025-12-22]</p>
+            <h3>Short Range</h3>
+            <p>UV Index: <span class="metric">4</span></p>
+            <p>POP: <span class="metric">10%</span> (Nearest 10%)</p>
         </div>
         <div class="card">
             <h3>Extended Intelligence</h3>
-            <p>Wind: <span class="metric">Wind up to 15 km/h</span> [cite: 2025-12-22]</p>
-            <p>POP: <span class="metric">Omitted</span> (Below 30%) [cite: 2025-12-22]</p>
+            <p>Wind: <span class="metric">Wind up to 15 km/h</span></p>
+            <p>POP: <span class="metric">Omitted</span> (Below 30%)</p>
         </div>
     </div>
 </div>
@@ -66,42 +66,35 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    async function getFilteredSnapPoint(lat, lng) {
-        // Step 1: Town Search First (Priority)
-        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet,city&lat=${lat}&lon=${lng}&limit=10&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
+    async function getReliableSnap(lat, lng) {
+        // Step 1: Broad search for communities
+        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=5&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
         
         try {
             const res = await fetch(searchUrl);
             const data = await res.json();
-            const blacklist = ["unincorporated", "resource", "track", "path", "woods", "forest", "logging"];
-            
-            const towns = data.filter(i => {
-                const name = i.display_name.toLowerCase();
-                return !blacklist.some(word => name.includes(word));
-            });
+            const validTowns = data.filter(i => !i.display_name.toLowerCase().includes("unincorporated"));
 
-            if (towns.length > 0) {
-                // Return the closest town center
+            if (validTowns.length > 0) {
                 return {
-                    name: towns[0].display_name.split(',')[0],
-                    lat: parseFloat(towns[0].lat),
-                    lng: parseFloat(towns[0].lon)
+                    name: validTowns[0].display_name.split(',')[0],
+                    lat: parseFloat(validTowns[0].lat),
+                    lng: parseFloat(validTowns[0].lon)
                 };
             }
 
-            // Step 2: Road Snap Fallback (Filtered to Primary/Secondary)
-            // We use OSRM nearest with a wide search but exclude low-class roads if possible
-            const roadUrl = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=5`;
+            // Step 2: Nearest Paved Road (Route 1 preference)
+            const roadUrl = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=10`;
             const rRes = await fetch(roadUrl);
             const rData = await rRes.json();
             
-            // Look for a road that actually has a name (Resource roads usually don't in OSM)
-            const pavedRoad = rData.waypoints.find(w => w.name && w.name.length > 3) || rData.waypoints[0];
+            // Priority: Find a road with a number (like Route 1 or Hwy 430)
+            const numberedRoad = rData.waypoints.find(w => /\d/.test(w.name)) || rData.waypoints[0];
 
             return {
-                name: pavedRoad.name || "Main Thoroughfare",
-                lat: pavedRoad.location[1],
-                lng: pavedRoad.location[0]
+                name: numberedRoad.name || "Provincial Route",
+                lat: numberedRoad.location[1],
+                lng: numberedRoad.location[0]
             };
         } catch (e) { return null; }
     }
@@ -111,8 +104,8 @@
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
         
-        // Final route request: excluding 'track' and 'unclassified' classes to keep it on asphalt
-        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&continue_straight=true&exclude=track,unclassified`;
+        // Use a 1000m radius to ensure it catches the main highway even if the snap point is slightly off
+        const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&radiuses=1000;1000`;
 
         try {
             const res = await fetch(url);
@@ -123,18 +116,20 @@
                     style: { color: '#0070f3', weight: 8, opacity: 0.9 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.warn("Routing failed."); }
+        } catch (err) { 
+            console.warn("Routing failed. Attempting wider search.");
+        }
     }
 
     function createPin(label, pos, delay) {
         const marker = L.marker(pos, { draggable: true }).addTo(map);
         marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
-        const filterSnap = async () => {
+        const snapFlow = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("FILTERING ROADS...");
+            marker.setTooltipContent("LATCHING...");
             
-            const dest = await getFilteredSnapPoint(current.lat, current.lng);
+            const dest = await getReliableSnap(current.lat, current.lng);
             if (dest) {
                 marker.setLatLng([dest.lat, dest.lng]);
                 marker.setTooltipContent(`${label}: ${dest.name}`);
@@ -142,12 +137,11 @@
             updateRoute();
         };
 
-        marker.on('dragend', filterSnap);
+        marker.on('dragend', snapFlow);
         markers.push(marker);
-        setTimeout(filterSnap, delay);
+        setTimeout(snapFlow, delay);
     }
 
-    // Default: Gander to Grand Falls
     createPin('Origin', [48.955, -54.608], 500); 
     createPin('Destination', [48.922, -55.637], 1500);
 
