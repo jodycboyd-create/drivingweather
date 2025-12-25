@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Named Community Lock</title>
+    <title>WEonG-Bulletin | Elastic Snap Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -15,21 +15,23 @@
 
         body { font-family: sans-serif; background: var(--primary-bg); color: var(--text-main); margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: auto; }
-        #map { height: 700px; border-radius: 8px; background: #000; border: 1px solid #333; }
+        #map { height: 700px; border-radius: 12px; background: #000; border: 1px solid #333; }
 
         .community-label {
             background: #ffffff;
             border: 2px solid var(--accent-blue);
             border-radius: 6px;
             color: #000;
-            padding: 5px 12px;
+            padding: 6px 14px;
             font-weight: 900;
-            font-size: 13px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            font-size: 14px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+            text-transform: uppercase;
         }
 
         .forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .card { background: var(--container-bg); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent-blue); }
+        .metric { color: var(--accent-blue); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -37,7 +39,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] ANTI-UNINCORPORATED FILTER</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] ELASTIC COMMUNITY SNAP</div>
     </header>
 
     <div id="map"></div>
@@ -45,11 +47,13 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range</h3>
-            <p>UV Index: 4. POP: 10%.</p>
+            <p>UV Index: <span class="metric">4</span></p>
+            <p>POP: <span class="metric">10%</span> (Nearest 10%)</p>
         </div>
         <div class="card">
-            <h3>Extended</h3>
-            <p>Wind up to 15 km/h. POP: Omitted.</p>
+            <h3>Extended Outlook</h3>
+            <p>Wind: <span class="metric">Up to 15 km/h</span> (Light Wind Logic)</p>
+            <p>POP: <span class="metric">Omitted</span> (&lt;30% Rule)</p>
         </div>
     </div>
 </div>
@@ -62,38 +66,32 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // REFINED SEARCH: Filters out "Unincorporated" and "undefined"
-    async function getNamedCommunity(lat, lng) {
-        const viewbox = "-59.8,46.5,-52.0,51.8";
-        // Search specifically for place types
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet,city&lat=${lat}&lon=${lng}&limit=15&bounded=1&viewbox=${viewbox}`;
+    // ELASTIC SEARCH: Finds named communities with a large fallback radius
+    async function findBestCommunity(lat, lng) {
+        // Query for actual place entities within the NL Viewbox
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=10&bounded=1&viewbox=-59.8,46.5,-52.0,51.8`;
         
         try {
             const res = await fetch(url);
             const data = await res.json();
             
-            if (data && data.length > 0) {
-                // Filter the list for real names
-                const validCommunities = data.filter(item => {
-                    const name = item.display_name.toLowerCase();
-                    return !name.includes("unincorporated") && 
-                           !name.includes("newfoundland and labrador") && 
-                           item.type !== "state";
+            // Filter out generic region names and "unincorporated"
+            const valid = data.filter(item => {
+                const n = item.display_name.toLowerCase();
+                return !n.includes("unincorporated") && !n.includes("newfoundland and labrador");
+            });
+
+            if (valid.length > 0) {
+                // Find the closest one within a reasonable "snap" distance (approx 40km)
+                let closest = valid[0];
+                let minDist = Infinity;
+
+                valid.forEach(c => {
+                    const d = Math.sqrt(Math.pow(c.lat - lat, 2) + Math.pow(c.lon - lng, 2));
+                    if (d < minDist) { minDist = d; closest = c; }
                 });
 
-                if (validCommunities.length > 0) {
-                    // Pick the one closest to the mouse drop
-                    let closest = validCommunities[0];
-                    let minDist = Infinity;
-
-                    validCommunities.forEach(c => {
-                        const d = Math.sqrt(Math.pow(c.lat - lat, 2) + Math.pow(c.lon - lng, 2));
-                        if (d < minDist) {
-                            minDist = d;
-                            closest = c;
-                        }
-                    });
-
+                if (minDist < 0.4) { // Roughly 40km snapping radius
                     return {
                         name: closest.display_name.split(',')[0],
                         lat: parseFloat(closest.lat),
@@ -101,8 +99,17 @@
                     };
                 }
             }
-        } catch (e) { console.error("Search failed"); }
-        return null;
+
+            // FINAL FALLBACK: Reverse lookup for a local place name if no "center" found
+            const revUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`;
+            const revRes = await fetch(revUrl);
+            const revData = await revRes.json();
+            const a = revData.address;
+            const fallbackName = a.suburb || a.neighbourhood || a.village || a.road || "Route 1 Segment";
+            
+            return { name: fallbackName, lat: lat, lng: lng };
+
+        } catch (e) { return null; }
     }
 
     async function updateRoute() {
@@ -114,13 +121,13 @@
         try {
             const res = await fetch(url);
             const data = await res.json();
+            routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
-                routeLayer.clearLayers();
                 L.geoJSON(data.routes[0].geometry, {
                     style: { color: '#0070f3', weight: 6, opacity: 0.8 }
                 }).addTo(routeLayer);
             }
-        } catch (err) { console.warn("Routing failed"); }
+        } catch (err) { console.warn("Routing error"); }
     }
 
     function createPin(label, pos, delay) {
@@ -129,20 +136,13 @@
         
         const snapAction = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("Searching...");
+            marker.setTooltipContent("SNAP-LOCKING...");
             
-            const comm = await getNamedCommunity(current.lat, current.lng);
+            const result = await findBestCommunity(current.lat, current.lng);
             
-            if (comm) {
-                marker.setLatLng([comm.lat, comm.lng]);
-                marker.setTooltipContent(`${label}: ${comm.name}`);
-            } else {
-                // FALLBACK: If no named town is near, use the closest road name
-                const revUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${current.lat}&lon=${current.lng}&zoom=12`;
-                const revRes = await fetch(revUrl);
-                const revData = await revRes.json();
-                const street = revData.address.road || revData.address.highway || "Highway Segment";
-                marker.setTooltipContent(`${label}: ${street}`);
+            if (result) {
+                marker.setLatLng([result.lat, result.lng]);
+                marker.setTooltipContent(`${label}: ${result.name}`);
             }
             updateRoute();
         };
@@ -153,7 +153,7 @@
     }
 
     createPin('Origin', [48.955, -54.608], 500); 
-    createPin('Destination', [49.06, -54.48], 1500);
+    createPin('Destination', [49.10, -54.20], 1500);
 
 </script>
 </body>
