@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Intelligent Routing</title>
+    <title>WEonG-Bulletin | Intelligent Community Routing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -21,14 +21,23 @@
         .radar-container { background: var(--container-bg); border-radius: 12px; padding: 12px; border: 1px solid #222; }
         #map { height: 700px; border-radius: 8px; background: #000; }
 
-        /* Custom Layer Control Styling */
-        .leaflet-control-layers { background: #1c1c1e !important; color: white !important; border: 1px solid #444 !important; }
+        /* Community Label Styling */
+        .community-label {
+            background: rgba(0, 112, 243, 0.9);
+            border: 1px solid white;
+            border-radius: 4px;
+            color: white;
+            padding: 2px 8px;
+            font-weight: bold;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .leaflet-control-layers { background: #1c1c1e !important; color: white !important; }
 
         /* [weong-route] Cards */
         .forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .card { background: var(--container-bg); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent-blue); }
-        .uv-tag { color: #ffcc00; font-weight: bold; }
-        .pop-tag { color: #88aaff; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -36,7 +45,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] INTERACTIVE LAYER CONTROL</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] DYNAMIC COMMUNITY SNAP</div>
     </header>
 
     <section class="radar-container">
@@ -46,13 +55,13 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range</h3>
-            <p>Route Status: Pins Active. <span class="uv-tag">UV Index: 4</span>.</p>
-            <p><span class="pop-tag">Precipitation:</span> 10%</p>
+            <p>Status: Localized Community Tracking. <span style="color:#ffcc00">UV Index: 4</span>.</p>
+            <p><strong>POP:</strong> 10%</p>
         </div>
         <div class="card">
             <h3>Extended Outlook</h3>
-            <p>Outlook: Operational clarity. <i>Wind up to 15 km/h.</i></p>
-            <p><span class="pop-tag">POP:</span> Omitted</p>
+            <p>Outlook: Infrastructure Intelligence. <i>Wind up to 15 km/h.</i></p>
+            <p><strong>POP:</strong> Omitted</p>
         </div>
     </div>
 </div>
@@ -62,51 +71,51 @@
     // 1. Initialize Map
     const map = L.map('map').setView([48.955, -54.608], 8);
 
-    // 2. Define Layers
-    const baseRoads = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        className: 'roads-layer'
-    });
+    // 2. Base Layers
+    const darkBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+    const roadOverlay = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { opacity: 0.5 });
+    const radarLayer = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_5076b9f2e307/256/{z}/{x}/{y}/2/1_1.png', { opacity: 0.6 }).addTo(map);
 
-    const darkBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© CartoDB'
-    }).addTo(map);
-
-    const radarLayer = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_5076b9f2e307/256/{z}/{x}/{y}/2/1_1.png', {
-        opacity: 0.6,
-        zIndex: 100
-    }).addTo(map);
-
-    // 3. Layer Toggles
-    const overlays = {
-        "Road Infrastructure": baseRoads,
-        "Weather Radar": radarLayer
-    };
+    const overlays = { "Roads": roadOverlay, "Radar": radarLayer };
     L.control.layers(null, overlays, { collapsed: false }).addTo(map);
 
-    // 4. Draggable Pins with Snapping Logic
-    function createDraggablePin(color, label, startPos) {
-        const marker = L.marker(startPos, {
-            draggable: true,
-            autoPan: true
-        }).addTo(map).bindPopup(label);
-
-        marker.on('dragend', function(e) {
-            const latlng = marker.getLatLng();
-            
-            // "Snapping" Logic: Simulating locking to coordinates of local communities 
-            // by rounding to significant decimals used by road networks
-            const snappedLat = Math.round(latlng.lat * 100) / 100;
-            const snappedLng = Math.round(latlng.lng * 100) / 100;
-            
-            marker.setLatLng([snappedLat, snappedLng]);
-            marker.setPopupContent(`${label} Locked: ${snappedLat}, ${snappedLng}`);
-            marker.openPopup();
-        });
+    // 3. Dynamic Geocoding Function
+    async function getNearestCommunity(lat, lng) {
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12`);
+            const data = await response.json();
+            // Prioritize town, village, or hamlet names
+            return data.address.city || data.address.town || data.address.village || data.address.hamlet || "Unknown Location";
+        } catch (error) {
+            return "Searching...";
+        }
     }
 
-    createDraggablePin('blue', 'Start Route', [48.95, -54.60]);
-    createDraggablePin('red', 'End Route', [49.10, -54.20]);
+    // 4. Draggable Pins with Dynamic Labels
+    function createSmartPin(color, labelText, startPos) {
+        const marker = L.marker(startPos, { draggable: true }).addTo(map);
+        
+        // Tooltip acts as the dynamic label
+        marker.bindTooltip(labelText, { 
+            permanent: true, 
+            direction: 'top', 
+            className: 'community-label' 
+        }).openTooltip();
+
+        marker.on('dragend', async function() {
+            const pos = marker.getLatLng();
+            marker.setTooltipContent("Locating...");
+            
+            const community = await getNearestCommunity(pos.lat, pos.lng);
+            marker.setTooltipContent(`${labelText}: ${community}`);
+        });
+
+        // Run once on load to set initial community
+        marker.fire('dragend');
+    }
+
+    createSmartPin('Start', 'Origin', [48.95, -54.60]);
+    createSmartPin('End', 'Destination', [49.10, -54.20]);
 
 </script>
 
