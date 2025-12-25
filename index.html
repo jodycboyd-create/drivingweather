@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Professional Routing</title>
+    <title>WEonG-Bulletin | Professional Community Routing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -39,7 +39,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] OSRM DRIVING ENGINE</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] RADIUS COMMUNITY SNAP</div>
     </header>
 
     <section class="radar-container">
@@ -49,11 +49,13 @@
     <div class="forecast-grid">
         <div class="card">
             <h3>Short Range</h3>
-            <p>UV Index: 4. POP: 10%.</p>
+            <p>Status: Community Locked. <span style="color:#ffcc00">UV Index: 4</span>.</p>
+            <p><strong>POP:</strong> 10% (Nearest 10%)</p>
         </div>
         <div class="card">
             <h3>Extended</h3>
-            <p>Wind up to 15 km/h. POP: Omitted.</p>
+            <p>Outlook: Operational. <i>Wind up to 15 km/h.</i></p>
+            <p><strong>POP:</strong> Omitted (&lt;30%)</p>
         </div>
     </div>
 </div>
@@ -66,30 +68,31 @@
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
 
-    // 1. SNAP TO ROAD & FIND COMMUNITY
-    async function getSnapAndName(lat, lng) {
+    // SEARCH FOR ACTUAL NAMED SETTLEMENTS
+    async function getNearestCommunity(lat, lng) {
+        // Search for towns/villages near the drop point
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=settlement&lat=${lat}&lon=${lng}&limit=5`;
+        
         try {
-            // First: Find the nearest community name
-            const geoUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12`;
-            const geoRes = await fetch(geoUrl);
-            const geoData = await geoRes.json();
-            const name = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.hamlet || "Roadside";
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            // Filter for real communities only
+            const community = data.find(c => 
+                c.type === 'town' || c.type === 'village' || c.type === 'hamlet' || c.type === 'city'
+            );
 
-            // Second: Snap to actual road coordinates using OSRM Nearest API
-            const snapUrl = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}`;
-            const snapRes = await fetch(snapUrl);
-            const snapData = await snapRes.json();
-            const snappedCoords = snapData.waypoints[0].location;
-
-            return {
-                name: name,
-                lat: snappedCoords[1],
-                lng: snappedCoords[0]
-            };
-        } catch (e) { return null; }
+            if (community) {
+                return {
+                    name: community.display_name.split(',')[0],
+                    lat: parseFloat(community.lat),
+                    lng: parseFloat(community.lon)
+                };
+            }
+        } catch (e) { console.error("Search failed"); }
+        return null;
     }
 
-    // 2. CALCULATE DRIVING ROUTE
     async function updateDrivingRoute() {
         if (markers.length < 2) return;
         
@@ -103,7 +106,7 @@
             
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
-                const routeLine = L.geoJSON(data.routes[0].geometry, {
+                L.geoJSON(data.routes[0].geometry, {
                     style: { color: '#0070f3', weight: 6, opacity: 0.8 }
                 }).addTo(routeLayer);
             }
@@ -115,13 +118,18 @@
         marker.bindTooltip(labelPrefix, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
 
         marker.on('dragend', async function() {
-            marker.setTooltipContent("Locking to Road...");
+            marker.setTooltipContent("Searching...");
             const pos = marker.getLatLng();
-            const data = await getSnapAndName(pos.lat, pos.lng);
             
-            if (data) {
-                marker.setLatLng([data.lat, data.lng]);
-                marker.setTooltipContent(`${labelPrefix}: ${data.name}`);
+            const community = await getNearestCommunity(pos.lat, pos.lng);
+            
+            if (community) {
+                // SUCCESS: Physical snap to town center
+                marker.setLatLng([community.lat, community.lng]);
+                marker.setTooltipContent(`${labelPrefix}: ${community.name}`);
+            } else {
+                // FALLBACK: If no town nearby, keep location but mark as custom point
+                marker.setTooltipContent(`${labelPrefix}: Drop Point`);
             }
             updateDrivingRoute();
         });
@@ -130,8 +138,9 @@
         marker.fire('dragend');
     }
 
-    createSmartPin('Origin', [48.95, -54.60]);
-    createSmartPin('Destination', [49.20, -54.80]);
+    // Default start/end points
+    createSmartPin('Origin', [48.95, -54.60]); // Gander
+    createSmartPin('Destination', [49.10, -54.20]); // Gambo area
 
 </script>
 </body>
