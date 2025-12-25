@@ -10,7 +10,17 @@ Radar: Gander, NL (Live ECCC Geomet) </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<script> window.onload = function() { var map = L.map('map').setView([48.95, -54.60], 9);
+<script> window.onload = function() { // 1. Load the Dark Background L.tileLayer('https://{s}{z}/{x}/{y}{r}.png').addTo(map);
+
+// 2. Load the Roads (This uses your .pavement CSS to turn them grey) L.tileLayer('https://{s}{z}/{x}/{y}{r}.png', { className: 'pavement', zIndex: 10 }).addTo(map);
+
+// 3. Load the Radar (Live ECCC Geomet) L.tileLayer.wms('?', { layers: 'RADAR_1KM_RRAI', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.7, zIndex: 5 }).addTo(map);
+
+// 4. Draw the Yellow Dashes (TCH Gander Corridor) var hwyStyle = { color: 'yellow', weight: 3, dashArray: '10, 15', opacity: 1, zIndex: 100 }; var tchCoords = [[48.91, -54.85], [48.95, -54.60], [48.88, -54.25]]; L.polyline(tchCoords, hwyStyle).addTo(map);
+
+// 5. Add the Center Marker L.marker([48.95, -54.60]).addTo(map).bindPopup("Gander Hub").openPopup();
+
+// 6. Force a refresh to ensure it displays immediately setTimeout(function() { map.invalidateSize(); }, 500);
 
 };
 
