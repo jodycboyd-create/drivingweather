@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WEonG-Bulletin | Coastline Persistence Command</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
             --primary-bg: #0a0a0b;
@@ -11,7 +12,6 @@
             --accent-blue: #0070f3;
             --text-main: #ffffff;
             --text-dim: #888888;
-            --exception-lvl3: #ff4e42;
         }
 
         body {
@@ -24,7 +24,6 @@
 
         .container { max-width: 1200px; margin: auto; }
 
-        /* HEADER - [weong-route] methodology locked */
         header {
             border-bottom: 1px solid #333;
             padding-bottom: 10px;
@@ -33,6 +32,7 @@
             justify-content: space-between;
         }
 
+        /* MAP AREA - Specifically tuned for coastline contrast */
         .radar-container {
             background: var(--container-bg);
             border-radius: 12px;
@@ -41,26 +41,15 @@
             border: 1px solid #222;
         }
 
-        /* THE COASTLINE FIX */
-        .map-wrapper {
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
-            background: #000;
+        #map {
             height: 700px;
-            /* This blend mode forces the bright coastline and road labels to stay on top */
-            mix-blend-mode: screen; 
+            border-radius: 8px;
+            background: #000;
+            /* Inverts colors to make coastlines white and water black */
+            filter: contrast(1.5) brightness(1.1);
         }
 
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            /* Custom filter to boost the white 'vector' lines of the coastline */
-            filter: contrast(1.4) brightness(1.1) saturate(1.3);
-        }
-
-        /* FORECAST CARDS */
+        /* FORECAST CARDS - [weong-route] Standards */
         .forecast-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -77,8 +66,6 @@
         .uv-tag { color: #ffcc00; font-weight: bold; }
         .wind-tag { font-style: italic; color: var(--text-dim); }
         .pop-tag { color: #88aaff; font-weight: bold; }
-
-        @media (max-width: 768px) { .forecast-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -93,31 +80,45 @@
 
     <section class="radar-container">
         <h3 style="margin-top: 0; text-transform: uppercase; font-size: 0.85rem; color: var(--text-dim); letter-spacing: 1px;">
-            Live Infrastructure & High-Contrast Coastline
+            Live Maritime & Coastline Persistence
         </h3>
-        <div class="map-wrapper">
-            <iframe 
-                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,8&control=1&precip=1&menu=0&monitor=1&color=6&logo=0&osh=1&m=4" 
-                allowfullscreen>
-            </iframe>
-        </div>
+        <div id="map"></div>
     </section>
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range Intelligence</h3>
-            <p>Status: Monitoring coastal corridors. <span class="uv-tag">UV Index: 4</span>.</p>
-            <p><span class="pop-tag">Precipitation:</span> 10% (Nearest 10%)</p>
+            <h3>Short Range</h3>
+            <p>Infrastructure: Coastline persistent. <span class="uv-tag">UV Index: 4</span>.</p>
+            <p><span class="pop-tag">Precipitation:</span> 10%</p>
         </div>
 
         <div class="card">
-            <h3>Extended Intelligence</h3>
-            <p>Outlook: Stability across road networks.</p>
-            <p><span class="wind-tag">Wind up to 15 km/h.</span></p>
+            <h3>Extended Outlook</h3>
+            <p>Outlook: Operational clarity. <span class="wind-tag">Wind up to 15 km/h.</span></p>
             <p><span class="pop-tag">POP:</span> Omitted (&lt;30%)</p>
         </div>
     </div>
 </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Initialize map focused on Gander / NL Region
+    const map = L.map('map').setView([48.955, -54.608], 8);
+
+    // BASE LAYER: High-contrast Dark Map to make coastlines pop
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© CartoDB'
+    }).addTo(map);
+
+    // RADAR LAYER: RainViewer with 60% opacity for coastline visibility
+    // Using palette 6 (High contrast)
+    const rainViewerUrl = 'https://tilecache.rainviewer.com/v2/radar/nowcast_5076b9f2e307/256/{z}/{x}/{y}/6/1_1.png';
+    
+    L.tileLayer(rainViewerUrl, {
+        opacity: 0.6, // <--- CRITICAL: This allows the coastline to bleed through
+        zIndex: 100
+    }).addTo(map);
+</script>
 
 </body>
 </html>
