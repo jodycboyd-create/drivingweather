@@ -3,29 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Velocity & Time Engine</title>
+    <title>WEonG-Bulletin | Dynamic Hub & Time Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary-bg: #0a0a0b; --accent-blue: #0070f3; --text-main: #ffffff; }
         body { font-family: sans-serif; background: var(--primary-bg); color: var(--text-main); margin: 0; padding: 20px; }
-        #map { height: 500px; border-radius: 12px; border: 1px solid #333; background: #000; }
+        #map { height: 550px; border-radius: 12px; border: 1px solid #333; background: #000; }
         
         .control-panel { 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; 
             margin-bottom: 15px; background: #161618; padding: 20px; border-radius: 12px; border: 1px solid #333;
         }
         
         .input-group { display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 12px; color: #888; text-transform: uppercase; font-weight: bold; }
+        label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; }
         input, select { background: #000; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 6px; }
         
         .speed-ctrl { display: flex; align-items: center; gap: 10px; }
-        .speed-btn { background: #333; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 18px; }
-        .speed-btn:hover { background: var(--accent-blue); }
+        .speed-btn { background: #333; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 16px; }
 
         .eta-display { 
             grid-column: 1 / -1; background: #000; padding: 15px; border-radius: 8px; 
-            border: 1px solid var(--accent-blue); text-align: center; font-size: 1.2rem;
+            border: 1px solid var(--accent-blue); display: flex; justify-content: space-around; font-size: 1rem;
         }
         
         .community-label {
@@ -33,6 +32,7 @@
             border-radius: 6px; color: #000; padding: 6px 12px;
             font-weight: 900; font-size: 12px; text-transform: uppercase;
         }
+        .metric { color: var(--accent-blue); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -40,32 +40,34 @@
 <div style="max-width: 1200px; margin: auto;">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] VELOCITY SYNC</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] DYNAMIC HUB SYNC</div>
     </header>
 
     <div class="control-panel">
         <div class="input-group">
-            <label>Departure Time</label>
-            <input type="time" id="depTime" value="08:00">
+            <label>Departure</label>
+            <input type="time" id="depTime" value="08:00" onchange="calculateTravel()">
         </div>
         
         <div class="input-group">
-            <label>Travel Speed (km/h)</label>
+            <label>Velocity (km/h)</label>
             <div class="speed-ctrl">
                 <button class="speed-btn" onclick="adjustSpeed(-5)">-</button>
-                <input type="number" id="travelSpeed" value="100" readonly style="text-align:center; width: 60px;">
+                <input type="number" id="travelSpeed" value="100" readonly style="text-align:center; width: 50px;">
                 <button class="speed-btn" onclick="adjustSpeed(5)">+</button>
             </div>
         </div>
 
         <div class="input-group">
-            <label>Search Town</label>
-            <input type="text" id="townSearch" placeholder="Type name..." onchange="jumpToTown()">
+            <label>Quick Jump</label>
+            <input type="text" id="townSearch" placeholder="Search towns..." list="townList" onchange="jumpToTown()">
+            <datalist id="townList"></datalist>
         </div>
 
         <div id="etaBox" class="eta-display">
-            Distance: <span id="distVal" class="metric">0 km</span> | 
-            Est. Travel Time: <span id="timeVal" class="metric">0h 0m</span>
+            <div>Distance: <span id="distVal" class="metric">0 km</span></div>
+            <div>Travel: <span id="timeVal" class="metric">0h 0m</span></div>
+            <div>Arrival: <span id="arrivalVal" class="metric">--:--</span></div>
         </div>
     </div>
 
@@ -75,11 +77,19 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const nlHubs = [
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Gander", lat: 48.955, lng: -54.608 },
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
-        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Clarenville", lat: 48.165, lng: -53.955 }
+        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
+        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Bay Roberts", lat: 47.596, lng: -53.262 },
+        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Bonavista", lat: 48.649, lng: -53.114 },
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Lewisporte", lat: 49.248, lng: -55.050 },
+        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Badger", lat: 48.974, lng: -56.035 },
+        { name: "Springdale", lat: 49.498, lng: -56.066 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
+        { name: "Pasadena", lat: 49.016, lng: -57.594 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
+        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
+        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 }
     ];
+
+    const dl = document.getElementById('townList');
+    nlHubs.forEach(h => { let opt = document.createElement('option'); opt.value = h.name; dl.appendChild(opt); });
 
     const map = L.map('map').setView([48.955, -54.608], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
@@ -88,23 +98,37 @@
     let markers = [];
     let routeDistance = 0;
 
-    function adjustSpeed(val) {
-        const input = document.getElementById('travelSpeed');
-        let newSpeed = parseInt(input.value) + val;
-        if (newSpeed < 20) newSpeed = 20;
-        input.value = newSpeed;
-        calculateTravel();
+    function findClosestHub(lat, lng) {
+        let closest = nlHubs[0];
+        let minD = Infinity;
+        nlHubs.forEach(hub => {
+            const d = Math.sqrt(Math.pow(hub.lat - lat, 2) + Math.pow(hub.lng - lng, 2));
+            if (d < minD) { minD = d; closest = hub; }
+        });
+        return closest;
     }
 
     function calculateTravel() {
         if (routeDistance === 0) return;
         const speed = parseInt(document.getElementById('travelSpeed').value);
-        const hours = routeDistance / speed;
-        const h = Math.floor(hours);
-        const m = Math.round((hours - h) * 60);
+        const depTime = document.getElementById('depTime').value;
         
-        document.getElementById('distVal').innerText = (routeDistance).toFixed(1) + " km";
+        const hoursTotal = routeDistance / speed;
+        const h = Math.floor(hoursTotal);
+        const m = Math.round((hoursTotal - h) * 60);
+        
+        document.getElementById('distVal').innerText = routeDistance.toFixed(1) + " km";
         document.getElementById('timeVal').innerText = `${h}h ${m}m`;
+
+        // Calculate Arrival Clock
+        const [depH, depM] = depTime.split(':').map(Number);
+        let arrM = depM + m;
+        let arrH = depH + h + Math.floor(arrM / 60);
+        arrM = arrM % 60;
+        arrH = arrH % 24;
+        
+        const arrivalStr = `${String(arrH).padStart(2, '0')}:${String(arrM).padStart(2, '0')}`;
+        document.getElementById('arrivalVal').innerText = arrivalStr;
     }
 
     async function updateRoute() {
@@ -118,7 +142,7 @@
             const data = await res.json();
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
-                routeDistance = data.routes[0].distance / 1000; // to KM
+                routeDistance = data.routes[0].distance / 1000;
                 L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 6 } }).addTo(routeLayer);
                 calculateTravel();
             }
@@ -132,14 +156,36 @@
         
         marker.on('dragend', function() {
             const current = marker.getLatLng();
-            // Snap logic (Simplified for demo)
+            const closest = findClosestHub(current.lat, current.lng);
+            marker.setLatLng([closest.lat, closest.lng]);
+            marker.setTooltipContent(`${label}: ${closest.name}`);
             updateRoute();
         });
         markers.push(marker);
     }
 
-    createPin('Origin', 1); // Gander
-    createPin('Destination', 2); // GFW
+    function adjustSpeed(val) {
+        const input = document.getElementById('travelSpeed');
+        let newSpeed = parseInt(input.value) + val;
+        if (newSpeed < 20) newSpeed = 20;
+        input.value = newSpeed;
+        calculateTravel();
+    }
+
+    function jumpToTown() {
+        const query = document.getElementById('townSearch').value;
+        const target = nlHubs.find(h => h.name.toLowerCase() === query.toLowerCase());
+        if (target) {
+            // Logic to move destination pin by default for jump
+            markers[1].setLatLng([target.lat, target.lng]);
+            markers[1].setTooltipContent(`Destination: ${target.name}`);
+            map.panTo([target.lat, target.lng]);
+            updateRoute();
+        }
+    }
+
+    createPin('Origin', 6); // Gander
+    createPin('Destination', 8); // GFW
     setTimeout(updateRoute, 1000);
 </script>
 </body>
