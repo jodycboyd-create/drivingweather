@@ -3,114 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Contrast Intelligence</title>
+    <title>WEonG-Bulletin | Intelligent Routing</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
             --primary-bg: #0a0a0b;
             --container-bg: #161618;
             --accent-blue: #0070f3;
             --text-main: #ffffff;
-            --text-dim: #bbbbbb;
-            --uv-gold: #ffcc00;
+            --text-dim: #888888;
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--primary-bg);
-            color: var(--text-main);
-            margin: 0;
-            padding: 20px;
-        }
-
+        body { font-family: sans-serif; background: var(--primary-bg); color: var(--text-main); margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: auto; }
+        
+        /* Map UI */
+        .radar-container { background: var(--container-bg); border-radius: 12px; padding: 12px; border: 1px solid #222; }
+        #map { height: 700px; border-radius: 8px; background: #000; }
 
-        header {
-            border-bottom: 1px solid #333;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
+        /* Custom Layer Control Styling */
+        .leaflet-control-layers { background: #1c1c1e !important; color: white !important; border: 1px solid #444 !important; }
 
-        /* RADAR SECTION - Optimized for Coastline Contrast */
-        .radar-container {
-            background: var(--container-bg);
-            border-radius: 12px;
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #333;
-        }
-
-        .map-wrapper {
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
-            background: #000;
-            height: 700px;
-            /* This filter forces white vectors (coast/names) to glow against the blue radar */
-            filter: contrast(1.4) brightness(1.1);
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        /* [weong-route] Forecast Cards */
-        .forecast-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        .card {
-            background: var(--container-bg);
-            padding: 20px;
-            border-radius: 12px;
-            border-left: 4px solid var(--accent-blue);
-        }
-
-        .uv-tag { color: var(--uv-gold); font-weight: bold; }
-        .wind-tag { font-style: italic; color: var(--text-dim); }
+        /* [weong-route] Cards */
+        .forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .card { background: var(--container-bg); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent-blue); }
+        .uv-tag { color: #ffcc00; font-weight: bold; }
         .pop-tag { color: #88aaff; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <header>
+    <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-size: 0.8rem; font-weight: bold; text-transform: uppercase;">
-            [WEONG-ROUTE] Methodology Locked
-        </div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] INTERACTIVE LAYER CONTROL</div>
     </header>
 
     <section class="radar-container">
-        <h3 style="margin-left: 10px; text-transform: uppercase; font-size: 0.85rem; color: var(--text-dim);">
-            Infrastructure & Coastline Contrast View
-        </h3>
-        <div class="map-wrapper">
-            <iframe 
-                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,9&control=1&precip=1&menu=0&monitor=1&color=2&logo=0&osh=1&m=3" 
-                allowfullscreen>
-            </iframe>
-        </div>
+        <div id="map"></div>
     </section>
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range Forecast</h3>
-            <p>Today: High-contrast monitoring. <span class="uv-tag">UV Index: 6 (High)</span>.</p>
-            <p><span class="pop-tag">Precipitation:</span> 20% (Nearest 10%)</p>
+            <h3>Short Range</h3>
+            <p>Route Status: Pins Active. <span class="uv-tag">UV Index: 4</span>.</p>
+            <p><span class="pop-tag">Precipitation:</span> 10%</p>
         </div>
-
         <div class="card">
             <h3>Extended Outlook</h3>
-            <p>Saturday: System movement tracking.</p>
-            <p><span class="wind-tag">Wind up to 15 km/h.</span></p>
-            <p><span class="pop-tag">POP:</span> 40%</p>
+            <p>Outlook: Operational clarity. <i>Wind up to 15 km/h.</i></p>
+            <p><span class="pop-tag">POP:</span> Omitted</p>
         </div>
     </div>
 </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // 1. Initialize Map
+    const map = L.map('map').setView([48.955, -54.608], 8);
+
+    // 2. Define Layers
+    const baseRoads = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        className: 'roads-layer'
+    });
+
+    const darkBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© CartoDB'
+    }).addTo(map);
+
+    const radarLayer = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_5076b9f2e307/256/{z}/{x}/{y}/2/1_1.png', {
+        opacity: 0.6,
+        zIndex: 100
+    }).addTo(map);
+
+    // 3. Layer Toggles
+    const overlays = {
+        "Road Infrastructure": baseRoads,
+        "Weather Radar": radarLayer
+    };
+    L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+
+    // 4. Draggable Pins with Snapping Logic
+    function createDraggablePin(color, label, startPos) {
+        const marker = L.marker(startPos, {
+            draggable: true,
+            autoPan: true
+        }).addTo(map).bindPopup(label);
+
+        marker.on('dragend', function(e) {
+            const latlng = marker.getLatLng();
+            
+            // "Snapping" Logic: Simulating locking to coordinates of local communities 
+            // by rounding to significant decimals used by road networks
+            const snappedLat = Math.round(latlng.lat * 100) / 100;
+            const snappedLng = Math.round(latlng.lng * 100) / 100;
+            
+            marker.setLatLng([snappedLat, snappedLng]);
+            marker.setPopupContent(`${label} Locked: ${snappedLat}, ${snappedLng}`);
+            marker.openPopup();
+        });
+    }
+
+    createDraggablePin('blue', 'Start Route', [48.95, -54.60]);
+    createDraggablePin('red', 'End Route', [49.10, -54.20]);
+
+</script>
 
 </body>
 </html>
