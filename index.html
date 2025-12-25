@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Robust Community Snap</title>
+    <title>WEonG-Bulletin | Fixed Draggable Routing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -38,7 +38,7 @@
 <div class="container">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] DEBOUNCED SNAP ENGINE</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] RADIUS SEARCH ACTIVE</div>
     </header>
 
     <section class="radar-container">
@@ -64,31 +64,30 @@
 
     let routeLayer = L.layerGroup().addTo(map);
     let markers = [];
-    let debounceTimer;
 
-    // REFINED SEARCH WITH NL BOUNDS
-    async function getCommunityCenter(lat, lng) {
-        // NL Bounding Box logic to keep pins in-province
-        const viewbox = "-59.5,46.5,-52.5,52.0";
-        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1&bounded=1&viewbox=${viewbox}`;
+    // Searches specifically for a community name within the vicinity of the drop
+    async function findCommunityNear(lat, lng) {
+        // We search for "settlement" near the coordinate
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=town,village,hamlet&lat=${lat}&lon=${lng}&limit=1`;
         
         try {
             const res = await fetch(url);
-            if (!res.ok) return null;
             const data = await res.json();
-            const a = data.address;
-
-            // Prioritize named towns/villages
-            const name = a.city || a.town || a.village || a.hamlet || a.suburb || a.neighbourhood || a.road;
             
-            // Validate coordinates - must be within Newfoundland region
-            const nLat = parseFloat(data.lat);
-            const nLng = parseFloat(data.lon);
-            
-            if (!isNaN(nLat) && nLat > 46 && nLat < 52) {
-                return { name: name, lat: nLat, lng: nLng };
+            if (data && data.length > 0) {
+                const c = data[0];
+                const cName = c.display_name.split(',')[0];
+                
+                // Ensure it's not a generic "Unincorporated" name
+                if (!cName.toLowerCase().includes("unincorporated")) {
+                    return {
+                        name: cName,
+                        lat: parseFloat(c.lat),
+                        lng: parseFloat(c.lon)
+                    };
+                }
             }
-        } catch (e) { return null; }
+        } catch (e) { console.error("Search error"); }
         return null;
     }
 
@@ -110,34 +109,34 @@
         } catch (err) { console.warn("Routing API error"); }
     }
 
-    function createPin(label, pos, initialDelay) {
+    function createPin(label, pos, delay) {
         const marker = L.marker(pos, { draggable: true }).addTo(map);
         marker.bindTooltip(label, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
         
         const snapAction = async () => {
             const current = marker.getLatLng();
-            marker.setTooltipContent("Locking...");
+            marker.setTooltipContent("Scanning...");
             
-            const loc = await getCommunityCenter(current.lat, current.lng);
+            const community = await findCommunityNear(current.lat, current.lng);
             
-            if (loc) {
-                marker.setLatLng([loc.lat, loc.lng]);
-                marker.setTooltipContent(`${label}: ${loc.name}`);
+            if (community) {
+                // If a real town is found nearby, snap to it
+                marker.setLatLng([community.lat, community.lng]);
+                marker.setTooltipContent(`${label}: ${community.name}`);
             } else {
-                // If API fails, just label it as current coordinate to prevent disappearing
-                marker.setTooltipContent(`${label}: Dropped Point`);
+                // FALLBACK: Keep the pin exactly where it was dropped to prevent it getting stuck
+                // Label with coordinates so the user knows no community was found
+                marker.setTooltipContent(`${label}: Segment (${current.lat.toFixed(2)}, ${current.lng.toFixed(2)})`);
             }
             updateRoute();
         };
 
-        // Debounce: Wait 500ms after move stops before calling API
-        marker.on('dragend', () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(snapAction, 500);
-        });
-
+        // Standard draggable events
+        marker.on('dragend', snapAction);
         markers.push(marker);
-        setTimeout(snapAction, initialDelay);
+
+        // Initial setup
+        setTimeout(snapAction, delay);
     }
 
     createPin('Origin', [48.955, -54.608], 500); 
