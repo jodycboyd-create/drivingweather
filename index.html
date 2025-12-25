@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | High-Contrast Coastline Command</title>
+    <title>WEonG-Bulletin | Coastline Persistence Command</title>
     <style>
         :root {
-            --primary-bg: #0f0f10; /* Darker background for better contrast */
-            --container-bg: #1c1c1e;
+            --primary-bg: #0a0a0b;
+            --container-bg: #161618;
             --accent-blue: #0070f3;
             --text-main: #ffffff;
-            --text-dim: #a0a0a0;
+            --text-dim: #888888;
             --exception-lvl3: #ff4e42;
-            --uv-gold: #ffcc00;
         }
 
         body {
@@ -25,38 +24,43 @@
 
         .container { max-width: 1200px; margin: auto; }
 
+        /* HEADER - [weong-route] methodology locked */
         header {
             border-bottom: 1px solid #333;
-            padding-bottom: 15px;
+            padding-bottom: 10px;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
         }
 
-        /* RADAR CONTAINER WITH COASTLINE PERSISTENCE */
         .radar-container {
             background: var(--container-bg);
             border-radius: 12px;
-            padding: 10px;
+            padding: 12px;
             margin-bottom: 20px;
-            border: 1px solid #333;
+            border: 1px solid #222;
         }
 
+        /* THE COASTLINE FIX */
         .map-wrapper {
             position: relative;
             border-radius: 8px;
             overflow: hidden;
             background: #000;
-            height: 700px; /* Increased height */
+            height: 700px;
+            /* This blend mode forces the bright coastline and road labels to stay on top */
+            mix-blend-mode: screen; 
         }
 
-        /* This filter ensures the white coastline/roads "pop" through the blue radar */
         iframe {
             width: 100%;
             height: 100%;
             border: none;
-            filter: saturate(1.2) contrast(1.2) brightness(1.1);
+            /* Custom filter to boost the white 'vector' lines of the coastline */
+            filter: contrast(1.4) brightness(1.1) saturate(1.3);
         }
 
-        /* FORECAST CARDS - [weong-route] Standards */
+        /* FORECAST CARDS */
         .forecast-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -70,7 +74,7 @@
             border-left: 4px solid var(--accent-blue);
         }
 
-        .uv-tag { color: var(--uv-gold); font-weight: bold; }
+        .uv-tag { color: #ffcc00; font-weight: bold; }
         .wind-tag { font-style: italic; color: var(--text-dim); }
         .pop-tag { color: #88aaff; font-weight: bold; }
 
@@ -82,18 +86,18 @@
 <div class="container">
     <header>
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-size: 0.8rem; font-weight: bold;">
+        <div style="color: var(--accent-blue); font-size: 0.8rem; font-weight: bold; align-self: center;">
             [WEONG-ROUTE] METHODOLOGY LOCKED
         </div>
     </header>
 
     <section class="radar-container">
-        <h3 style="margin-left: 10px; text-transform: uppercase; font-size: 0.9rem; color: var(--text-dim);">
-            Live Infrastructure & Coastline Intelligence
+        <h3 style="margin-top: 0; text-transform: uppercase; font-size: 0.85rem; color: var(--text-dim); letter-spacing: 1px;">
+            Live Infrastructure & High-Contrast Coastline
         </h3>
         <div class="map-wrapper">
             <iframe 
-                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,8&control=1&precip=1&menu=0&monitor=1&color=4&logo=0&osh=1&m=1" 
+                src="https://www.rainviewer.com/map.html?loc=48.955,-54.608,8&control=1&precip=1&menu=0&monitor=1&color=6&logo=0&osh=1&m=4" 
                 allowfullscreen>
             </iframe>
         </div>
@@ -101,14 +105,14 @@
 
     <div class="forecast-grid">
         <div class="card">
-            <h3>Short Range</h3>
-            <p>Conditions: Sunny intervals. <span class="uv-tag">UV Index: 4 (Moderate)</span>.</p>
+            <h3>Short Range Intelligence</h3>
+            <p>Status: Monitoring coastal corridors. <span class="uv-tag">UV Index: 4</span>.</p>
             <p><span class="pop-tag">Precipitation:</span> 10% (Nearest 10%)</p>
         </div>
 
         <div class="card">
-            <h3>Extended Outlook</h3>
-            <p>Outlook: High pressure building.</p>
+            <h3>Extended Intelligence</h3>
+            <p>Outlook: Stability across road networks.</p>
             <p><span class="wind-tag">Wind up to 15 km/h.</span></p>
             <p><span class="pop-tag">POP:</span> Omitted (&lt;30%)</p>
         </div>
