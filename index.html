@@ -2,34 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | Fixed Engine v3.2</title>
+    <title>WEonG-Bulletin | Anchor-Sync v3.4</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --map-grey: #0d0d0e; --accent: #0070f3; --text: #e0e0e0; --panel-border: #333; }
-        body { font-family: 'Inter', sans-serif; background: #000; color: var(--text); margin: 0; padding: 20px; }
-        #map { height: 600px; border-radius: 8px; border: 1px solid var(--panel-border); background: #000; }
+        :root { --carbon: #1a1a1b; --accent: #0070f3; --text: #f0f0f0; --border: #333; }
+        body { font-family: 'Inter', sans-serif; background: #222; color: var(--text); margin: 0; padding: 20px; }
+        #map { height: 600px; border-radius: 8px; border: 1px solid var(--border); background: var(--carbon); }
         
         .control-panel { 
             display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; 
-            margin-bottom: 20px; background: #161618; padding: 20px; border-radius: 12px; border: 1px solid var(--panel-border);
+            margin-bottom: 20px; background: #111; padding: 20px; border-radius: 12px; border: 1px solid var(--border);
         }
         
         .input-group { display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: 700; }
-        input { background: #000; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 4px; }
+        label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: 900; }
+        input { background: #000; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 4px; outline: none; }
         
-        .btn-launch { 
-            grid-column: 1 / -1; background: var(--accent); color: white; border: none; padding: 12px; 
-            border-radius: 6px; font-weight: 800; cursor: pointer; text-transform: uppercase;
-        }
-
         .community-label {
             background: #ffffff; border: 2px solid #000; border-radius: 4px;
-            color: #000; padding: 4px 8px; font-weight: 900; font-size: 11px;
+            color: #000; padding: 4px 10px; font-weight: 900; font-size: 11px;
             text-transform: uppercase; white-space: nowrap; pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.8);
         }
-        
-        .leaflet-tile-pane { filter: grayscale(100%) brightness(0.4) contrast(1.5) invert(100%) hue-rotate(180deg); }
+
+        /* Professional Grey Filtering */
+        .leaflet-tile-pane { filter: grayscale(100%) brightness(0.8) contrast(1.2); opacity: 0.6; }
+        .leaflet-container { background: #bbb !important; }
     </style>
 </head>
 <body>
@@ -37,14 +35,13 @@
 <div style="max-width: 1400px; margin: auto;">
     <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <h2 style="margin:0;">WEonG <span style="color:var(--accent)">ROUTE</span></h2>
-        <div style="font-size: 12px; color: #555;">ENGINE RESTORED | LEVEL 3 TRIGGER ACTIVE</div>
+        <div style="font-size: 11px; color: #888;">PROFESSIONAL GREY | ANCHOR-SYNC ACTIVE</div>
     </header>
 
     <div class="control-panel">
-        <div class="input-group"><label>Origin</label><input type="text" id="originIn" readonly></div>
-        <div class="input-group"><label>Destination</label><input type="text" id="destIn" readonly></div>
-        <div class="input-group"><label>Departure</label><input type="time" id="depTime" value="09:00"></div>
-        <button class="btn-launch" onclick="alert('Generating [weong-route] Bulletin...')">Generate Forecast</button>
+        <div class="input-group"><label>Origin Hub</label><input type="text" id="originIn" readonly></div>
+        <div class="input-group"><label>Dest. Hub</label><input type="text" id="destIn" readonly></div>
+        <div class="input-group"><label>Methodology</label><div style="color:var(--accent); font-weight:bold; font-size:12px;">LEVEL 3 TRIGGER</div></div>
     </div>
 
     <div id="map"></div>
@@ -52,20 +49,17 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // Massive Island-Wide Expansion
+    // FULL ISLAND-WIDE HYPER-DENSITY DATASET [cite: 2025-12-23]
     const nlHubs = [
         { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
         { name: "Carbonear", lat: 47.737, lng: -53.228 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Glenwood", lat: 48.995, lng: -54.872 },
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Bishop's Falls", lat: 49.014, lng: -55.485 },
-        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "Baie Verte", lat: 49.932, lng: -56.183 },
-        { name: "La Scie", lat: 49.957, lng: -55.590 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
-        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Musgrave Harbour", lat: 49.444, lng: -53.961 },
-        { name: "Summerford", lat: 49.496, lng: -54.646 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 }
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Baie Verte", lat: 49.932, lng: -56.183 }, { name: "La Scie", lat: 49.957, lng: -55.590 },
+        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
+        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 }
     ];
 
-    const map = L.map('map').setView([48.9, -55.5], 7);
+    const map = L.map('map').setView([48.5, -55.5], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png').addTo(map);
 
     let markers = [];
@@ -88,8 +82,9 @@
         const dx = Math.abs(p1.x - p2.x);
         const dy = Math.abs(p1.y - p2.y);
         
-        if (dx < 160 && dy < 60) {
-            markers[1].getTooltip().setParams({ offset: [0, -45] });
+        // Dynamic leapfrog if labels overlap in pixel space
+        if (dx < 170 && dy < 50) {
+            markers[1].getTooltip().setParams({ offset: [0, -50] });
         } else {
             markers[1].getTooltip().setParams({ offset: [0, -10] });
         }
@@ -97,17 +92,21 @@
 
     async function updateRoute() {
         if (markers.length < 2) return;
+        // CRITICAL: Use the exact snapped hub coordinates for the route
         const s = markers[0].getLatLng();
         const e = markers[1].getLatLng();
         const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
+        
         try {
             const res = await fetch(url);
             const data = await res.json();
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
-                L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 6 } }).addTo(routeLayer);
+                L.geoJSON(data.routes[0].geometry, { 
+                    style: { color: '#0070f3', weight: 7, opacity: 0.9 } 
+                }).addTo(routeLayer);
             }
-        } catch (err) { console.error("Routing error:", err); }
+        } catch (err) { console.error("Sync Error:", err); }
     }
 
     function createMarker(idx, label) {
@@ -117,26 +116,26 @@
             permanent: true, direction: 'top', className: 'community-label', offset: [0, -10]
         }).openTooltip();
         
-        // Dynamic Drag Logic
         marker.on('drag', function() {
-            const closest = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
-            marker.setTooltipContent(`${label}: ${closest.name}`);
+            const temp = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
+            marker.setTooltipContent(`${label}: ${temp.name}`);
             resolveCollision();
         });
 
         marker.on('dragend', function() {
-            const closest = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
-            marker.setLatLng([closest.lat, closest.lng]);
-            document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = closest.name;
-            updateRoute();
+            const snap = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
+            marker.setLatLng([snap.lat, snap.lng]); // Finalize snap
+            document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = snap.name;
+            updateRoute(); // Only trigger route after snap is fixed
         });
 
         markers.push(marker);
         document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = hub.name;
     }
 
-    createMarker(4, 'Origin'); // Gander
-    createMarker(6, 'Destination'); // GFW
+    // Initial load
+    createMarker(2, 'Origin');    // Carbonear
+    createMarker(6, 'Destination'); // Baie Verte
     
     map.on('zoomend move', resolveCollision);
     setTimeout(updateRoute, 500);
