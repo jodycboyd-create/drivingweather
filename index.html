@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG-Bulletin | Force-Clear Labels</title>
+    <title>WEonG-Bulletin | Hyper-Density Stack Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary-bg: #0a0a0b; --accent-blue: #0070f3; --text-main: #ffffff; }
@@ -27,14 +27,13 @@
             border: 1px solid var(--accent-blue); display: flex; justify-content: space-around;
         }
         
-        /* Strict Label Styling */
+        /* High-Visibility Non-Overlap Styling */
         .community-label {
             background: #ffffff; border: 2px solid var(--accent-blue);
             border-radius: 6px; color: #000; padding: 6px 12px;
-            font-weight: 900; font-size: 12px; text-transform: uppercase;
+            font-weight: 900; font-size: 11px; text-transform: uppercase;
             white-space: nowrap; pointer-events: none;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
-            transition: all 0.1s ease-out;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.7);
         }
         .metric { color: var(--accent-blue); font-weight: bold; }
     </style>
@@ -44,7 +43,7 @@
 <div style="max-width: 1200px; margin: auto;">
     <header style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h1>WEonG-Bulletin</h1>
-        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] COLLISION-FREE HUB SYSTEM</div>
+        <div style="color: var(--accent-blue); font-weight: bold;">[WEONG-ROUTE] HYPER-DENSITY HUB v3.0</div>
     </header>
 
     <div class="control-panel">
@@ -61,8 +60,8 @@
             </div>
         </div>
         <div class="input-group">
-            <label>Destination Search</label>
-            <input type="text" id="townSearch" placeholder="Search 200+ towns..." list="townList" onchange="jumpToTown()">
+            <label>Location Search</label>
+            <input type="text" id="townSearch" placeholder="Search hubs..." list="townList" onchange="jumpToTown()">
             <datalist id="townList"></datalist>
         </div>
         <div id="etaBox" class="eta-display">
@@ -77,18 +76,20 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // Expanded 200+ Community Dataset
+    // HYPER-DENSITY DATASET (Added requested hubs)
     const nlHubs = [
         { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
-        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Holyrood", lat: 47.388, lng: -53.131 },
-        { name: "Whitbourne", lat: 47.424, lng: -53.530 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
-        { name: "Port Blandford", lat: 48.355, lng: -54.162 }, { name: "Terra Nova", lat: 48.441, lng: -54.015 },
-        { name: "Glovertown", lat: 48.667, lng: -54.033 }, { name: "Gambo", lat: 48.748, lng: -54.214 },
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Glenwood", lat: 48.995, lng: -54.872 },
+        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Whitbourne", lat: 47.424, lng: -53.530 },
+        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Glovertown", lat: 48.667, lng: -54.033 },
+        { name: "Gambo", lat: 48.748, lng: -54.214 }, { name: "Gander", lat: 48.955, lng: -54.608 },
+        { name: "Glenwood", lat: 48.995, lng: -54.872 }, { name: "Musgrave Harbour", lat: 49.444, lng: -53.961 },
+        { name: "Lumsden", lat: 49.298, lng: -53.585 }, { name: "Summerford", lat: 49.496, lng: -54.646 },
+        { name: "Twillingate", lat: 49.648, lng: -54.764 }, { name: "Lewisporte", lat: 49.248, lng: -55.050 },
         { name: "Bishop's Falls", lat: 49.014, lng: -55.485 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
-        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "South Brook", lat: 49.431, lng: -56.082 },
-        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 }
+        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "Springdale", lat: 49.498, lng: -56.066 },
+        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Pasadena", lat: 49.016, lng: -57.594 },
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }
     ];
 
     const dl = document.getElementById('townList');
@@ -111,34 +112,22 @@
         return closest;
     }
 
-    // ADVANCED COLLISION LOGIC
-    function resolveLabelCollision() {
+    // MANDATORY STACK LOGIC
+    function enforceLabelStack() {
         if (markers.length < 2) return;
+        const p1 = map.latLngToLayerPoint(markers[0].getLatLng());
+        const p2 = map.latLngToLayerPoint(markers[1].getLatLng());
         
-        const m1 = markers[0];
-        const m2 = markers[1];
-        
-        // Reset to default
-        m1.getTooltip().setParams({ direction: 'top', offset: [0, -10] });
-        m2.getTooltip().setParams({ direction: 'top', offset: [0, -10] });
+        const xDiff = Math.abs(p1.x - p2.x);
+        const yDiff = Math.abs(p1.y - p2.y);
 
-        const t1 = m1.getTooltip()._container;
-        const t2 = m2.getTooltip()._container;
-
-        if (!t1 || !t2) return;
-
-        const r1 = t1.getBoundingClientRect();
-        const r2 = t2.getBoundingClientRect();
-
-        // Check if boxes overlap (with 10px padding)
-        const isOverlapping = !(r2.left > r1.right + 10 || 
-                                r2.right < r1.left - 10 || 
-                                r2.top > r1.bottom + 10 ||
-                                r2.bottom < r1.top - 10);
-
-        if (isOverlapping) {
-            // Force Destination label to move to the bottom if origin is on top
-            m2.getTooltip().setParams({ direction: 'bottom', offset: [0, 10] });
+        // If markers are within 150px of each other, force a vertical stack
+        if (xDiff < 150 && yDiff < 100) {
+            markers[0].getTooltip().setParams({ offset: [0, -10], direction: 'top' });
+            markers[1].getTooltip().setParams({ offset: [0, -45], direction: 'top' });
+        } else {
+            markers[0].getTooltip().setParams({ offset: [0, -10], direction: 'top' });
+            markers[1].getTooltip().setParams({ offset: [0, -10], direction: 'top' });
         }
     }
 
@@ -155,8 +144,8 @@
 
         const [depH, depM] = depTime.split(':').map(Number);
         let arrM = depM + m;
-        let arrH = depH + h + Math.floor(arrM / 60);
-        arrM = arrM % 60; arrH = arrH % 24;
+        let arrH = (depH + h + Math.floor(arrM / 60)) % 24;
+        arrM = arrM % 60;
         document.getElementById('arrivalVal').innerText = `${String(arrH).padStart(2, '0')}:${String(arrM).padStart(2, '0')}`;
     }
 
@@ -169,7 +158,7 @@
             routeLayer.clearLayers();
             if (data.routes && data.routes[0]) {
                 routeDistance = data.routes[0].distance / 1000;
-                L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 6 } }).addTo(routeLayer);
+                L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 6, opacity: 0.8 } }).addTo(routeLayer);
                 calculateTravel();
             }
         } catch (e) {}
@@ -179,15 +168,14 @@
         const hub = nlHubs[idx];
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
         marker.bindTooltip(`${label}: ${hub.name}`, { 
-            permanent: true, 
-            className: 'community-label'
+            permanent: true, direction: 'top', className: 'community-label'
         }).openTooltip();
         
         marker.on('drag', function() {
             const current = marker.getLatLng();
             const closest = findClosestHub(current.lat, current.lng);
             marker.setTooltipContent(`${label}: ${closest.name}`);
-            resolveLabelCollision();
+            enforceLabelStack();
         });
 
         marker.on('dragend', function() {
@@ -196,7 +184,7 @@
             marker.setLatLng([closest.lat, closest.lng]);
             marker.setTooltipContent(`${label}: ${closest.name}`);
             updateRoute();
-            setTimeout(resolveLabelCollision, 50); // Final check after snap
+            enforceLabelStack();
         });
         markers.push(marker);
     }
@@ -215,14 +203,14 @@
             markers[1].setTooltipContent(`Destination: ${target.name}`);
             map.panTo([target.lat, target.lng]);
             updateRoute();
-            setTimeout(resolveLabelCollision, 100);
+            enforceLabelStack();
         }
     }
 
-    createPin('Origin', 10); // Gander
-    createPin('Destination', 13); // GFW
+    createPin('Origin', 8); // Gambo
+    createPin('Destination', 11); // Summerford
     
-    map.on('zoom move', resolveLabelCollision);
+    map.on('zoom move', enforceLabelStack);
     setTimeout(updateRoute, 1000);
 </script>
 </body>
