@@ -1,9 +1,3 @@
-/**
- * route-engine.js 
- * Project: [weong-route]
- * Fixed for: https://[username].github.io/drivingweather/
- */
-
 export class RouteEngine {
     constructor() {
         this.communities = [];
@@ -11,21 +5,20 @@ export class RouteEngine {
 
     async loadCommunities() {
         try {
-            // Using the full repo path to avoid 404s
-            const response = await fetch('/drivingweather/data/nl/communities.json');
+            // Using a relative path from the root where index.html sits
+            const response = await fetch('./data/nl/communities.json');
             
             if (!response.ok) {
-                throw new Error(`Failed to load data. Status: ${response.status}`);
+                // This will help us see EXACTLY where it tried to look
+                throw new Error(`404 Not Found at: ${response.url}`);
             }
             
             this.communities = await response.json();
-            console.log("Newfoundland Dataset Locked and Loaded.");
             return this.communities;
         } catch (error) {
-            console.error("RouteEngine Fetch Error:", error);
-            // Alerting the UI that it failed
+            console.error("RouteEngine Error:", error);
             const status = document.getElementById('status-msg');
-            if (status) status.innerHTML = `<span style="color:red;">Error: ${error.message}</span>`;
+            if (status) status.innerHTML = `<span style="color:red;">${error.message}</span>`;
             return [];
         }
     }
