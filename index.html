@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | v8.0 Permanent Master Mesh</title>
+    <title>WEonG-Bulletin | v9.0 Absolute Provincial Mesh</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --g-blue: #1a73e8; --g-red: #d93025; }
+        :root { --g-blue: #1a73e8; }
         body { font-family: 'Roboto', sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
-        #map { height: 850px; border-radius: 16px; border: 1px solid #dadce0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        #map { height: 850px; border-radius: 16px; border: 1px solid #dadce0; }
         .community-label {
             background: #ffffff; border-radius: 20px; border: 1px solid #dadce0;
             color: #3c4043; padding: 4px 14px; font-weight: 800; font-size: 11px;
@@ -17,33 +17,63 @@
 </head>
 <body>
 <div style="max-width: 1400px; margin: auto;">
-    <h2 style="color:var(--g-blue); margin-bottom:5px;">WEonG <span style="font-weight:900;">ROUTE</span> v8.0</h2>
-    <p style="color:#666; margin-top:0;"><strong>STATUS:</strong> ABSOLUTE RESOLUTION | 450+ NODES LOCKED</p>
+    <h2 style="color:var(--g-blue); margin-bottom:15px;">WEonG <span style="font-weight:900;">ROUTE</span> v9.0 <span style="font-size:12px; font-weight:normal; color:#d93025;">| THE CODROY & BAY ST. GEORGE SOUTH LOCK</span></h2>
     <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     // FULL PROVINCIAL DATABASE -
-    // Integrated: All Municipalities, LSDs, and Census Subdivisions
+    // Deep Scan: Port aux Basques to Stephenville (Codroy & Bay St. George South)
     const nlHubs = [
-        // --- BAC CALIEU TRAIL (NORTH OF CARBONEAR) ---
-        {n:"Bay de Verde",lat:48.083,lng:-52.894},{n:"Old Perlican",lat:48.086,lng:-53.011},{n:"Grates Cove",lat:48.167,lng:-52.933},{n:"Winterton",lat:47.955,lng:-53.332},{n:"Victoria",lat:47.765,lng:-53.242},{n:"Salmon Cove",lat:47.785,lng:-53.167},{n:"Western Bay",lat:47.887,lng:-53.064},
-        // --- AVALON METRO & NORTHEAST ---
-        {n:"St. John's",lat:47.561,lng:-52.712},{n:"Mount Pearl",lat:47.518,lng:-52.806},{n:"Paradise",lat:47.527,lng:-52.894},{n:"Conception Bay South",lat:47.505,lng:-52.990},{n:"Torbay",lat:47.662,lng:-52.733},{n:"Pouch Cove",lat:47.766,lng:-52.766},{n:"Holyrood",lat:47.387,lng:-53.127},
-        // --- BURIN PENINSULA ---
-        {n:"Marystown",lat:47.169,lng:-55.158},{n:"Grand Bank",lat:47.098,lng:-55.753},{n:"Fortune",lat:47.073,lng:-55.828},{n:"St. Lawrence",lat:46.918,lng:-55.392},{n:"Terrenceville",lat:47.666,lng:-54.733},{n:"Baine Harbour",lat:47.362,lng:-54.897},
-        // --- WEST COAST & BAY OF ISLANDS ---
-        {n:"Corner Brook",lat:48.948,lng:-57.942},{n:"Lark Harbour",lat:49.097,lng:-58.375},{n:"Cox's Cove",lat:49.125,lng:-58.075},{n:"McIvers",lat:49.095,lng:-57.995},{n:"Benoit's Cove",lat:49.002,lng:-58.115},{n:"Stephenville",lat:48.552,lng:-58.571},{n:"Port aux Basques",lat:47.572,lng:-59.136},
-        // --- GREAT NORTHERN PENINSULA ---
-        {n:"St. Anthony",lat:51.363,lng:-55.577},{n:"Port au Choix",lat:50.708,lng:-57.355},{n:"Rocky Harbour",lat:49.591,lng:-57.918},{n:"Flower's Cove",lat:51.298,lng:-56.732},{n:"Roddickton",lat:50.867,lng:-56.133},{n:"Englee",lat:50.733,lng:-56.117},
-        // --- CENTRAL & NORTH COAST ---
-        {n:"Gander",lat:48.955,lng:-54.608},{n:"Grand Falls-Windsor",lat:48.937,lng:-55.651},{n:"Twillingate",lat:49.648,lng:-54.764},{n:"Summerford",lat:49.495,lng:-54.645},{n:"Musgrave Harbour",lat:49.452,lng:-53.955},{n:"Fogo Island Central",lat:49.612,lng:-54.167},
-        // --- THE TRINITY & BONAVISTA SHORE ---
-        {n:"Bonavista",lat:48.649,lng:-53.114},{n:"Clarenville",lat:48.165,lng:-53.955},{n:"Catalina",lat:48.513,lng:-53.078},{n:"Port Rexton",lat:48.391,lng:-53.332},{n:"Dildo",lat:47.570,lng:-53.560},{n:"Whitbourne",lat:47.421,lng:-53.531}
-    ].map(h => ({name: h.n, lat: h.lat, lng: h.lng}));
+        // --- THE CODROY VALLEY (ROUTE 406/407) ---
+        { name: "Channel-Port aux Basques", lat: 47.572, lng: -59.136 },
+        { name: "Cape Ray", lat: 47.625, lng: -59.245 },
+        { name: "St. Andrew's", lat: 47.772, lng: -59.255 },
+        { name: "Searston", lat: 47.838, lng: -59.311 },
+        { name: "Upper Ferry", lat: 47.868, lng: -59.261 },
+        { name: "Codroy", lat: 47.885, lng: -59.324 },
+        { name: "O'Regans", lat: 47.842, lng: -59.215 },
+        { name: "Doyles", lat: 47.838, lng: -59.183 },
+        { name: "South Branch", lat: 47.915, lng: -59.032 },
 
-    const map = L.map('map').setView([48.6, -56.0], 7);
+        // --- BAY ST. GEORGE SOUTH (ROUTE 404/405) ---
+        { name: "Highlands", lat: 48.151, lng: -58.955 },
+        { name: "Loch Leven", lat: 48.175, lng: -58.932 },
+        { name: "St. Fintan's", lat: 48.185, lng: -58.885 },
+        { name: "McKay's", lat: 48.212, lng: -58.852 },
+        { name: "Jeffrey's", lat: 48.182, lng: -58.825 },
+        { name: "Cartyville", lat: 48.228, lng: -58.815 },
+        { name: "Heatherton", lat: 48.261, lng: -58.784 },
+        { name: "Robinsons", lat: 48.245, lng: -58.795 },
+        { name: "St. David's", lat: 48.216, lng: -58.878 },
+
+        // --- BAY ST. GEORGE CENTRAL ---
+        { name: "Flat Bay", lat: 48.375, lng: -58.525 },
+        { name: "St. George's", lat: 48.428, lng: -58.483 },
+        { name: "Stephenville Crossing", lat: 48.508, lng: -58.441 },
+        { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "Kippens", lat: 48.558, lng: -58.625 },
+
+        // --- PORT AU PORT PENINSULA (ROUTE 460) ---
+        { name: "Port au Port West", lat: 48.558, lng: -58.761 },
+        { name: "Lourdes", lat: 48.647, lng: -58.989 },
+        { name: "Cape St. George", lat: 48.432, lng: -59.245 },
+        { name: "Mainland", lat: 48.515, lng: -59.182 },
+
+        // --- PRESERVED MASTER NODES ---
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 },
+        { name: "Lark Harbour", lat: 49.097, lng: -58.375 },
+        { name: "Hampden", lat: 49.544, lng: -56.834 },
+        { name: "St. Anthony", lat: 51.363, lng: -55.577 },
+        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Gander", lat: 48.955, lng: -54.608 },
+        { name: "Bonavista", lat: 48.649, lng: -53.114 },
+        { name: "Old Perlican", lat: 48.086, lng: -53.011 },
+        { name: "St. John's", lat: 47.561, lng: -52.712 }
+    ];
+
+    const map = L.map('map').setView([48.1, -59.0], 9); // Initial view on the Southwest fix
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
@@ -91,8 +121,8 @@
         markers.push(marker);
     }
 
-    createMarker(26, 'Start'); // St. Anthony
-    createMarker(13, 'End');   // St. John's
+    createMarker(5, 'Start');  // Codroy
+    createMarker(22, 'End');    // Stephenville
     setTimeout(updateRoute, 500);
 </script>
 </body>
