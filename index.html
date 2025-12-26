@@ -2,59 +2,81 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-ROUTE | v30.0 TOTAL PROVINCIAL SATURATION</title>
+    <title>WEonG-ROUTE | v31.0 FINAL TOTAL SATURATION</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --g-blue: #1a73e8; --g-red: #d93025; }
         body { font-family: 'Roboto', sans-serif; background: #f8f9fa; margin: 0; padding: 0; }
         #map { height: 92vh; width: 100%; }
         .community-label { background: white; border-radius: 20px; border: 2px solid var(--g-blue); color: var(--g-blue); padding: 5px 12px; font-weight: 900; font-size: 10px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        #data-header { padding: 10px 20px; background: white; border-bottom: 4px solid var(--g-blue); display: flex; justify-content: space-between; align-items: center;}
+        #header { padding: 10px 20px; background: white; border-bottom: 4px solid var(--g-blue); display: flex; justify-content: space-between; align-items: center;}
     </style>
 </head>
 <body>
 
-<div id="data-header">
-    <h1 style="margin:0; font-size: 18px;">WEonG ROUTE v30.0 | <span style="color:var(--g-red)">TOTAL SATURATION & REACTIVE LOCK</span></h1>
-    <div id="count-display" style="font-weight: 900; color: var(--g-blue);">STATUS: FULL ISLAND MAPPED (350+ NODES)</div>
+<div id="header">
+    <h1 style="margin:0; font-size: 18px;">WEonG ROUTE v31.0 | <span style="color:var(--g-red)">ABSOLUTE MESH LOCK</span></h1>
+    <div id="count-display" style="font-weight: 900; color: var(--g-blue);">SATURATION ACTIVE</div>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // --- ABSOLUTE PROVINCIAL DATASET: NO TRUNCATION ALLOWED ---
     const nlHubs = [
-        // --- CLARENVILLE & BONAVISTA LOOP (RESTORED) ---
+        // --- 1. CLARENVILLE & BONAVISTA LOOP ---
         { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Milton", lat: 48.190, lng: -53.940 },
         { name: "George's Brook", lat: 48.217, lng: -53.933 }, { name: "Harcourt", lat: 48.250, lng: -53.883 },
         { name: "Monroe", lat: 48.283, lng: -53.817 }, { name: "Burgoyne's Cove", lat: 48.233, lng: -53.750 },
         { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Elliston", lat: 48.633, lng: -53.033 },
         { name: "Port Union", lat: 48.498, lng: -53.082 }, { name: "Trinity", lat: 48.367, lng: -53.367 },
-        { name: "Musgravetown", lat: 48.383, lng: -53.883 }, { name: "Lethbridge", lat: 48.351, lng: -53.882 },
+        { name: "Port Rexton", lat: 48.383, lng: -53.333 }, { name: "Musgravetown", lat: 48.383, lng: -53.883 },
+        { name: "Lethbridge", lat: 48.351, lng: -53.882 }, { name: "Plate Cove West", lat: 48.483, lng: -53.517 },
 
-        // --- ROAD TO THE ISLES (SUMMERFORD RESTORED) ---
+        // --- 2. ROAD TO THE ISLES & NOTRE DAME BAY ---
         { name: "Summerford", lat: 49.495, lng: -54.646 }, { name: "Cottlesville", lat: 49.533, lng: -54.667 },
         { name: "Moreton's Harbour", lat: 49.583, lng: -54.617 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
+        { name: "Virgin Arm", lat: 49.550, lng: -54.583 }, { name: "Crow Head", lat: 49.667, lng: -54.783 },
+        { name: "Leading Tickles", lat: 49.483, lng: -55.417 }, { name: "Fortune Harbour", lat: 49.417, lng: -55.233 },
 
-        // --- BAY OF ISLANDS & WEST COAST ---
+        // --- 3. BAY OF ISLANDS (NORTH & SOUTH) ---
         { name: "Lark Harbour", lat: 49.097, lng: -58.375 }, { name: "York Harbour", lat: 49.045, lng: -58.373 },
-        { name: "Benoit's Cove", lat: 49.011, lng: -58.101 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "Cox's Cove", lat: 49.117, lng: -58.067 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-        { name: "Channel-Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Rose Blanche", lat: 47.617, lng: -58.683 },
+        { name: "Bottle Cove", lat: 49.112, lng: -58.397 }, { name: "Benoit's Cove", lat: 49.011, lng: -58.101 },
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Mount Moriah", lat: 48.967, lng: -58.017 },
+        { name: "Cox's Cove", lat: 49.117, lng: -58.067 }, { name: "McIvers", lat: 49.083, lng: -58.100 },
+        { name: "Gillams", lat: 49.033, lng: -58.117 }, { name: "Meadows", lat: 48.995, lng: -58.075 },
 
-        // --- GREAT NORTHERN PENINSULA ---
-        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Flower's Cove", lat: 51.298, lng: -56.732 },
-        { name: "Port au Choix", lat: 50.708, lng: -57.355 }, { name: "Rocky Harbour", lat: 49.591, lng: -57.918 },
+        // --- 4. SOUTHWEST COAST & BAY ST. GEORGE ---
+        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Stephenville Crossing", lat: 48.500, lng: -58.433 },
+        { name: "St. George's", lat: 48.433, lng: -58.483 }, { name: "Flat Bay", lat: 48.367, lng: -58.500 },
+        { name: "Cape St. George", lat: 48.467, lng: -59.250 }, { name: "Lourdes", lat: 48.650, lng: -58.983 },
+        { name: "Port au Port", lat: 48.550, lng: -58.717 }, { name: "Heatherton", lat: 48.200, lng: -58.850 },
+        { name: "Robinsons", lat: 48.183, lng: -58.867 }, { name: "McKay's", lat: 48.167, lng: -58.883 },
+        { name: "St. Andrew's", lat: 47.772, lng: -59.255 }, { name: "Doyles", lat: 47.833, lng: -59.183 },
+        { name: "Codroy", lat: 47.883, lng: -59.383 }, { name: "Channel-Port aux Basques", lat: 47.572, lng: -59.136 },
+        { name: "Isle aux Morts", lat: 47.583, lng: -58.983 }, { name: "Rose Blanche", lat: 47.617, lng: -58.683 },
 
-        // --- BURIN & CONNAIGRE ---
-        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Fortune", lat: 47.072, lng: -55.829 },
-        { name: "Harbour Breton", lat: 47.483, lng: -55.833 }, { name: "St. Alban's", lat: 47.850, lng: -55.833 },
+        // --- 5. GREAT NORTHERN PENINSULA ---
+        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "St. Lunaire-Griquet", lat: 51.500, lng: -55.450 },
+        { name: "L'Anse aux Meadows", lat: 51.595, lng: -55.531 }, { name: "Raleigh", lat: 51.550, lng: -55.733 },
+        { name: "Flower's Cove", lat: 51.298, lng: -56.732 }, { name: "Port au Choix", lat: 50.708, lng: -57.355 },
+        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Norris Point", lat: 49.521, lng: -57.882 },
+        { name: "Woody Point", lat: 49.492, lng: -57.923 }, { name: "Cow Head", lat: 49.917, lng: -57.783 },
 
-        // --- AVALON ---
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Carbonear", lat: 47.737, lng: -53.228 }
+        // --- 6. BURIN & CONNAIGRE ---
+        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Burin", lat: 47.033, lng: -55.167 },
+        { name: "Fortune", lat: 47.072, lng: -55.829 }, { name: "Grand Bank", lat: 47.098, lng: -55.753 },
+        { name: "St. Lawrence", lat: 46.917, lng: -55.383 }, { name: "Harbour Breton", lat: 47.483, lng: -55.833 },
+        { name: "Hermitage", lat: 47.550, lng: -55.933 }, { name: "St. Alban's", lat: 47.850, lng: -55.833 },
+
+        // --- 7. AVALON & MAINLINE ---
+        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
+        { name: "Conception Bay South", lat: 47.505, lng: -52.990 }, { name: "Carbonear", lat: 47.737, lng: -53.228 },
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }
     ];
 
-    const map = L.map('map').setView([48.165, -53.955], 10); // Defaulting to Clarenville view
+    const map = L.map('map').setView([48.5, -56.0], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
@@ -79,7 +101,7 @@
         const data = await res.json();
         routeLayer.clearLayers();
         if (data.routes && data.routes[0]) {
-            L.geoJSON(data.routes[0].geometry, { style: { color: '#1a73e8', weight: 8, opacity: 0.85 } }).addTo(routeLayer);
+            L.geoJSON(data.routes[0].geometry, { style: { color: '#d93025', weight: 8, opacity: 0.85 } }).addTo(routeLayer);
         }
     }
 
@@ -88,7 +110,7 @@
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
         marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label', offset: [0, -12] }).openTooltip();
         
-        // REACTIVE LOCK RESTORED
+        // REACTIVE PIN LOGIC - LOCKED
         marker.on('drag', () => {
             const nearest = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
             marker.setTooltipContent(`${label}: ${nearest.name}`);
@@ -103,8 +125,12 @@
         markers.push(marker);
     }
 
-    createMarker(0, 'Start'); // Clarenville
-    createMarker(6, 'End');   // Bonavista
+    // VERIFY MESH COUNT
+    document.getElementById('count-display').innerText = `SATURATION: ${nlHubs.length} CORE NODES LOCKED`;
+
+    // DEFAULT PINS: Clarenville to Summerford
+    createMarker(0, 'Origin'); 
+    createMarker(14, 'Destination'); 
     setTimeout(updateRoute, 500);
 </script>
 </body>
