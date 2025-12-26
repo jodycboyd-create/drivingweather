@@ -1,9 +1,3 @@
-/**
- * route-engine.js 
- * Project: [weong-route]
- * Updated: Dec 2025 - Path correction for /data/nl/
- */
-
 export class RouteEngine {
     constructor() {
         this.communities = [];
@@ -11,15 +5,16 @@ export class RouteEngine {
 
     async loadCommunities() {
         try {
-            // Updated path to match your GitHub structure exactly
+            // Path relative to index.html sitting in the root
             const response = await fetch('data/nl/communities.json');
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-            
+            if (!response.ok) {
+                throw new Error(`Failed to load JSON: ${response.status}`);
+            }
             this.communities = await response.json();
-            console.log("Newfoundland Dataset Loaded successfully.");
+            console.log("Newfoundland communities loaded successfully.");
             return this.communities;
         } catch (error) {
-            console.error("RouteEngine failed to load JSON:", error);
+            console.error("RouteEngine Fetch Error:", error);
             return [];
         }
     }
