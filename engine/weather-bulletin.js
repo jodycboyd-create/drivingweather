@@ -15,7 +15,7 @@ export const BulletinLogic = {
         return {
             location: community.name, 
             pop: this.formatPOP(weatherData.pop, weatherData.range === 'extended'),
-            uvIndex: (!weatherData.isExtended && weatherData.isDaytime) ? weatherData.uvIndex : null,
+            uvIndex: (weatherData.range === 'short' && weatherData.isDaytime) ? weatherData.uvIndex : null,
             isCritical: this.checkException(weatherData.levels),
             timestamp: new Date().toLocaleTimeString('en-CA', { timeZone: 'America/St_Johns' })
         };
