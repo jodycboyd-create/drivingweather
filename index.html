@@ -2,22 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Route Engine</title>
+    <title>WEonG - Newfoundland Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
         .leaflet-routing-container { display: none !important; }
         
-        /* Persistent community label styling */
         .snapping-label {
             font-weight: bold;
             color: #0047AB;
             background: white;
             border: 2px solid #0047AB;
-            padding: 3px 10px;
+            padding: 4px 10px;
             border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -30,8 +30,8 @@
 
 <script>
     /**
-     * Project: [weong-route]
-     * Build: Persistent Labels + Forced Routing Refresh
+     * Build: [weong-route] Road Integrity + Always-On Labels
+     * Methodology: Magnet Snapping with Forced Waypoint Sync
      * Dataset: Locked Newfoundland Deep Dive [cite: 2025-12-26]
      */
 
@@ -43,11 +43,9 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Load comprehensive island dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
-
             setupRouting();
         } catch (error) {
             console.error("Data load failed", error);
@@ -55,6 +53,7 @@
     }
 
     function setupRouting() {
+        // Initial locked-in coordinates [cite: 2025-12-26]
         const start = L.latLng(48.9515, -57.9482); // Corner Brook
         const end = L.latLng(47.5615, -52.7126);   // St. John's
 
@@ -69,50 +68,46 @@
             createMarker: function(i, wp) {
                 const marker = L.marker(wp.latLng, { draggable: true });
                 
-                // Initialize the label immediately [cite: 2025-12-26]
-                const initialNearest = findNearest(wp.latLng);
-                updateLabel(marker, initialNearest.properties.name);
+                // 1. Label initialization (Always On) [cite: 2025-12-26]
+                const updateTooltip = (latlng) => {
+                    const nearest = findNearest(latlng);
+                    marker.bindTooltip(nearest.properties.name, { 
+                        permanent: true, 
+                        direction: 'top', 
+                        className: 'snapping-label',
+                        offset: [0, -10]
+                    }).openTooltip();
+                    return nearest;
+                };
 
-                // Update label dynamically while dragging
-                marker.on('drag', function(e) {
-                    const nearest = findNearest(e.latlng);
-                    updateLabel(marker, nearest.properties.name);
-                });
+                updateTooltip(wp.latLng);
 
-                // MAGNET SNAP + FORCED ROUTE REFRESH
+                // 2. Dynamic Update during drag
+                marker.on('drag', (e) => updateTooltip(e.latlng));
+
+                // 3. MAGNET SNAP + ROUTE SYNC
                 marker.on('dragend', function(e) {
-                    const nearest = findNearest(e.latlng);
+                    const snappedCommunity = updateTooltip(e.latlng);
                     const snappedPos = L.latLng(
-                        nearest.geometry.coordinates[1], 
-                        nearest.geometry.coordinates[0]
+                        snappedCommunity.geometry.coordinates[1], 
+                        snappedCommunity.geometry.coordinates[0]
                     );
                     
-                    // 1. Visually snap the pin [cite: 2025-12-26]
+                    // Force the physical marker to the snap point [cite: 2025-12-26]
                     marker.setLatLng(snappedPos);
-                    updateLabel(marker, nearest.properties.name);
                     
-                    // 2. FORCE update to the routing engine
-                    const waypoints = routingControl.getWaypoints();
-                    waypoints[i].latLng = snappedPos;
-                    routingControl.setWaypoints(waypoints); // This triggers the road update
+                    // Force a total waypoint refresh to fix the "Broken Route" [cite: 2025-12-23]
+                    const currentWaypoints = routingControl.getWaypoints();
+                    currentWaypoints[i].latLng = snappedPos;
+                    routingControl.setWaypoints(currentWaypoints);
                 });
 
                 return marker;
             },
             lineOptions: {
-                styles: [{ color: '#0047AB', weight: 6, opacity: 0.8 }]
+                styles: [{ color: '#0047AB', weight: 7, opacity: 0.8 }]
             }
         }).addTo(map);
-    }
-
-    // Ensures label is always attached and visible
-    function updateLabel(marker, name) {
-        marker.bindTooltip(name, { 
-            permanent: true, 
-            direction: 'top', 
-            className: 'snapping-label',
-            offset: [0, -10]
-        }).openTooltip();
     }
 
     function findNearest(latlng) {
