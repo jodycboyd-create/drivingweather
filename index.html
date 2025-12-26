@@ -3,27 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Newfoundland Route Engine</title>
+    <title>WEonG - Newfoundland Road Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            width: 100%; 
-            overflow: hidden; 
-            background: #f0f2f5;
-        }
-        /* Hides the text instruction panel to keep the map clean */
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
         .leaflet-routing-container { display: none !important; }
-        /* Custom styling for the dynamic community labels */
         .snapping-label {
             font-weight: bold;
             color: #0047AB;
-            border: 1px solid #0047AB;
-            padding: 2px 6px;
-            border-radius: 4px;
+            background: white;
+            border: 2px solid #0047AB;
+            padding: 2px 8px;
+            border-radius: 5px;
         }
     </style>
 </head>
@@ -36,52 +28,47 @@
 
 <script>
     /**
-     * Project: [weong-route]
-     * Methodology: Magnet Snapping & Road-Following Route
-     * Dataset: Newfoundland Comprehensive Deep Dive [2025-12-26]
+     * Build: [weong-route] Refined Routing Update
+     * Methodology: Magnet Snapping with Forced Road-Network Refresh
+     * Dataset: Locked Newfoundland Deep Dive [2025-12-26]
      */
 
     let map, communities = [];
     let routingControl;
 
     async function init() {
-        // 1. Initialize Map centered on Newfoundland
         map = L.map('map').setView([48.5, -55.8], 7);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // 2. Load the comprehensive Newfoundland dataset [cite: 2025-12-26]
+            // Load the locked Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
 
-            // 3. Initialize Route with Magnet Snapping
             setupRouting();
         } catch (error) {
-            console.error("Error loading Newfoundland dataset:", error);
+            console.error("Dataset load failed:", error);
         }
     }
 
     function setupRouting() {
-        // Default Points: Corner Brook and St. John's [cite: 2025-12-26]
-        const origin = L.latLng(48.9515, -57.9482);
-        const destination = L.latLng(47.5615, -52.7126);
+        // Default locked-in start points [cite: 2025-12-26]
+        const startPoint = L.latLng(48.9515, -57.9482); // Corner Brook
+        const endPoint = L.latLng(47.5615, -52.7126);   // St. John's
 
         routingControl = L.Routing.control({
-            waypoints: [origin, destination],
+            waypoints: [startPoint, endPoint],
             router: L.Routing.osrmv1({
                 serviceUrl: 'https://router.project-osrm.org/route/v1',
                 profile: 'driving'
             }),
-            routeWhileDragging: false, // Performance: Only update route on 'magnet' release
+            routeWhileDragging: false, 
             show: false,
             createMarker: function(i, wp) {
                 const marker = L.marker(wp.latLng, { draggable: true });
 
-                // DYNAMIC LABEL: Updates continuously while dragging
+                // Dynamic Community Label (Continuous during drag)
                 marker.on('drag', function(e) {
                     const nearest = findNearest(e.latlng);
                     marker.bindTooltip(nearest.properties.name, { 
@@ -91,7 +78,7 @@
                     }).openTooltip();
                 });
 
-                // MAGNET SNAPPING: Locks to community and updates road route on release
+                // MAGNET SNAP: Force snap and REFRESH route on release
                 marker.on('dragend', function(e) {
                     const nearest = findNearest(e.latlng);
                     const snappedPos = L.latLng(
@@ -99,11 +86,13 @@
                         nearest.geometry.coordinates[0]
                     );
                     
-                    // Force the pin to the magnet point [cite: 2025-12-26]
+                    // 1. Visually snap the marker to the community [cite: 2025-12-26]
                     marker.setLatLng(snappedPos);
                     
-                    // Immediately update the road network route
-                    routingControl.spliceWaypoints(i, 1, snappedPos);
+                    // 2. Update the Waypoint array specifically to trigger the road route update
+                    const currentWaypoints = routingControl.getWaypoints();
+                    currentWaypoints[i].latLng = snappedPos;
+                    routingControl.setWaypoints(currentWaypoints);
                 });
 
                 return marker;
@@ -114,18 +103,16 @@
         }).addTo(map);
     }
 
-    // Helper to find nearest community in the locked dataset [cite: 2025-12-26]
+    // Snapping logic building on the 2025-12-26 helper [cite: 2025-12-26]
     function findNearest(latlng) {
         return communities.reduce((prev, curr) => {
-            const prevCoords = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const currCoords = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(currCoords) < latlng.distanceTo(prevCoords) ? curr : prev;
+            const pCoord = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+            const cCoord = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+            return latlng.distanceTo(cCoord) < latlng.distanceTo(pCoord) ? curr : prev;
         });
     }
 
-    // Launch Application
     window.onload = init;
 </script>
-
 </body>
 </html>
