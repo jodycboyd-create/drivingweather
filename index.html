@@ -2,14 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Synchronized NL Route</title>
+    <title>WEonG - Restored Route Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
-        /* Keep map clean by hiding the text instruction panel */
         .leaflet-routing-container { display: none !important; }
-        /* Style for the always-on community labels */
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 6px;
@@ -25,43 +23,38 @@
 
 <script>
     /**
-     * Build: [weong-route] Forced Sync & Magnet Logic
-     * Methodology: Hijacked Marker Controller [cite: 2025-12-26]
-     * Dataset: Locked Newfoundland Deep Dive [cite: 2025-12-26]
+     * Project: [weong-route]
+     * Methodology: Restored Internal Marker Logic [cite: 2025-12-23]
+     * Goal: Force road path to reappear and snap to communities [cite: 2025-12-26]
      */
     let map, communities = [], routingControl;
 
     async function init() {
-        // Center on Central Newfoundland (Gander/GFW area)
-        map = L.map('map').setView([48.9, -55.0], 8);
+        map = L.map('map').setView([48.9, -55.2], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        try {
-            // Load the locked Newfoundland dataset [cite: 2025-12-26]
-            const response = await fetch('data/nl/communities.json');
-            const data = await response.json();
-            communities = data.features;
-            setupRouting();
-        } catch (e) {
-            console.error("Data load failed", e);
-        }
+        const response = await fetch('data/nl/communities.json');
+        const data = await response.json();
+        communities = data.features;
+        
+        setupEngine();
     }
 
-    function setupRouting() {
-        // Locked Defaults: Grand Falls-Windsor and Gander [cite: 2025-12-26]
-        const p1 = L.latLng(48.9351, -55.6562); 
-        const p2 = L.latLng(48.9566, -54.6089);
+    function setupEngine() {
+        // Locked Baseline Coordinates [cite: 2025-12-26]
+        const gfw = L.latLng(48.9351, -55.6562); 
+        const gander = L.latLng(48.9566, -54.6089);
 
         routingControl = L.Routing.control({
-            waypoints: [p1, p2],
+            waypoints: [gfw, gander],
             router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            routeWhileDragging: true, // Enable real-time line stretching
+            routeWhileDragging: true, 
             show: false,
+            // Use the internal marker creator to ensure the line stays attached [cite: 2025-12-25]
             createMarker: function(i, wp) {
-                // This 'hijacks' the routing markers to add our custom snapping [cite: 2025-12-26]
                 const marker = L.marker(wp.latLng, { draggable: true });
 
-                const updateLabel = (ll) => {
+                const updateTooltip = (ll) => {
                     const nearest = findNearest(ll);
                     marker.bindTooltip(nearest.properties.name, { 
                         permanent: true, direction: 'top', className: 'snapping-label' 
@@ -69,30 +62,30 @@
                     return nearest;
                 };
 
-                updateLabel(wp.latLng);
+                updateTooltip(wp.latLng);
 
-                // Update label dynamically as you move the pin [cite: 2025-12-26]
-                marker.on('drag', (e) => updateLabel(e.latlng));
+                // Update label while moving [cite: 2025-12-26]
+                marker.on('drag', (e) => updateTooltip(e.latlng));
 
-                // THE MAGNET SNAP: Forces marker and route to the town node [cite: 2025-12-26]
+                // THE MAGNET SNAP: This re-aligns the route line [cite: 2025-12-26]
                 marker.on('dragend', function(e) {
                     const nearest = findNearest(e.latlng);
                     const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
                     
-                    // 1. Physically snap the marker
+                    // 1. Physically move the marker to the town node
                     marker.setLatLng(snappedPos);
-                    updateLabel(snappedPos);
+                    updateTooltip(snappedPos);
                     
-                    // 2. Force the routing engine to refresh the line to the snapped point [cite: 2025-12-25]
-                    const wps = routingControl.getWaypoints();
-                    wps[i].latLng = snappedPos;
-                    routingControl.setWaypoints(wps);
+                    // 2. IMPORTANT: Update the routing machine waypoints to force line refresh [cite: 2025-12-25]
+                    const currentWaypoints = routingControl.getWaypoints();
+                    currentWaypoints[i].latLng = snappedPos;
+                    routingControl.setWaypoints(currentWaypoints);
                 });
 
                 return marker;
             },
             lineOptions: {
-                styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }]
+                styles: [{ color: '#0047AB', weight: 8, opacity: 0.9 }]
             }
         }).addTo(map);
     }
