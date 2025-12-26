@@ -2,28 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | v4.5 Deep Lock</title>
+    <title>WEonG-Bulletin | v4.6 Whole Island</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --g-blue: #1a73e8; }
         body { font-family: 'Roboto', sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
-        
-        /* HARD-LOCKED GOOGLE 2025 MINT/TEAL [cite: 2025-12-25] */
         #map { height: 750px; border-radius: 16px; border: 1px solid #dadce0; background: #aadaff; }
-
         .community-label {
             background: #ffffff; border-radius: 20px; border: 1px solid #dadce0;
             color: #3c4043; padding: 6px 16px; font-weight: 600; font-size: 13px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2); white-space: nowrap;
         }
-
         .control-panel { 
             display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; 
             margin-bottom: 20px; background: #fff; padding: 24px; border-radius: 16px; 
             box-shadow: 0 1px 3px rgba(60,64,67,0.3); border: 1px solid #e0e0e0;
         }
-        
-        input { width: 92%; border: 1px solid #dadce0; padding: 12px; border-radius: 8px; font-size: 14px; background: #f1f3f4; }
+        input { width: 92%; border: 1px solid #dadce0; padding: 12px; border-radius: 8px; background: #f1f3f4; }
         label { font-size: 11px; color: #70757a; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; display: block; }
     </style>
 </head>
@@ -32,14 +27,13 @@
 <div style="max-width: 1400px; margin: auto;">
     <header style="display: flex; align-items: center; margin-bottom: 20px; gap: 15px;">
         <h2 style="margin:0; color:var(--g-blue);">WEonG <span style="font-weight:900;">ROUTE</span></h2>
-        <div style="background:#e6fffa; color:#2c7a7b; padding:4px 12px; border-radius:100px; font-size:12px; font-weight:700;">v4.5 DEEP INJECTION RECOVERY</div>
+        <div style="background:#e6fffa; color:#2c7a7b; padding:4px 12px; border-radius:100px; font-size:12px; font-weight:700;">v4.6 WHOLE ISLAND INJECTION</div>
     </header>
 
     <div class="control-panel">
         <div class="input-group"><label>Origin</label><input type="text" id="originIn" readonly></div>
         <div class="input-group"><label>Destination</label><input type="text" id="destIn" readonly></div>
-        <div class="input-group"><label>Logic Lock</label><div style="color:#d93025; font-weight:700; font-size:11px; margin-top:8px;">LEVEL 3 TRIGGER ACTIVE</div></div>
-        <button style="grid-column: 1 / -1; background: var(--g-blue); color: white; border: none; padding: 16px; border-radius: 30px; cursor: pointer; font-weight: 700;" onclick="alert('Bulletin Generated based on Level 3 constraints.')">Generate Bulletin</button>
+        <button style="grid-column: 1 / -1; background: var(--g-blue); color: white; border: none; padding: 16px; border-radius: 30px; cursor: pointer; font-weight: 700;" onclick="generateBulletin()">Generate [weong-route] Bulletin</button>
     </div>
 
     <div id="map"></div>
@@ -47,44 +41,39 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // DEEP INJECTION DATABASE: All Micro-points & Outports [cite: 2025-12-23]
+    // FULL ISLAND DATABASE: Snapping points for all sub-regions
     const nlHubs = [
-        // Avalon Deep Dive
+        // AVALON & EASTERN
         { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
         { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "CBS", lat: 47.505, lng: -52.990 },
-        { name: "Torbay", lat: 47.662, lng: -52.733 }, { name: "Pouch Cove", lat: 47.770, lng: -52.765 },
-        { name: "Flatrock", lat: 47.700, lng: -52.710 }, { name: "Bauline", lat: 47.700, lng: -52.830 },
-        { name: "Portugal Cove", lat: 47.625, lng: -52.855 }, { name: "St. Philip's", lat: 47.595, lng: -52.885 },
-        { name: "Logy Bay", lat: 47.620, lng: -52.670 }, { name: "Middle Cove", lat: 47.650, lng: -52.700 },
-        { name: "Outer Cove", lat: 47.660, lng: -52.715 }, { name: "Holyrood", lat: 47.387, lng: -53.127 },
-        { name: "Avondale", lat: 47.420, lng: -53.190 }, { name: "Brigus", lat: 47.540, lng: -53.290 },
-        { name: "Cupids", lat: 47.545, lng: -53.230 }, { name: "Clarke's Beach", lat: 47.545, lng: -53.280 },
-        { name: "South River", lat: 47.550, lng: -53.295 }, { name: "Bay Roberts", lat: 47.596, lng: -53.262 },
-        { name: "Spaniard's Bay", lat: 47.620, lng: -53.270 }, { name: "Upper Island Cove", lat: 47.640, lng: -53.210 },
-        { name: "Harbour Grace", lat: 47.690, lng: -53.210 }, { name: "Carbonear", lat: 47.737, lng: -53.228 },
-        { name: "Victoria", lat: 47.760, lng: -53.240 }, { name: "Salmon Cove", lat: 47.780, lng: -53.160 },
-        { name: "Broad Cove", lat: 47.830, lng: -53.080 }, { name: "Old Perlican", lat: 48.085, lng: -53.008 },
-        { name: "Bay de Verde", lat: 48.070, lng: -53.000 }, { name: "Whitbourne", lat: 47.421, lng: -53.531 },
-        { name: "Dildo", lat: 47.560, lng: -53.560 }, { name: "South Dildo", lat: 47.540, lng: -53.570 },
-        { name: "Placentia", lat: 47.239, lng: -53.960 }, { name: "Arnold's Cove", lat: 47.755, lng: -53.990 },
-        { name: "Sunnyside", lat: 47.855, lng: -53.918 }, { name: "Goobies", lat: 47.930, lng: -53.980 },
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Port Blandford", lat: 48.350, lng: -53.990 },
-        // Central Deep Dive
-        { name: "Glovertown", lat: 48.667, lng: -54.033 }, { name: "Gambo", lat: 48.748, lng: -54.214 },
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Glenwood", lat: 48.995, lng: -54.872 },
-        { name: "Appleton", lat: 48.985, lng: -54.855 }, { name: "Bishop's Falls", lat: 49.014, lng: -55.485 },
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Badger", lat: 48.974, lng: -56.035 },
-        { name: "South Brook", lat: 49.430, lng: -56.080 }, { name: "Springdale", lat: 49.498, lng: -56.066 },
-        { name: "Beachside", lat: 49.620, lng: -55.930 }, { name: "Baie Verte", lat: 49.932, lng: -56.183 },
-        // Western Deep Dive
-        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Reidville", lat: 49.210, lng: -57.400 },
-        { name: "Pasadena", lat: 49.016, lng: -57.594 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "Steady Brook", lat: 48.960, lng: -57.820 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-        { name: "St. George's", lat: 48.420, lng: -58.480 }, { name: "Burgeo", lat: 47.611, lng: -57.612 },
-        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 }
+        { name: "Holyrood", lat: 47.387, lng: -53.127 }, { name: "Whitbourne", lat: 47.421, lng: -53.531 },
+        { name: "Dildo", lat: 47.560, lng: -53.560 }, { name: "Arnold's Cove", lat: 47.755, lng: -53.990 },
+        { name: "Goobies", lat: 47.930, lng: -53.980 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
+        // BONAVISTA PENINSULA
+        { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Port Rexton", lat: 48.385, lng: -53.332 },
+        { name: "Musgravetown", lat: 48.391, lng: -53.951 }, { name: "Trinity", lat: 48.368, lng: -53.354 },
+        // BURIN PENINSULA
+        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Burin", lat: 47.034, lng: -55.168 },
+        { name: "Grand Bank", lat: 47.098, lng: -55.753 }, { name: "Fortune", lat: 47.072, lng: -55.828 },
+        { name: "Terrenceville", lat: 47.666, lng: -54.733 }, { name: "St. Lawrence", lat: 46.918, lng: -55.393 },
+        // CENTRAL & GANDER REGION
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Glovertown", lat: 48.667, lng: -54.033 },
+        { name: "Gambo", lat: 48.748, lng: -54.214 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
+        { name: "Lewisporte", lat: 49.245, lng: -55.053 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Bishop's Falls", lat: 49.014, lng: -55.485 }, { name: "Botwood", lat: 49.141, lng: -55.343 },
+        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "Springdale", lat: 49.498, lng: -56.066 },
+        // WEST COAST & NORTHERN PEN
+        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
+        { name: "Pasadena", lat: 49.016, lng: -57.594 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "Stephenville Crossing", lat: 48.502, lng: -58.437 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
+        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Port au Choix", lat: 50.708, lng: -57.355 },
+        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Flowers Cove", lat: 51.298, lng: -56.732 },
+        // SOUTH COAST
+        { name: "Burgeo", lat: 47.611, lng: -57.612 }, { name: "Harbour Breton", lat: 47.478, lng: -55.828 },
+        { name: "St. Alban's", lat: 47.854, lng: -55.842 }
     ];
 
-    const map = L.map('map').setView([47.6, -53.0], 9);
+    const map = L.map('map').setView([48.9, -56.0], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
@@ -134,9 +123,13 @@
         document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = hub.name;
     }
 
-    createMarker(22, 'Origin');      // Carbonear
-    createMarker(28, 'Destination'); // Bay de Verde
+    createMarker(20, 'Origin');      // Gander
+    createMarker(31, 'Destination'); // Corner Brook
     setTimeout(updateRoute, 500);
+
+    function generateBulletin() {
+        console.log("Generating Level 3 Bulletin...");
+    }
 </script>
 </body>
 </html>
