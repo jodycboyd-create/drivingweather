@@ -1,137 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="manifest" href="./data/nl/manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Newfoundland Route Engine</title>
+    <title>WEonG - Newfoundland Route</title>
     <style>
-        :root {
-            --priority-red: #d9534f;
-            --nl-blue: #002d62;
-        }
-
-        body { 
-            font-family: -apple-system, system-ui, sans-serif; 
-            background: #f8f9fa; 
-            margin: 0; 
-            color: #333;
-        }
-
-        header {
-            background: var(--nl-blue);
-            color: white;
-            padding: 1.5rem;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        #bulletin-board { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); 
-            gap: 20px; 
-            padding: 30px; 
-        }
-
-        .community-card { 
-            background: white; 
-            padding: 20px; 
-            border-radius: 10px; 
-            border: 1px solid #e0e0e0;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
-        }
-
-        .community-card:hover { transform: translateY(-3px); }
-
-        /* Level 3 Priority Styling */
-        .exception { 
-            border: 2px solid var(--priority-red); 
-            background: #fffafa; 
-        }
-
-        .alert-badge { 
-            background: var(--priority-red);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            display: inline-block;
-            margin-top: 10px;
-        }
-
-        .meta-info { font-size: 0.85rem; color: #666; margin-top: 15px; border-top: 1px solid #eee; pt: 10px; }
-        
-        #debug-log { background: #333; color: #0f0; padding: 15px; margin: 20px; font-family: monospace; border-radius: 5px; display: none; }
+        body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
+        #bulletin-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
+        .community-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        /* Style for Level 3 Exceptions */
+        .exception { border: 2px solid red; background: #fff0f0; }
+        .alert-label { color: red; font-weight: bold; display: block; margin-top: 10px; }
     </style>
 </head>
 <body>
-
-    <header>
-        <h1 style="margin:0;">WEonG Bulletin</h1>
-        <small>Newfoundland Route Engine | Logic Locked</small>
-    </header>
-
-    <div id="debug-log"></div>
+    <h1>Newfoundland Weather Bulletin</h1>
     <div id="bulletin-board"></div>
 
     <script type="module">
         import { RouteEngine } from './engine/route-engine.js';
         import { BulletinLogic } from './engine/weather-bulletin.js';
 
-        const debugBox = document.getElementById('debug-log');
-        
-        function logDebug(msg) {
-            debugBox.style.display = 'block';
-            debugBox.innerHTML += `> ${msg}<br>`;
-        }
-
         async function init() {
-            try {
-                const engine = new RouteEngine();
-                const communities = await engine.loadCommunities();
+            const engine = new RouteEngine();
+            const communities = await engine.loadCommunities();
+            const container = document.getElementById('bulletin-board');
+
+            communities.forEach(loc => {
+                // Test Data: Simulating a Level 3 event for Gander/Island locations
+                const weatherData = {
+                    pop: 45,
+                    uvIndex: 7,
+                    isDaytime: true,
+                    range: 'short',
+                    levels: { precip: 3, wind: 1 } 
+                };
+
+                const report = BulletinLogic.generate(loc, weatherData);
                 
-                if (!communities || communities.length === 0) {
-                    logDebug("ERROR: No communities found in data/nl/communities.json");
-                    return;
-                }
-
-                const container = document.getElementById('bulletin-board');
-
-                communities.forEach(loc => {
-                    // Simulated Weather (Following Level 3 primary exception trigger)
-                    const weatherData = {
-                        pop: 45, // Will round to 50%
-                        uvIndex: 6,
-                        isDaytime: true,
-                        range: 'short',
-                        levels: { precip: 3, wind: 1 } // Triggering Level 3 Exception
-                    };
-
-                    const report = BulletinLogic.generate(loc, weatherData);
-                    
-                    const div = document.createElement('div');
-                    div.className = `community-card ${report.isCritical ? 'exception' : ''}`;
-                    
-                    div.innerHTML = `
-                        <h3 style="margin:0 0 10px 0;">${report.location}</h3>
-                        <div class="weather-details">
-                            <p><strong>Precipitation:</strong> ${report.pop || '---'}</p>
-                            ${report.uvIndex ? `<p><strong>UV Index:</strong> ${report.uvIndex}</p>` : ''}
-                        </div>
-                        ${report.isCritical ? '<span class="alert-badge">⚠️ LEVEL 3 PRIORITY</span>' : ''}
-                        <div class="meta-info">
-                            Updated: ${report.timestamp}
-                        </div>
-                    `;
-                    container.appendChild(div);
-                });
-
-                console.log("Bulletin rendering complete.");
-            } catch (err) {
-                logDebug("FATAL ERROR: " + err.message);
-            }
+                const div = document.createElement('div');
+                // Aligned with BulletinLogic properties: isCritical and location
+                div.className = `community-card ${report.isCritical ? 'exception' : ''}`;
+                div.innerHTML = `
+                    <h3 style="margin-top:0;">${report.location}</h3>
+                    <p>POP: ${report.pop || '---'}</p>
+                    ${report.uvIndex ? `<p>UV Index: ${report.uvIndex}</p>` : ''}
+                    ${report.isCritical ? '<span class="alert-label">⚠️ Level 3 Priority</span>' : ''}
+                    <hr>
+                    <small>Updated: ${report.timestamp}</small>
+                `;
+                container.appendChild(div);
+            });
         }
 
         init();
