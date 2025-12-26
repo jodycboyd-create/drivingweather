@@ -43,7 +43,6 @@
 {"type":"Feature","properties":{"name":"Admiral's Beach","region":"St. Mary's Bay"},"geometry":{"type":"Point","coordinates":[-53.6511,47.0011]}},
 {"type":"Feature","properties":{"name":"St. Bride's","region":"Cape Shore"},"geometry":{"type":"Point","coordinates":[-54.1751,46.9272]}},
 {"type":"Feature","properties":{"name":"Cuslett","region":"Cape Shore"},"geometry":{"type":"Point","coordinates":[-54.1512,46.9662]}},
-{"type":"Feature","properties":{"name":"St. Vincent's","region":"Cape Shore"},"geometry":{"type":"Point","coordinates":[-53.6502,46.7834]}},
 {"type":"Feature","properties":{"name":"Point Lance","region":"Cape Shore"},"geometry":{"type":"Point","coordinates":[-54.0831,46.8162]}},
 {"type":"Feature","properties":{"name":"Branch","region":"Cape Shore"},"geometry":{"type":"Point","coordinates":[-53.9511,46.8832]}},
 {"type":"Feature","properties":{"name":"Placentia","region":"Avalon West"},"geometry":{"type":"Point","coordinates":[-53.9612,47.2391]}},
@@ -122,7 +121,7 @@
 {"type":"Feature","properties":{"name":"Grand Bank","region":"Burin-West"},"geometry":{"type":"Point","coordinates":[-55.7531,47.0982]}},
 {"type":"Feature","properties":{"name":"Garnish","region":"Burin-West"},"geometry":{"type":"Point","coordinates":[-55.3661,47.2331]}},
 {"type":"Feature","properties":{"name":"Frenchman's Cove","region":"Burin-West"},"geometry":{"type":"Point","coordinates":[-55.4162,47.2012]}},
-{"type":"Feature","properties":{"name":"Winterland","region":"Burin-West"},"geometry":{"type":"Point","coordinates":[-55.3331,47.1512]}}
+{"type":"Feature","properties":{"name":"Winterland","region":"Burin-West"},"geometry":{"type":"Point","coordinates":[-55.3331,47.1512]}},
  {"type":"Feature","properties":{"name":"Clarenville","region":"East"},"geometry":{"type":"Point","coordinates":[-53.9551,48.1652]}},
 {"type":"Feature","properties":{"name":"Milton","region":"East"},"geometry":{"type":"Point","coordinates":[-53.9402,48.1901]}},
 {"type":"Feature","properties":{"name":"George's Brook","region":"East"},"geometry":{"type":"Point","coordinates":[-53.9332,48.2171]}},
@@ -152,7 +151,7 @@
 {"type":"Feature","properties":{"name":"Plate Cove West","region":"Bonavista Peninsula"},"geometry":{"type":"Point","coordinates":[-53.6332,48.4511]}},
 {"type":"Feature","properties":{"name":"Princeton","region":"Bonavista Peninsula"},"geometry":{"type":"Point","coordinates":[-53.5661,48.3512]}},
 {"type":"Feature","properties":{"name":"Musgravetown","region":"Bonavista Peninsula"},"geometry":{"type":"Point","coordinates":[-53.9332,48.4011]}},
-{"type":"Feature","properties":{"name":"Lethbridge","region":"Bonavista Peninsula"},"geometry":{"type":"Point","coordinates":[-53.8661,48.3662]}}
+{"type":"Feature","properties":{"name":"Lethbridge","region":"Bonavista Peninsula"},"geometry":{"type":"Point","coordinates":[-53.8661,48.3662]}},
     {"type":"Feature","properties":{"name":"Gander","region":"Central-Hub"},"geometry":{"type":"Point","coordinates":[-54.6122,48.9551]}},
 {"type":"Feature","properties":{"name":"Grand Falls-Windsor","region":"Central-Hub"},"geometry":{"type":"Point","coordinates":[-55.6622,48.9331]}},
 {"type":"Feature","properties":{"name":"Bishop's Falls","region":"Central-Hub"},"geometry":{"type":"Point","coordinates":[-55.4831,49.0162]}},
@@ -266,6 +265,26 @@
 {"type":"Feature","properties":{"name":"Margaree","region":"Southwest-Coast"},"geometry":{"type":"Point","coordinates":[-59.0662,47.6001]}},
 {"type":"Feature","properties":{"name":"Fox Roost","region":"Southwest-Coast"},"geometry":{"type":"Point","coordinates":[-59.0331,47.6162]}},
 {"type":"Feature","properties":{"name":"Petites","region":"Southwest-Coast"},"geometry":{"type":"Point","coordinates":[-58.6162,47.6161]}},
-{"type":"Feature","properties":{"name":"Grand Bruit","region":"Southwest-Coast"},"geometry":{"type":"Point","coordinates":[-58.2161,47.6662]}}
+{"type":"Feature","properties":{"name":"Grand Bruit","region":"Southwest-Coast"},"geometry":{"type":"Point","coordinates":[-58.2161,47.6662]}},
+{"type":"Feature","properties":{"name":"Rocky Harbour","region":"Gros Morne"},"geometry":{"type":"Point","coordinates":[-57.9162,49.5912]}},
+{"type":"Feature","properties":{"name":"Norris Point","region":"Gros Morne"},"geometry":{"type":"Point","coordinates":[-57.9011,49.5162]}},
+{"type":"Feature","properties":{"name":"Cow Head","region":"GNP-South"},"geometry":{"type":"Point","coordinates":[-57.7831,49.9162]}},
+{"type":"Feature","properties":{"name":"Daniel's Harbour","region":"GNP-South"},"geometry":{"type":"Point","coordinates":[-57.5832,50.2331]}},
+{"type":"Feature","properties":{"name":"Port au Choix","region":"GNP-Central"},"geometry":{"type":"Point","coordinates":[-57.3661,50.7012]}},
+{"type":"Feature","properties":{"name":"St. Barbe","region":"GNP-North"},"geometry":{"type":"Point","coordinates":[-56.7661,51.2012]}},
+{"type":"Feature","properties":{"name":"St. Anthony","region":"GNP-Hub"},"geometry":{"type":"Point","coordinates":[-55.5991,51.3622]}},
+{"type":"Feature","properties":{"name":"L'Anse aux Meadows","region":"GNP-Hub"},"geometry":{"type":"Point","coordinates":[-55.5331,51.5952]}},
+{"type":"Feature","properties":{"name":"Main Brook","region":"GNP-East"},"geometry":{"type":"Point","coordinates":[-56.0162,51.1831]}},
+{"type":"Feature","properties":{"name":"Roddickton","region":"GNP-East"},"geometry":{"type":"Point","coordinates":[-56.1331,50.8661]}},
+{"type":"Feature","properties":{"name":"Grey River","region":"Southwest-Isolated"},"geometry":{"type":"Point","coordinates":[-57.1162,47.5831]}},
+{"type":"Feature","properties":{"name":"François","region":"Southwest-Isolated"},"geometry":{"type":"Point","coordinates":[-56.7501,47.5832]}},
+{"type":"Feature","properties":{"name":"McCallum","region":"Southwest-Isolated"},"geometry":{"type":"Point","coordinates":[-56.2331,47.6331]}},
+{"type":"Feature","properties":{"name":"Burgeo","region":"Southwest-Coast"},"geometry":{"type":"Point","coordinates":[-57.6162,47.6111]}},
+{"type":"Feature","properties":{"name":"Ramea","region":"Southwest-Coast"},"geometry":{"type":"Point","coordinates":[-57.3831,47.5162]}},
+{"type":"Feature","properties":{"name":"Rose Blanche","region":"Southwest-Coast"},"geometry":{"type":"Point","coordinates":[-58.2831,47.6162]}},
+{"type":"Feature","properties":{"name":"Belleoram","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.4162,47.5161]}},
+{"type":"Feature","properties":{"name":"St. Jacques","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.4111,47.4832]}},
+{"type":"Feature","properties":{"name":"Pool's Cove","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.4331,47.6832]}},
+{"type":"Feature","properties":{"name":"Gaultois","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.9162,47.6012]}}    
   ]
 }
