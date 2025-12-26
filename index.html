@@ -2,12 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Automatic Route</title>
+    <title>WEonG - Newfoundland Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
-        /* This hides the text instructions box that clutter your screenshots */
+        /* Hides the text instruction panel to keep the map clean */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -26,17 +26,20 @@
         attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // 2. Define the exact default coordinates for our hubs
-    var startPoint = L.latLng(48.9515, -57.9482); // Corner Brook
-    var endPoint = L.latLng(47.5615, -52.7126);   // St. John's
+    // 2. Define our Default Waypoints (Corner Brook to St. John's)
+    // These are pulled from the locked-in 2025-12-26 dataset
+    var waypoints = [
+        L.latLng(48.9515, -57.9482), // Origin
+        L.latLng(47.5615, -52.7126)  // Destination
+    ];
 
-    // 3. Initialize the routing with BOTH waypoints already included
+    // 3. Create the Routing Control - This draws the pins and route ON LOAD
     var control = L.Routing.control({
-        waypoints: [startPoint, endPoint],
+        waypoints: waypoints,
         routeWhileDragging: true,
-        show: false,
+        show: false, 
         createMarker: function(i, wp) {
-            // This ensures draggable pins appear immediately on load
+            // This ensures both pins are draggable immediately
             return L.marker(wp.latLng, {
                 draggable: true
             }).bindPopup(i === 0 ? "<b>Origin</b>" : "<b>Destination</b>").openPopup();
@@ -46,11 +49,12 @@
         }
     }).addTo(map);
 
-    // 4. Force map to fit the route once the TCH path is found
+    // 4. Automatically zoom to show the route
     control.on('routeselected', function(e) {
         var bounds = L.latLngBounds(e.route.coordinates);
         map.fitBounds(bounds, { padding: [50, 50] });
     });
 </script>
+
 </body>
 </html>
