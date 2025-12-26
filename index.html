@@ -1,14 +1,14 @@
-<!<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Newfoundland Route Map</title>
+    <title>WEonG - Newfoundland Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; }
-        #map { width: 100%; height: 100vh; }
-        .popup-header { font-weight: bold; color: #333; }
+        /* This ensures the map is actually visible on the screen */
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; }
+        #map { height: 100vh; width: 100vw; background: #e5e3df; }
     </style>
 </head>
 <body>
@@ -18,112 +18,51 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
         import { RouteEngine } from './engine/route-engine.js';
-        import { BulletinLogic } from './engine/weather-bulletin.js';
 
-        async function initRouteMap() {
-            // Center map on the island's center
+        async function init() {
+            // 1. Initialize the Map
             const map = L.map('map').setView([48.5, -55.8], 7);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
-            // Default Coordinates (Locked in from NL Deep Dive)
-            const origin = { name: "Corner Brook", coords: [48.9515, -57.9482] };
-            const destination = { name: "St. John's", coords: [47.5615, -52.7126] };
+            // 2. Define our "Locked" Origin and Destination
+            // Using coordinates directly from your Newfoundland Deep Dive
+            const origin = { name: "Corner Brook", lat: 48.9515, lng: -57.9482 };
+            const dest = { name: "St. John's", lat: 47.5615, lng: -52.7126 };
 
-            // Add Origin Pin
-            L.marker(origin.coords).addTo(map)
-                .bindPopup(`<div class="popup-header">Origin: ${origin.name}</div>`);
+            // 3. Drop the Pins immediately
+            const startPin = L.marker([origin.lat, origin.lng]).addTo(map)
+                .bindPopup(`<b>Origin:</b> ${origin.name}`).openPopup();
 
-            // Add Destination Pin
-            L.marker(destination.coords).addTo(map)
-                .bindPopup(`<div class="popup-header">Destination: ${destination.name}</div>`);
+            const endPin = L.marker([dest.lat, dest.lng]).addTo(map)
+                .bindPopup(`<b>Destination:</b> ${dest.name}`);
 
-            // Road Route Simulation (Trans-Canada Highway Pathing)
-            // Note: For real-time turn-by-turn road geometry, use a routing engine API
-            const roadGeometry = [
-                origin.coords,
-                [48.95, -57.0], [48.9, -56.0], [48.8, -55.0], 
-                [48.7, -54.0], [48.4, -53.8], [47.8, -53.5],
-                destination.coords
+            // 4. Draw the Road Route (Trans-Canada Highway Path)
+            const tchRoute = [
+                [48.9515, -57.9482], // Corner Brook
+                [48.91, -57.43],     // Deer Lake
+                [48.93, -56.01],     // Grand Falls-Windsor
+                [48.95, -54.60],     // Gander
+                [48.18, -53.98],     // Clarenville
+                [47.58, -53.25],     // Whitbourne
+                [47.5615, -52.7126]  // St. John's
             ];
 
-            const routeLine = L.polyline(roadGeometry, {
+            const routeLine = L.polyline(tchRoute, {
                 color: '#2a52be', 
-                weight: 6,
-                opacity: 0.8,
-                dashArray: '10, 10' // Visualizing the 'weong-route' style
+                weight: 6, 
+                opacity: 0.9,
+                lineJoin: 'round'
             }).addTo(map);
 
+            // 5. Adjust the view to show the whole route
             map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
         }
 
-        initRouteMap();
-    </script>
-</body>
-</html>DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Newfoundland Route Map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; }
-        #map { width: 100%; height: 100vh; }
-        .popup-header { font-weight: bold; color: #333; }
-    </style>
-</head>
-<body>
-
-    <div id="map"></div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module">
-        import { RouteEngine } from './engine/route-engine.js';
-        import { BulletinLogic } from './engine/weather-bulletin.js';
-
-        async function initRouteMap() {
-            // Center map on the island's center
-            const map = L.map('map').setView([48.5, -55.8], 7);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap'
-            }).addTo(map);
-
-            // Default Coordinates (Locked in from NL Deep Dive)
-            const origin = { name: "Corner Brook", coords: [48.9515, -57.9482] };
-            const destination = { name: "St. John's", coords: [47.5615, -52.7126] };
-
-            // Add Origin Pin
-            L.marker(origin.coords).addTo(map)
-                .bindPopup(`<div class="popup-header">Origin: ${origin.name}</div>`);
-
-            // Add Destination Pin
-            L.marker(destination.coords).addTo(map)
-                .bindPopup(`<div class="popup-header">Destination: ${destination.name}</div>`);
-
-            // Road Route Simulation (Trans-Canada Highway Pathing)
-            // Note: For real-time turn-by-turn road geometry, use a routing engine API
-            const roadGeometry = [
-                origin.coords,
-                [48.95, -57.0], [48.9, -56.0], [48.8, -55.0], 
-                [48.7, -54.0], [48.4, -53.8], [47.8, -53.5],
-                destination.coords
-            ];
-
-            const routeLine = L.polyline(roadGeometry, {
-                color: '#2a52be', 
-                weight: 6,
-                opacity: 0.8,
-                dashArray: '10, 10' // Visualizing the 'weong-route' style
-            }).addTo(map);
-
-            map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
-        }
-
-        initRouteMap();
+        // Run the script
+        init();
     </script>
 </body>
 </html>
