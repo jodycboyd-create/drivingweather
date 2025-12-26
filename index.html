@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Final Magnet Sync</title>
+    <title>WEonG - Newfoundland Road Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -23,17 +23,17 @@
 
 <script>
     /**
-     * Build: [weong-route] Forced Sync Logic
-     * Goal: Magnet snap to community first, then update road route.
-     * Dataset: 2025-12-26 Locked Newfoundland Database
+     * Build: [weong-route] Full Synchronization & Magnet Logic
+     * Goal: Pin and Route Line are locked together [cite: 2025-12-25]
      */
     let map, communities = [], routingControl;
     let markers = [];
 
     async function init() {
-        map = L.map('map').setView([48.9, -55.3], 8);
+        map = L.map('map').setView([48.9, -55.0], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+        // Loading locked-in Newfoundland dataset [cite: 2025-12-26]
         const response = await fetch('data/nl/communities.json');
         const data = await response.json();
         communities = data.features;
@@ -42,27 +42,26 @@
     }
 
     function setupEngine() {
-        // Yesterday's working default: Grand Falls-Windsor to Gander [cite: 2025-12-26]
+        // Default working baseline: Grand Falls-Windsor to Gander [cite: 2025-12-26]
         const p1 = L.latLng(48.9351, -55.6562); 
         const p2 = L.latLng(48.9566, -54.6089);
 
-        // 1. Create Routing Control WITHOUT markers to prevent ghosting [cite: 2025-12-25]
+        // 1. Initialize Routing WITHOUT markers [cite: 2025-12-25]
         routingControl = L.Routing.control({
             waypoints: [p1, p2],
             router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            createMarker: () => null, 
-            addWaypoints: false,
-            routeWhileDragging: false,
+            createMarker: () => null, // Disables internal ghost markers
+            routeWhileDragging: true,
             show: false,
             lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
         }).addTo(map);
 
-        // 2. Add our own Snapping Markers as the source of truth [cite: 2025-12-26]
-        markers[0] = createMagnetMarker(p1, 0);
-        markers[1] = createMagnetMarker(p2, 1);
+        // 2. Setup custom managed markers
+        markers[0] = createManagedMarker(p1, 0);
+        markers[1] = createManagedMarker(p2, 1);
     }
 
-    function createMagnetMarker(latlng, index) {
+    function createManagedMarker(latlng, index) {
         const marker = L.marker(latlng, { draggable: true }).addTo(map);
         
         const updateUI = (ll) => {
@@ -75,22 +74,26 @@
 
         updateUI(latlng);
 
-        // Labels update while dragging [cite: 2025-12-26]
-        marker.on('drag', (e) => updateUI(e.latlng));
+        // REAL-TIME SYNC: Update route while dragging [cite: 2025-12-26]
+        marker.on('drag', (e) => {
+            updateUI(e.latlng);
+            const currentWps = routingControl.getWaypoints();
+            currentWps[index].latLng = e.latlng;
+            routingControl.setWaypoints(currentWps);
+        });
 
-        // CRITICAL FIX: The Magnet Snap + Routing Force Update
+        // MAGNET SNAP: Snap to community and lock road route [cite: 2025-12-26]
         marker.on('dragend', function(e) {
-            const nearest = updateUI(e.latlng);
+            const nearest = findNearest(e.latlng);
             const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
             
-            // Step A: Magnetically snap the pin [cite: 2025-12-26]
+            // Step 1: Force pin to the community node
             marker.setLatLng(snappedPos);
+            updateUI(snappedPos);
             
-            // Step B: Update the routing engine's internal waypoint array
+            // Step 2: Force route line to the community node [cite: 2025-12-25]
             const currentWps = routingControl.getWaypoints();
-            currentWps[index] = L.routing.waypoint(snappedPos); // Force type matching
-            
-            // Step C: Force a fresh road-network calculation [cite: 2025-12-23]
+            currentWps[index].latLng = snappedPos;
             routingControl.setWaypoints(currentWps);
         });
 
