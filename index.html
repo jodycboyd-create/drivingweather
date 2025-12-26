@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Snapping Engine</title>
+    <title>WEonG - Newfoundland Road Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -29,69 +29,78 @@
 
 <script>
     /**
-     * Build: [weong-route] Synchronization & Always-On Labels
-     * Logic: Magnet Snap to Community Node + Forced OSRM Refresh
+     * Build: [weong-route] Synchronization & Magnet Logic
+     * Methodology: Custom Marker Source-of-Truth
      * Dataset: Comprehensive Newfoundland [cite: 2025-12-26]
      */
     let map, communities = [], routingControl;
+    let markers = [];
 
     async function init() {
-        map = L.map('map').setView([48.9, -55.5], 8); // Centered on central NL
+        map = L.map('map').setView([48.9, -55.0], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         const response = await fetch('data/nl/communities.json');
         const data = await response.json();
         communities = data.features;
-        setupRouting();
+        
+        setupEngine();
     }
 
-    function setupRouting() {
-        // Locked Defaults: Gander and Grand Falls-Windsor [cite: 2025-12-26]
-        const gander = L.latLng(48.9566, -54.6089);
-        const gfw = L.latLng(48.9351, -55.6562);
+    function setupEngine() {
+        // Locked Defaults: Grand Falls-Windsor and Gander [cite: 2025-12-26]
+        const startPos = L.latLng(48.9351, -55.6562); 
+        const endPos = L.latLng(48.9566, -54.6089);
 
+        // 1. Initialize Routing Engine WITHOUT its own markers [cite: 2025-12-25]
         routingControl = L.Routing.control({
-            waypoints: [gander, gfw],
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+            waypoints: [startPos, endPos],
+            router: L.Routing.osrmv1({ 
+                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                profile: 'driving'
+            }),
+            createMarker: () => null, // Disables ghost markers
             routeWhileDragging: false,
             show: false,
-            createMarker: function(i, wp) {
-                const marker = L.marker(wp.latLng, { draggable: true });
-                
-                // Unified Label Update (Always On)
-                const refreshUI = (latlng) => {
-                    const nearest = findNearest(latlng);
-                    marker.bindTooltip(nearest.properties.name, { 
-                        permanent: true, direction: 'top', className: 'snapping-label' 
-                    }).openTooltip();
-                    return nearest;
-                };
-
-                refreshUI(wp.latLng);
-
-                // Live label while dragging
-                marker.on('drag', (e) => refreshUI(e.latlng));
-
-                // MAGNET SNAP: Forces route and marker to the community node [cite: 2025-12-26]
-                marker.on('dragend', function(e) {
-                    const nearest = refreshUI(e.latlng);
-                    const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
-                    
-                    // 1. Force the physical marker to the snap point
-                    marker.setLatLng(snappedPos);
-                    
-                    // 2. FORCE SYNC: Manually update the routing waypoint to match the marker [cite: 2025-12-25]
-                    const currentWaypoints = routingControl.getWaypoints();
-                    currentWaypoints[i].latLng = snappedPos;
-                    routingControl.setWaypoints(currentWaypoints);
-                });
-
-                return marker;
-            },
-            lineOptions: {
-                styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }]
-            }
+            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
         }).addTo(map);
+
+        // 2. Create Managed Custom Markers [cite: 2025-12-26]
+        markers[0] = createMagnetMarker(startPos, 0);
+        markers[1] = createMagnetMarker(endPos, 1);
+    }
+
+    function createMagnetMarker(latlng, index) {
+        const marker = L.marker(latlng, { draggable: true }).addTo(map);
+        
+        const updateUI = (ll) => {
+            const nearest = findNearest(ll);
+            marker.bindTooltip(nearest.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
+            }).openTooltip();
+            return nearest;
+        };
+
+        updateUI(latlng);
+
+        // Continuous label track [cite: 2025-12-26]
+        marker.on('drag', (e) => updateUI(e.latlng));
+
+        // MAGNET SNAP & SYNC: Force line to marker [cite: 2025-12-25]
+        marker.on('dragend', function(e) {
+            const nearest = updateUI(e.latlng);
+            const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
+            
+            // Reposition physical marker to magnet point [cite: 2025-12-26]
+            marker.setLatLng(snappedPos);
+            
+            // RE-CALCULATE ROAD ROUTE: Force engine to new snapped point
+            const wps = routingControl.getWaypoints();
+            wps[index].latLng = snappedPos;
+            routingControl.setWaypoints(wps);
+        });
+
+        return marker;
     }
 
     function findNearest(latlng) {
