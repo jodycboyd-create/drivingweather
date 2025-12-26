@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Route</title>
+    <title>WEonG - Final Snapping Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
         .leaflet-routing-container { display: none !important; }
-        
         .snapping-label {
             font-weight: bold;
             color: #0047AB;
@@ -17,7 +16,6 @@
             padding: 4px 10px;
             border-radius: 6px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            white-space: nowrap;
         }
     </style>
 </head>
@@ -31,31 +29,24 @@
 <script>
     /**
      * Build: [weong-route] Road Integrity + Always-On Labels
-     * Methodology: Magnet Snapping with Forced Waypoint Sync
-     * Dataset: Locked Newfoundland Deep Dive [cite: 2025-12-26]
+     * Methodology: Magnet Snapping with Forced Sync [cite: 2025-12-26]
      */
-
-    let map, communities = [];
-    let routingControl;
+    let map, communities = [], routingControl;
 
     async function init() {
         map = L.map('map').setView([48.5, -55.8], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        try {
-            const response = await fetch('data/nl/communities.json');
-            const data = await response.json();
-            communities = data.features;
-            setupRouting();
-        } catch (error) {
-            console.error("Data load failed", error);
-        }
+        const response = await fetch('data/nl/communities.json');
+        const data = await response.json();
+        communities = data.features;
+        setupRouting();
     }
 
     function setupRouting() {
-        // Initial locked-in coordinates [cite: 2025-12-26]
-        const start = L.latLng(48.9515, -57.9482); // Corner Brook
-        const end = L.latLng(47.5615, -52.7126);   // St. John's
+        // Locked defaults: Corner Brook and St. John's [cite: 2025-12-26]
+        const start = L.latLng(48.9515, -57.9482);
+        const end = L.latLng(47.5615, -52.7126);
 
         routingControl = L.Routing.control({
             waypoints: [start, end],
@@ -66,40 +57,36 @@
             routeWhileDragging: false,
             show: false,
             createMarker: function(i, wp) {
+                // Initial marker setup with Always-On Label
                 const marker = L.marker(wp.latLng, { draggable: true });
-                
-                // 1. Label initialization (Always On) [cite: 2025-12-26]
-                const updateTooltip = (latlng) => {
+                const snap = (latlng) => {
                     const nearest = findNearest(latlng);
                     marker.bindTooltip(nearest.properties.name, { 
-                        permanent: true, 
-                        direction: 'top', 
-                        className: 'snapping-label',
-                        offset: [0, -10]
+                        permanent: true, direction: 'top', className: 'snapping-label' 
                     }).openTooltip();
                     return nearest;
                 };
 
-                updateTooltip(wp.latLng);
+                snap(wp.latLng);
 
-                // 2. Dynamic Update during drag
-                marker.on('drag', (e) => updateTooltip(e.latlng));
+                // Continuous label update during drag [cite: 2025-12-26]
+                marker.on('drag', (e) => snap(e.latlng));
 
-                // 3. MAGNET SNAP + ROUTE SYNC
+                // MAGNET SNAP + FORCED ROUTE UPDATE
                 marker.on('dragend', function(e) {
-                    const snappedCommunity = updateTooltip(e.latlng);
+                    const nearest = snap(e.latlng);
                     const snappedPos = L.latLng(
-                        snappedCommunity.geometry.coordinates[1], 
-                        snappedCommunity.geometry.coordinates[0]
+                        nearest.geometry.coordinates[1], 
+                        nearest.geometry.coordinates[0]
                     );
                     
-                    // Force the physical marker to the snap point [cite: 2025-12-26]
+                    // Force visual pin to community point [cite: 2025-12-26]
                     marker.setLatLng(snappedPos);
                     
-                    // Force a total waypoint refresh to fix the "Broken Route" [cite: 2025-12-23]
-                    const currentWaypoints = routingControl.getWaypoints();
-                    currentWaypoints[i].latLng = snappedPos;
-                    routingControl.setWaypoints(currentWaypoints);
+                    // RE-SYNC ROUTE: This fixes the detached line issue shown in images
+                    const wps = routingControl.getWaypoints();
+                    wps[i].latLng = snappedPos;
+                    routingControl.setWaypoints(wps);
                 });
 
                 return marker;
@@ -112,9 +99,9 @@
 
     function findNearest(latlng) {
         return communities.reduce((prev, curr) => {
-            const pCoord = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const cCoord = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(cCoord) < latlng.distanceTo(pCoord) ? curr : prev;
+            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
         });
     }
 
