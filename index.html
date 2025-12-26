@@ -1,18 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <base href="/drivingweather/">
-    
-    <link rel="manifest" href="data/nl/manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WEonG - Newfoundland Bulletin</title>
     <style>
-        body { font-family: sans-serif; background: #f0f0f0; margin: 0; padding: 20px; }
+        body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
         #bulletin-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 15px; }
         .community-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .exception { border: 2px solid #d9534f; background: #fff5f5; }
-        .alert-text { color: #d9534f; font-weight: bold; font-size: 0.9em; }
+        .alert-text { color: #d9534f; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -20,17 +17,17 @@
     <div id="bulletin-board"></div>
 
     <script type="module">
-        // Base tag handles the prefix, so we use direct relative paths
-        import { RouteEngine } from 'engine/route-engine.js';
-        import { BulletinLogic } from 'engine/weather-bulletin.js';
+        // Using explicit paths relative to the root drivingweather folder
+        import { RouteEngine } from './engine/route-engine.js';
+        import { BulletinLogic } from './engine/weather-bulletin.js';
 
         async function init() {
             const engine = new RouteEngine();
             const communities = await engine.loadCommunities();
             const container = document.getElementById('bulletin-board');
 
-            if (communities.length === 0) {
-                container.innerHTML = "<p>Loading Newfoundland communities...</p>";
+            if (!communities || communities.length === 0) {
+                container.innerHTML = "<p style='color:red;'>Check Console (F12): Failed to load data/nl/communities.json</p>";
                 return;
             }
 
@@ -40,7 +37,7 @@
                     uvIndex: 7,
                     isDaytime: true,
                     range: 'short',
-                    levels: { precip: 3, wind: 1 } 
+                    levels: { precip: 3, wind: 1 } // Triggering Level 3 Exception
                 };
 
                 const report = BulletinLogic.generate(loc, weatherData);
@@ -51,7 +48,7 @@
                     <h3 style="margin-top:0;">${report.location}</h3>
                     <p>POP: ${report.pop || '---'}</p>
                     ${report.uvIndex ? `<p>UV Index: ${report.uvIndex}</p>` : ''}
-                    ${report.isCritical ? '<span class="alert-text">⚠️ Level 3 Exception</span>' : ''}
+                    ${report.isCritical ? '<span class="alert-text">⚠️ Level 3 Priority</span>' : ''}
                 `;
                 container.appendChild(div);
             });
