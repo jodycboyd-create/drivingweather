@@ -1,50 +1,25 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Route</title>
-    <style>
-        .exception { border: 2px solid red; background: #fff0f0; }
-        .community-card { margin: 10px; padding: 10px; border: 1px solid #ccc; display: inline-block; width: 200px; }
-    </style>
-</head>
-<body>
-    <div id="bulletin-board"></div>
+/**
+ * route-engine.js 
+ * Project: [weong-route]
+ * Purpose: Manages the Newfoundland geographic dataset.
+ */
 
-    <script type="module">
-        import { RouteEngine } from './engine/route-engine.js';
-        import { BulletinLogic } from './engine/weather-bulletin.js';
+export class RouteEngine {
+    constructor() {
+        this.communities = [];
+    }
 
-        async function init() {
-            const engine = new RouteEngine();
-            const communities = await engine.loadCommunities();
-            const container = document.getElementById('bulletin-board');
-
-            communities.forEach(loc => {
-                // Example Weather Data (Simulated)
-                const weatherData = {
-                    pop: 45,
-                    uvIndex: 7,
-                    isDaytime: true,
-                    range: 'short',
-                    levels: { precip: 3, wind: 1 } // Triggering Level 3 Exception
-                };
-
-                const report = BulletinLogic.generate(loc, weatherData);
-                
-                const div = document.createElement('div');
-                div.className = `community-card ${report.isAlert ? 'exception' : ''}`;
-                div.innerHTML = `
-                    <h3>${report.name}</h3>
-                    <p>POP: ${report.pop || '---'}</p>
-                    ${report.uv ? `<p>UV Index: ${report.uv}</p>` : ''}
-                    ${report.isAlert ? '<strong>⚠️ Level 3 Priority</strong>' : ''}
-                `;
-                container.appendChild(div);
-            });
+    async loadCommunities() {
+        try {
+            // Path tailored to your GitHub structure: data/nl/communities.json
+            const response = await fetch('./data/nl/communities.json');
+            if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+            this.communities = await response.json();
+            console.log("Newfoundland Dataset Locked and Loaded.");
+            return this.communities;
+        } catch (error) {
+            console.error("RouteEngine Error:", error);
+            return [];
         }
-
-        init();
-    </script>
-</body>
-</html>
+    }
+}
