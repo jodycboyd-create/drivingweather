@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Final Snapping Engine</title>
+    <title>WEonG - Synchronized Newfoundland Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
-        .leaflet-routing-container { display: none !important; }
+        .leaflet-routing-container { display: none !important; } /* Clean Map */
         .snapping-label {
             font-weight: bold;
             color: #0047AB;
@@ -20,7 +20,6 @@
     </style>
 </head>
 <body>
-
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -28,10 +27,11 @@
 
 <script>
     /**
-     * Build: [weong-route] Road Integrity + Always-On Labels
-     * Methodology: Magnet Snapping with Forced Sync [cite: 2025-12-26]
+     * Build: [weong-route] Sync Fix
+     * Methodology: Custom Marker Source of Truth + Magnet Snap [cite: 2025-12-26]
      */
     let map, communities = [], routingControl;
+    let markers = [];
 
     async function init() {
         map = L.map('map').setView([48.5, -55.8], 7);
@@ -40,61 +40,60 @@
         const response = await fetch('data/nl/communities.json');
         const data = await response.json();
         communities = data.features;
-        setupRouting();
+
+        setupEngine();
     }
 
-    function setupRouting() {
-        // Locked defaults: Corner Brook and St. John's [cite: 2025-12-26]
-        const start = L.latLng(48.9515, -57.9482);
-        const end = L.latLng(47.5615, -52.7126);
+    function setupEngine() {
+        const startPos = L.latLng(48.9515, -57.9482); // Corner Brook
+        const endPos = L.latLng(47.5615, -52.7126);   // St. John's
+
+        // Initialize markers first to ensure they are the primary controllers
+        markers[0] = createManagedMarker(startPos, 0);
+        markers[1] = createManagedMarker(endPos, 1);
 
         routingControl = L.Routing.control({
-            waypoints: [start, end],
-            router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'driving'
-            }),
+            waypoints: [startPos, endPos],
+            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+            createMarker: () => null, // Disable internal markers to prevent desync [cite: 2025-12-25]
+            addWaypoints: false,
             routeWhileDragging: false,
             show: false,
-            createMarker: function(i, wp) {
-                // Initial marker setup with Always-On Label
-                const marker = L.marker(wp.latLng, { draggable: true });
-                const snap = (latlng) => {
-                    const nearest = findNearest(latlng);
-                    marker.bindTooltip(nearest.properties.name, { 
-                        permanent: true, direction: 'top', className: 'snapping-label' 
-                    }).openTooltip();
-                    return nearest;
-                };
-
-                snap(wp.latLng);
-
-                // Continuous label update during drag [cite: 2025-12-26]
-                marker.on('drag', (e) => snap(e.latlng));
-
-                // MAGNET SNAP + FORCED ROUTE UPDATE
-                marker.on('dragend', function(e) {
-                    const nearest = snap(e.latlng);
-                    const snappedPos = L.latLng(
-                        nearest.geometry.coordinates[1], 
-                        nearest.geometry.coordinates[0]
-                    );
-                    
-                    // Force visual pin to community point [cite: 2025-12-26]
-                    marker.setLatLng(snappedPos);
-                    
-                    // RE-SYNC ROUTE: This fixes the detached line issue shown in images
-                    const wps = routingControl.getWaypoints();
-                    wps[i].latLng = snappedPos;
-                    routingControl.setWaypoints(wps);
-                });
-
-                return marker;
-            },
-            lineOptions: {
-                styles: [{ color: '#0047AB', weight: 7, opacity: 0.8 }]
-            }
+            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
         }).addTo(map);
+    }
+
+    function createManagedMarker(latlng, index) {
+        const marker = L.marker(latlng, { draggable: true }).addTo(map);
+        
+        const updateLabel = (ll) => {
+            const nearest = findNearest(ll);
+            marker.bindTooltip(nearest.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
+            }).openTooltip();
+            return nearest;
+        };
+
+        updateLabel(latlng);
+
+        // Continuous label while dragging
+        marker.on('drag', (e) => updateLabel(e.latlng));
+
+        // MAGNET SNAP: Force marker and route line to align on release [cite: 2025-12-26]
+        marker.on('dragend', function(e) {
+            const nearest = updateLabel(e.latlng);
+            const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
+            
+            // 1. Force Marker to the magnet community
+            marker.setLatLng(snappedPos);
+            
+            // 2. Force Route Line to update based on the new marker position
+            const wps = routingControl.getWaypoints();
+            wps[index].latLng = snappedPos;
+            routingControl.setWaypoints(wps);
+        });
+
+        return marker;
     }
 
     function findNearest(latlng) {
