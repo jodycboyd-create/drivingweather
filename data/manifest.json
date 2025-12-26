@@ -1,1 +1,29 @@
-{}
+{
+  "short_name": "WEonG-NL",
+  "name": "WEonG Weather Bulletin - Newfoundland",
+  "description": "Comprehensive Newfoundland weather monitoring with Level 3 exception triggers.",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/index.html",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#d9534f",
+  "shortcuts": [
+    {
+      "name": "Island-Wide View",
+      "url": "/index.html",
+      "description": "View all Newfoundland community bulletins"
+    }
+  ]
+}
