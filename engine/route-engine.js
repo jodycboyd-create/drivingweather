@@ -1,3 +1,9 @@
+/**
+ * route-engine.js 
+ * Project: [weong-route]
+ * Purpose: Fetches the locked Newfoundland community dataset.
+ */
+
 export class RouteEngine {
     constructor() {
         this.communities = [];
@@ -5,20 +11,27 @@ export class RouteEngine {
 
     async loadCommunities() {
         try {
-            // Using a relative path from the root where index.html sits
-            const response = await fetch('./data/nl/communities.json');
+            // Relative fetch: Looks for 'data' folder in the same root as index.html
+            const response = await fetch('data/nl/communities.json');
             
             if (!response.ok) {
-                // This will help us see EXACTLY where it tried to look
-                throw new Error(`404 Not Found at: ${response.url}`);
+                throw new Error(`404: File not found at ${response.url}`);
             }
             
-            this.communities = await response.json();
+            const geoData = await response.json();
+            
+            // Extract the 'name' from the GeoJSON properties for the Bulletin logic
+            this.communities = geoData.features.map(f => ({
+                name: f.properties.name,
+                region: f.properties.region
+            }));
+
+            console.log(`Success: ${this.communities.length} NL communities loaded.`);
             return this.communities;
         } catch (error) {
             console.error("RouteEngine Error:", error);
             const status = document.getElementById('status-msg');
-            if (status) status.innerHTML = `<span style="color:red;">${error.message}</span>`;
+            if (status) status.innerHTML = `<span style="color:red;">Error: ${error.message}</span>`;
             return [];
         }
     }
