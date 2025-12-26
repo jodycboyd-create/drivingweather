@@ -7,57 +7,77 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
-        #map { width: 100%; height: 100vh; }
-        .popup-critical { color: #d9534f; font-weight: bold; }
+        #map { width: 100%; height: calc(100vh - 50px); }
+        #controls { height: 50px; background: #333; color: white; display: flex; align-items: center; padding: 0 20px; gap: 15px; }
+        select { padding: 5px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
+    <div id="controls">
+        <label>Origin:</label>
+        <select id="origin-select"><option>Select Origin...</option></select>
+        <label>Destination:</label>
+        <select id="dest-select"><option>Select Destination...</option></select>
+        <button id="route-btn">Generate Route</button>
+    </div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
         import { RouteEngine } from './engine/route-engine.js';
-        import { BulletinLogic } from './engine/weather-bulletin.js';
 
-        async function initMap() {
-            // Initialize map centered on Newfoundland
-            const map = L.map('map').setView([49.0, -56.0], 7);
+        let map, routeLine, originMarker, destMarker;
+        const engine = new RouteEngine();
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
+        async function init() {
+            map = L.map('map').setView([49.0, -56.0], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-            const engine = new RouteEngine();
-            // Fetching the comprehensive NL dataset (Deep Dive [2025-12-26])
             const response = await fetch('data/nl/communities.json');
             const geoData = await response.json();
+            const features = geoData.features;
 
-            L.geoJSON(geoData, {
-                onEachFeature: (feature, layer) => {
-                    // Simulation for Route Weather logic
-                    const mockWeather = {
-                        pop: 45, // Will round to 50%
-                        uvIndex: 6,
-                        isDaytime: true,
-                        levels: { wind: 3 } // Exception Trigger
-                    };
+            const originDropdown = document.getElementById('origin-select');
+            const destDropdown = document.getElementById('dest-select');
 
-                    const report = BulletinLogic.generate(feature.properties, mockWeather);
+            // Fill dropdowns with locked Newfoundland dataset names
+            features.forEach((f, index) => {
+                const name = f.properties.name;
+                originDropdown.options.add(new Option(name, index));
+                destDropdown.options.add(new Option(name, index));
+            });
 
-                    let popupContent = `<strong>${report.location}</strong><br>`;
-                    if (report.pop) popupContent += `POP: ${report.pop}<br>`; // Nearest 10%
-                    if (report.uvIndex) popupContent += `UV Index: ${report.uvIndex}<br>`;
-                    if (report.isCritical) {
-                        popupContent += `<span class="popup-critical">⚠️ LEVEL 3 PRIORITY</span>`; //
-                    }
+            document.getElementById('route-btn').onclick = () => {
+                const originIdx = originDropdown.value;
+                const destIdx = destDropdown.value;
 
-                    layer.bindPopup(popupContent);
-                }
-            }).addTo(map);
+                if (originIdx === "" || destIdx === "") return;
+
+                const originFeat = features[originIdx];
+                const destFeat = features[destIdx];
+
+                // Clear existing pins
+                if (originMarker) map.removeLayer(originMarker);
+                if (destMarker) map.removeLayer(destMarker);
+                if (routeLine) map.removeLayer(routeLine);
+
+                // Add Origin Pin
+                const originCoords = [originFeat.geometry.coordinates[1], originFeat.geometry.coordinates[0]];
+                originMarker = L.marker(originCoords).addTo(map).bindPopup(`Origin: ${originFeat.properties.name}`).openPopup();
+
+                // Add Destination Pin
+                const destCoords = [destFeat.geometry.coordinates[1], destFeat.geometry.coordinates[0]];
+                destMarker = L.marker(destCoords).addTo(map).bindPopup(`Destination: ${destFeat.properties.name}`);
+
+                // Draw simple line between them for the route
+                routeLine = L.polyline([originCoords, destCoords], {color: 'blue', weight: 4}).addTo(map);
+                
+                map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+            };
         }
 
-        initMap();
+        init();
     </script>
 </body>
 </html>
