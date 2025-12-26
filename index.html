@@ -1,65 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Route Map</title>
+    <title>WEonG - Route Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; }
-        #map { height: 100vh; width: 100%; background: #f0f0f0; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; }
+        /* Hides the text directions panel to keep the map clean */
+        .leaflet-routing-container { display: none; }
     </style>
 </head>
 <body>
+    <div id="map"></div>
 
-<div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script>
+        // 1. Initialize Map centered on NL
+        var map = L.map('map').setView([48.5, -55.8], 7);
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-    // 1. Setup Map - Centered on Newfoundland
-    const map = L.map('map').setView([48.5, -55.8], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
 
-    // 2. Add Tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
+        // 2. Setup the Routing Control with Default Draggable Waypoints
+        // Starting points: Corner Brook and St. John's
+        var control = L.Routing.control({
+            waypoints: [
+                L.latLng(48.9515, -57.9482), // Corner Brook
+                L.latLng(47.5615, -52.7126)  // St. John's
+            ],
+            routeWhileDragging: true,
+            show: false, // Hide the text box
+            createMarker: function(i, wp) {
+                return L.marker(wp.latLng, {
+                    draggable: true
+                }).bindPopup(i === 0 ? "Origin" : "Destination").openPopup();
+            },
+            lineOptions: {
+                styles: [{ color: '#0047AB', weight: 6, opacity: 0.8 }]
+            }
+        }).addTo(map);
 
-    // 3. Define Default Pins (Corner Brook to St. John's)
-    const startPos = [48.9515, -57.9482]; 
-    const endPos = [47.5615, -52.7126];
-
-    // 4. Create Draggable Pins
-    const originPin = L.marker(startPos, {
-        draggable: true,
-        title: "Origin"
-    }).addTo(map).bindPopup("<b>Origin: Corner Brook</b><br>Drag to change start.");
-
-    const destPin = L.marker(endPos, {
-        draggable: true,
-        title: "Destination"
-    }).addTo(map).bindPopup("<b>Destination: St. John's</b><br>Drag to change end.");
-
-    // 5. Create the Route Line connecting them
-    const routeLine = L.polyline([originPin.getLatLng(), destPin.getLatLng()], {
-        color: '#0047AB',
-        weight: 5,
-        opacity: 0.7
-    }).addTo(map);
-
-    // 6. Function to make the line follow the pins as you drag
-    function redrawRoute() {
-        routeLine.setLatLngs([
-            originPin.getLatLng(),
-            destPin.getLatLng()
-        ]);
-    }
-
-    // Attach the drag events
-    originPin.on('drag', redrawRoute);
-    destPin.on('drag', redrawRoute);
-
-    // Automatically zoom to show both pins on load
-    map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
-
-</script>
+        // 3. Ensure the map zooms to fit the route automatically
+        control.on('routeselected', function(e) {
+            var bounds = L.latLngBounds(e.route.coordinates);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        });
+    </script>
 </body>
 </html>
