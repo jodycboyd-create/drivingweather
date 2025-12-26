@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Newfoundland Route</title>
+    <title>WEonG - Draggable Newfoundland Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
         #map { height: 100vh; width: 100vw; }
-        .pin-label { font-weight: bold; font-size: 14px; }
+        /* Hides the text instructions to keep the focus on the map */
+        .leaflet-routing-container { display: none; }
     </style>
 </head>
 <body>
@@ -16,50 +18,46 @@
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // Use standard script instead of module to ensure immediate execution
         window.onload = function() {
-            // 1. Initialize Map
+            // 1. Setup the Map
             const map = L.map('map').setView([48.5, -55.8], 7);
 
-            // 2. Add Map Tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
-            // 3. The Pins (Corner Brook & St. John's)
-            // Using the coordinates locked in from your Dec 26 Deep Dive
-            const startCoords = [48.9515, -57.9482]; // Corner Brook
-            const endCoords = [47.5615, -52.7126];   // St. John's
+            // 2. Define our Default Points (Corner Brook & St. John's)
+            const cornerBrook = L.latLng(48.9515, -57.9482);
+            const stJohns = L.latLng(47.5615, -52.7126);
 
-            const originPin = L.marker(startCoords).addTo(map)
-                .bindPopup("<div class='pin-label'>Origin: Corner Brook</div>")
-                .openPopup();
-
-            const destPin = L.marker(endCoords).addTo(map)
-                .bindPopup("<div class='pin-label'>Destination: St. John's</div>");
-
-            // 4. The Road Route (TCH Path)
-            const routePath = [
-                startCoords,
-                [49.17, -57.43], // Deer Lake
-                [49.02, -55.48], // Bishop's Falls
-                [48.95, -54.61], // Gander
-                [48.16, -53.95], // Clarenville
-                [47.51, -53.58], // Whitbourne
-                endCoords
-            ];
-
-            const routeLine = L.polyline(routePath, {
-                color: '#0047AB', 
-                weight: 5, 
-                opacity: 0.7,
-                dashArray: '5, 10'
+            // 3. Initialize Routing with Draggable Pins
+            const control = L.Routing.control({
+                waypoints: [cornerBrook, stJohns],
+                routeWhileDragging: true, // This makes the route move with the pins
+                show: false,              // Keeps the UI clean
+                lineOptions: {
+                    styles: [{ color: '#0047AB', weight: 6, opacity: 0.8 }]
+                },
+                // Custom marker logic to ensure they look like our "locked" project pins
+                createMarker: function(i, waypoint, n) {
+                    const marker = L.marker(waypoint.latLng, {
+                        draggable: true,
+                        bounceOnAdd: true
+                    });
+                    
+                    const label = (i === 0) ? "Origin: Corner Brook" : "Destination: St. John's";
+                    return marker.bindPopup(`<b>${label}</b>`).openPopup();
+                }
             }).addTo(map);
 
-            // 5. Fit the map to the pins
-            map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+            // 4. Update the view to fit the route
+            control.on('routeselected', function(e) {
+                const bounds = L.latLngBounds(e.route.coordinates);
+                map.fitBounds(bounds, { padding: [50, 50] });
+            });
         };
     </script>
 </body>
