@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Restored Route Engine</title>
+    <title>WEonG - Newfoundland Route Restoration</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -23,69 +23,74 @@
 
 <script>
     /**
-     * Project: [weong-route]
-     * Methodology: Restored Internal Marker Logic [cite: 2025-12-23]
-     * Goal: Force road path to reappear and snap to communities [cite: 2025-12-26]
+     * Build: [weong-route] Synchronization & Route Persistence
+     * Logic: Reset to working baseline from Dec 25.
+     * Methodology: Hijack internal waypoints to prevent "No Route" error.
      */
     let map, communities = [], routingControl;
 
     async function init() {
-        map = L.map('map').setView([48.9, -55.2], 8);
+        map = L.map('map').setView([48.9, -55.0], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+        // Load locked Newfoundland dataset [cite: 2025-12-26]
         const response = await fetch('data/nl/communities.json');
         const data = await response.json();
         communities = data.features;
         
-        setupEngine();
+        setupRouting();
     }
 
-    function setupEngine() {
-        // Locked Baseline Coordinates [cite: 2025-12-26]
-        const gfw = L.latLng(48.9351, -55.6562); 
-        const gander = L.latLng(48.9566, -54.6089);
+    function setupRouting() {
+        // Grand Falls-Windsor to Gander baseline [cite: 2025-12-26]
+        const start = L.latLng(48.9351, -55.6562); 
+        const end = L.latLng(48.9566, -54.6089);
 
         routingControl = L.Routing.control({
-            waypoints: [gfw, gander],
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            routeWhileDragging: true, 
+            waypoints: [start, end],
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                profile: 'driving'
+            }),
+            routeWhileDragging: true,
             show: false,
-            // Use the internal marker creator to ensure the line stays attached [cite: 2025-12-25]
+            // DO NOT disable createMarker; hijack it instead to force snapping [cite: 2025-12-25]
             createMarker: function(i, wp) {
                 const marker = L.marker(wp.latLng, { draggable: true });
 
-                const updateTooltip = (ll) => {
+                const updateUI = (ll) => {
                     const nearest = findNearest(ll);
+                    // Persistent Community Labels [cite: 2025-12-26]
                     marker.bindTooltip(nearest.properties.name, { 
                         permanent: true, direction: 'top', className: 'snapping-label' 
                     }).openTooltip();
                     return nearest;
                 };
 
-                updateTooltip(wp.latLng);
+                updateUI(wp.latLng);
 
-                // Update label while moving [cite: 2025-12-26]
-                marker.on('drag', (e) => updateTooltip(e.latlng));
+                // Update label while dragging
+                marker.on('drag', (e) => updateUI(e.latlng));
 
-                // THE MAGNET SNAP: This re-aligns the route line [cite: 2025-12-26]
+                // FORCED MAGNET SNAP: Recalculates route on release [cite: 2025-12-26]
                 marker.on('dragend', function(e) {
                     const nearest = findNearest(e.latlng);
                     const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
                     
-                    // 1. Physically move the marker to the town node
+                    // 1. Move the visual pin to the town node
                     marker.setLatLng(snappedPos);
-                    updateTooltip(snappedPos);
+                    updateUI(snappedPos);
                     
-                    // 2. IMPORTANT: Update the routing machine waypoints to force line refresh [cite: 2025-12-25]
-                    const currentWaypoints = routingControl.getWaypoints();
-                    currentWaypoints[i].latLng = snappedPos;
-                    routingControl.setWaypoints(currentWaypoints);
+                    // 2. Force the routing line to refresh its waypoint [cite: 2025-12-25]
+                    const wps = routingControl.getWaypoints();
+                    wps[i].latLng = snappedPos;
+                    routingControl.setWaypoints(wps);
                 });
 
                 return marker;
             },
             lineOptions: {
-                styles: [{ color: '#0047AB', weight: 8, opacity: 0.9 }]
+                styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }]
             }
         }).addTo(map);
     }
