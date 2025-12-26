@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Robust Route Engine</title>
+    <title>WEonG - Robust NL Route Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
-        .leaflet-routing-container { display: none !important; } /* Hide text panel */
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
+        .leaflet-routing-container { display: none !important; } /* No text panels */
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 6px;
@@ -23,31 +23,16 @@
 
 <script>
     /**
-     * [weong-route] Robust Build
-     * Strategy: Event-Driven State Management
-     * Data: Locked Newfoundland Community Nodes [cite: 2025-12-26]
+     * [weong-route] Robust Architectural Build
+     * Methodology: Decoupled State Management [cite: 2025-12-23]
+     * Dataset: Locked Newfoundland Comprehensive [cite: 2025-12-26]
      */
     
     let map, communities = [], routingControl;
-    let markers = [];
-    
-    // 1. Core Logic: Finding the nearest locked node [cite: 2025-12-26]
-    function getSnappedNode(latlng) {
-        return communities.reduce((prev, curr) => {
-            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
-        });
-    }
-
-    // 2. State Sync: Force markers and route line to align perfectly [cite: 2025-12-25]
-    function syncRoute() {
-        if (!routingControl) return;
-        const coords = markers.map(m => m.getLatLng());
-        routingControl.setWaypoints(coords);
-    }
+    let masterWaypoints = []; // The single source of truth
 
     async function init() {
+        // Center on Central NL (Gander area) [cite: 2025-12-26]
         map = L.map('map').setView([48.9, -55.0], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -56,61 +41,74 @@
             const data = await response.json();
             communities = data.features;
             
-            // Define starting baseline: Grand Falls-Windsor & Gander [cite: 2025-12-26]
-            const startNode = getSnappedNode(L.latLng(48.9351, -55.6562));
-            const endNode = getSnappedNode(L.latLng(48.9566, -54.6089));
-            
-            const p1 = L.latLng(startNode.geometry.coordinates[1], startNode.geometry.coordinates[0]);
-            const p2 = L.latLng(endNode.geometry.coordinates[1], endNode.geometry.coordinates[0]);
+            // Baseline: Gander and Grand Falls-Windsor [cite: 2025-12-26]
+            const p1 = L.latLng(48.9351, -55.6562); 
+            const p2 = L.latLng(48.9566, -54.6089);
 
-            // 3. Initialize Markers (Source of Truth) [cite: 2025-12-26]
-            [p1, p2].forEach((pos, i) => {
-                const marker = L.marker(pos, { draggable: true }).addTo(map);
-                
-                const updateLabel = (ll) => {
-                    const node = getSnappedNode(ll);
-                    marker.bindTooltip(node.properties.name, { 
-                        permanent: true, direction: 'top', className: 'snapping-label' 
-                    }).openTooltip();
-                };
-
-                updateLabel(pos);
-
-                marker.on('drag', (e) => {
-                    updateLabel(e.latlng);
-                    // Optional: Update line while dragging (set to false for performance)
-                    // syncRoute(); 
-                });
-
-                marker.on('dragend', (e) => {
-                    const node = getSnappedNode(e.latlng);
-                    const snappedPos = L.latLng(node.geometry.coordinates[1], node.geometry.coordinates[0]);
-                    
-                    // Force physical snap
-                    marker.setLatLng(snappedPos);
-                    updateLabel(snappedPos);
-                    
-                    // Force route sync [cite: 2025-12-25]
-                    syncRoute();
-                });
-
-                markers.push(marker);
-            });
-
-            // 4. Initialize Routing Engine (Display Only) [cite: 2025-12-25]
-            routingControl = L.Routing.control({
-                waypoints: [p1, p2],
-                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                createMarker: () => null, // Disables LRM's conflicting markers
-                addWaypoints: false,
-                routeWhileDragging: false,
-                show: false,
-                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.9 }] }
-            }).addTo(map);
-
-        } catch (error) {
-            console.error("Newfoundland dataset failed to load.", error);
+            setupEngine(p1, p2);
+        } catch (e) {
+            console.error("Critical: Dataset load failed", e);
         }
+    }
+
+    function setupEngine(start, end) {
+        // 1. Create the Routing Control as a RENDERER ONLY [cite: 2025-12-25]
+        routingControl = L.Routing.control({
+            waypoints: [start, end],
+            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+            createMarker: () => null, // CRITICAL: Disable internal ghost markers
+            addWaypoints: false,
+            routeWhileDragging: false,
+            show: false,
+            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.9 }] }
+        }).addTo(map);
+
+        // 2. Initialize Master Markers (The Input Sensors) [cite: 2025-12-26]
+        createMasterMarker(start, 0);
+        createMasterMarker(end, 1);
+    }
+
+    function createMasterMarker(latlng, index) {
+        // Initial snap to ensure we start on a town node [cite: 2025-12-26]
+        const node = findNearest(latlng);
+        const startPos = L.latLng(node.geometry.coordinates[1], node.geometry.coordinates[0]);
+        
+        const marker = L.marker(startPos, { draggable: true }).addTo(map);
+        masterWaypoints[index] = marker;
+
+        const updateLabel = (ll) => {
+            const nearest = findNearest(ll);
+            marker.bindTooltip(nearest.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
+            }).openTooltip();
+        };
+
+        updateLabel(startPos);
+
+        // Visual drag (Doesn't affect route line yet to save performance)
+        marker.on('drag', (e) => updateLabel(e.latlng));
+
+        // THE SNAP & SYNC COMMAND [cite: 2025-12-25]
+        marker.on('dragend', function(e) {
+            const nearest = findNearest(e.latlng);
+            const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
+            
+            // 1. Teleport visual marker to the community node [cite: 2025-12-26]
+            marker.setLatLng(snappedPos);
+            updateLabel(snappedPos);
+            
+            // 2. Force the Routing Engine to recalculate using the master array
+            const newWaypoints = masterWaypoints.map(m => m.getLatLng());
+            routingControl.setWaypoints(newWaypoints);
+        });
+    }
+
+    function findNearest(latlng) {
+        return communities.reduce((prev, curr) => {
+            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
+        });
     }
 
     window.onload = init;
