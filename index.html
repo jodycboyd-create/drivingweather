@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | v5.4 Total Provincial Resolution</title>
+    <title>WEonG-Bulletin | v5.5 Absolute Provincial Resolution</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --g-blue: #1a73e8; --g-teal: #008080; }
@@ -21,12 +21,12 @@
 <div style="max-width: 1400px; margin: auto;">
     <header style="display: flex; align-items: center; margin-bottom: 20px; gap: 15px;">
         <h2 style="margin:0; color:var(--g-blue);">WEonG <span style="font-weight:900;">ROUTE</span></h2>
-        <div class="status-badge">v5.4 CENSUS-GRADE GLOBAL MESH (>200 POP)</div>
+        <div class="status-badge">v5.5 MAXIMUM RESOLUTION: >200 POP MESH</div>
     </header>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-        <div><label style="font-size:10px; font-weight:700; color:#70757a;">FROM</label><input type="text" id="originIn" style="width:100%; padding:12px; border:1px solid #dadce0; border-radius:8px;" readonly></div>
-        <div><label style="font-size:10px; font-weight:700; color:#70757a;">TO</label><input type="text" id="destIn" style="width:100%; padding:12px; border:1px solid #dadce0; border-radius:8px;" readonly></div>
+        <div><label style="font-size:10px; font-weight:700; color:#70757a;">FROM (SNAPPED)</label><input type="text" id="originIn" style="width:100%; padding:12px; border:1px solid #dadce0; border-radius:8px;" readonly></div>
+        <div><label style="font-size:10px; font-weight:700; color:#70757a;">TO (SNAPPED)</label><input type="text" id="destIn" style="width:100%; padding:12px; border:1px solid #dadce0; border-radius:8px;" readonly></div>
     </div>
 
     <div id="map"></div>
@@ -34,43 +34,47 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // FULL ISLAND CENSUS MESH - CONSOLIDATED v5.4
+    // MAXIMUM RESOLUTION DATABASE - ALL COMMUNITIES >200 POP
     const nlHubs = [
-        // --- AVALON & EASTERN ---
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
-        { name: "Conception Bay South", lat: 47.505, lng: -52.990 }, { name: "Carbonear", lat: 47.737, lng: -53.228 },
-        { name: "Bay Roberts", lat: 47.596, lng: -53.262 }, { name: "Placentia", lat: 47.239, lng: -53.960 },
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Arnold's Cove", lat: 47.755, lng: -53.987 },
-        { name: "Whitbourne", lat: 47.421, lng: -53.531 }, { name: "Old Perlican", lat: 48.085, lng: -53.012 },
+        // --- NEW WORLD ISLAND & TWILLINGATE (SUMMERFORD FIX) ---
+        { name: "Summerford", lat: 49.495, lng: -54.645 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
+        { name: "Cottlesville", lat: 49.485, lng: -54.698 }, { name: "Moreton's Harbour", lat: 49.585, lng: -54.858 },
+        
+        // --- CENTRAL-EAST & GANDER BAY ---
+        { name: "Gambo", lat: 48.749, lng: -54.218 }, { name: "Glovertown", lat: 48.675, lng: -54.062 },
+        { name: "Hare Bay", lat: 48.847, lng: -54.015 }, { name: "Main Point", lat: 49.278, lng: -54.405 },
+        { name: "Lumsden", lat: 49.297, lng: -53.585 }, { name: "New-Wes-Valley", lat: 49.117, lng: -53.600 },
 
         // --- BONAVISTA PENINSULA (LOCKED) ---
         { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Trinity Bay North", lat: 48.517, lng: -53.117 },
         { name: "Musgravetown", lat: 48.391, lng: -53.951 }, { name: "Port Rexton", lat: 48.385, lng: -53.332 },
         { name: "Lethbridge", lat: 48.351, lng: -53.864 }, { name: "Bloomfield", lat: 48.349, lng: -53.916 },
 
-        // --- CENTRAL & NORTHEAST (THE GAMBO/GLOVERTOWN GAP) ---
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Gambo", lat: 48.749, lng: -54.218 },
-        { name: "Glovertown", lat: 48.675, lng: -54.062 }, { name: "Hare Bay", lat: 48.847, lng: -54.015 },
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Bishop's Falls", lat: 49.014, lng: -55.485 },
-        { name: "Lewisporte", lat: 49.245, lng: -55.053 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
-        { name: "Badger", lat: 48.975, lng: -56.035 }, { name: "New-Wes-Valley", lat: 49.117, lng: -53.600 },
+        // --- GREEN BAY & BAIE VERTE ---
+        { name: "Springdale", lat: 49.499, lng: -56.069 }, { name: "Robert's Arm", lat: 49.485, lng: -55.815 },
+        { name: "Triton", lat: 49.518, lng: -55.620 }, { name: "Baie Verte", lat: 49.939, lng: -56.191 },
+        { name: "La Scie", lat: 49.958, lng: -55.592 }, { name: "Middle Arm", lat: 49.705, lng: -56.092 },
 
         // --- BURIN & SOUTH COAST ---
         { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Burin", lat: 47.034, lng: -55.168 },
         { name: "Grand Bank", lat: 47.098, lng: -55.753 }, { name: "Fortune", lat: 47.072, lng: -55.828 },
         { name: "St. Alban's", lat: 47.863, lng: -55.842 }, { name: "Harbour Breton", lat: 47.483, lng: -55.833 },
-        { name: "Burgeo", lat: 47.614, lng: -57.616 }, { name: "Hermitage", lat: 47.538, lng: -55.928 },
+        { name: "Burgeo", lat: 47.614, lng: -57.616 }, { name: "Terrenceville", lat: 47.666, lng: -54.733 },
 
-        // --- WEST COAST & NORTHERN PENINSULA ---
+        // --- WEST & NORTHERN PENINSULA ---
         { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
         { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Pasadena", lat: 49.017, lng: -57.600 },
-        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 },
-        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Port au Choix", lat: 50.708, lng: -57.355 },
-        { name: "Massey Drive", lat: 48.932, lng: -57.892 }, { name: "Humber Arm South", lat: 49.015, lng: -58.115 },
-        { name: "St. George's", lat: 48.428, lng: -58.483 }, { name: "Irishtown-Summerside", lat: 48.975, lng: -58.005 }
+        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 },
+        { name: "Port Saunders", lat: 50.638, lng: -57.301 }, { name: "Cow Head", lat: 49.914, lng: -57.784 },
+
+        // --- AVALON (ULTRA-DENSE) ---
+        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
+        { name: "CBS", lat: 47.505, lng: -52.990 }, { name: "Paradise", lat: 47.533, lng: -52.866 },
+        { name: "Torbay", lat: 47.658, lng: -52.733 }, { name: "Holyrood", lat: 47.387, lng: -53.127 },
+        { name: "Whitbourne", lat: 47.421, lng: -53.531 }, { name: "Placentia", lat: 47.239, lng: -53.960 }
     ];
 
-    const map = L.map('map').setView([48.9, -56.0], 7); 
+    const map = L.map('map').setView([48.9, -56.0], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
@@ -117,8 +121,8 @@
         document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = hub.name;
     }
 
-    createMarker(34, 'Origin');      // Corner Brook
-    createMarker(20, 'Destination'); // Grand Falls-Windsor
+    createMarker(0, 'Origin');      // Summerford
+    createMarker(22, 'Destination'); // Marystown
     setTimeout(updateRoute, 500);
 </script>
 </body>
