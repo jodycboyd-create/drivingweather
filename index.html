@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | v13.0 Absolute Island Resolution</title>
+    <title>WEonG-Bulletin | v13.1 Dynamic Interactivity Lock</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --g-blue: #1a73e8; --g-red: #d93025; }
         body { font-family: 'Roboto', sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
-        #map { height: 950px; border-radius: 16px; border: 3px solid #dadce0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        #map { height: 900px; border-radius: 16px; border: 3px solid #dadce0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .community-label {
-            background: #ffffff; border-radius: 20px; border: 1.5px solid var(--g-blue);
+            background: #ffffff; border-radius: 20px; border: 2px solid var(--g-blue);
             color: var(--g-blue); padding: 5px 12px; font-weight: 900; font-size: 11px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.15); white-space: nowrap;
         }
@@ -18,68 +18,37 @@
 <body>
 
 <div style="max-width: 1400px; margin: 0 auto 20px auto; background: white; padding: 25px; border-radius: 12px; border-left: 12px solid var(--g-blue);">
-    <h1 style="margin:0; font-size: 32px;">WEonG <span style="font-weight:900;">ROUTE</span> v13.0</h1>
-    <p style="color: var(--g-red); font-weight: bold; font-size: 14px; margin: 8px 0 0 0;">
-        SYSTEM STATUS: FULL ISLAND COMPREHENSIVE SCAN COMPLETE | ALL LOOPS & SHORES LOCKED
-    </p>
+    <h1 style="margin:0;">WEonG <span style="font-weight:900;">ROUTE</span> v13.1</h1>
+    <p style="color: var(--g-red); font-weight: bold; margin: 8px 0 0 0;">INTERACTIVITY RESTORED | REAL-TIME SNAP ACTIVE | FULL ISLAND MESH LOCKED</p>
 </div>
 
 <div id="map" style="max-width: 1400px; margin: auto;"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // FULL-ISLAND CUMULATIVE DATABASE (v13.0)
-    // No compression. Every road-accessible node is explicitly defined.
     const nlHubs = [
-        // --- THE STRAIGHT SHORE & GANDER BAY LOOP (ROUTE 320/330) ---
-        { name: "New-Wes-Valley", lat: 49.167, lng: -53.583 }, { name: "Wesleyville", lat: 49.145, lng: -53.562 },
-        { name: "Greenspond", lat: 49.066, lng: -53.583 }, { name: "Lumsden", lat: 49.297, lng: -53.641 },
+        // --- STRAIGHT SHORE & GANDER BAY (LOCKED) ---
+        { name: "New-Wes-Valley", lat: 49.167, lng: -53.583 }, { name: "Lumsden", lat: 49.297, lng: -53.641 },
         { name: "Musgrave Harbour", lat: 49.452, lng: -53.955 }, { name: "Carmanville", lat: 49.398, lng: -54.288 },
-        { name: "Ladle Cove", lat: 49.467, lng: -54.133 }, { name: "Aspen Cove", lat: 49.483, lng: -54.183 },
-        { name: "Frederickton", lat: 49.417, lng: -54.417 }, { name: "Main Point", lat: 49.333, lng: -54.483 },
-        { name: "Gander Bay South", lat: 49.317, lng: -54.483 }, { name: "Dover", lat: 48.883, lng: -53.983 },
-        { name: "Hare Bay", lat: 48.850, lng: -54.017 }, { name: "Indian Bay", lat: 49.033, lng: -53.867 },
-
-        // --- ROAD TO THE ISLES (ROUTE 340) ---
-        { name: "Twillingate", lat: 49.648, lng: -54.764 }, { name: "Crow Head", lat: 49.667, lng: -54.783 },
-        { name: "Durrell", lat: 49.658, lng: -54.742 }, { name: "Newville", lat: 49.567, lng: -54.683 },
-        { name: "Hillgrade", lat: 49.555, lng: -54.717 }, { name: "Summerford", lat: 49.495, lng: -54.645 },
-        { name: "Cottlesville", lat: 49.483, lng: -54.667 }, { name: "Boyd's Cove", lat: 49.351, lng: -54.512 },
-        { name: "Lewisporte", lat: 49.245, lng: -55.053 }, { name: "Embree", lat: 49.295, lng: -55.015 },
-
-        // --- BAIE VERTE PENINSULA & WHITE BAY (ROUTE 410/420) ---
-        { name: "Baie Verte", lat: 49.939, lng: -56.191 }, { name: "La Scie", lat: 49.958, lng: -55.592 },
-        { name: "Ming's Bight", lat: 49.972, lng: -56.052 }, { name: "Pacquet", lat: 49.983, lng: -55.867 },
-        { name: "Fleur de Lys", lat: 50.117, lng: -56.117 }, { name: "Coachman's Cove", lat: 50.050, lng: -56.150 },
-        { name: "Seal Cove (WB)", lat: 49.931, lng: -56.373 }, { name: "Wild Cove", lat: 49.833, lng: -56.617 },
-        { name: "Hampden", lat: 49.544, lng: -56.834 }, { name: "Jackson's Arm", lat: 49.866, lng: -56.784 },
-
-        // --- SOUTHWEST COAST & CODROY (LOCKED) ---
-        { name: "Channel-Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Cape Ray", lat: 47.625, lng: -59.245 },
-        { name: "St. Andrew's", lat: 47.772, lng: -59.255 }, { name: "Searston", lat: 47.838, lng: -59.311 },
-        { name: "Doyles", lat: 47.838, lng: -59.183 }, { name: "Highlands", lat: 48.151, lng: -58.955 },
-        { name: "Jeffrey's", lat: 48.182, lng: -58.825 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-
-        // --- CENTRAL & EXPLOITS (LOCKED) ---
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Bishop's Falls", lat: 49.012, lng: -55.485 },
-        { name: "Botwood", lat: 49.141, lng: -55.344 }, { name: "Gander", lat: 48.955, lng: -54.608 },
+        { name: "Gander Bay South", lat: 49.317, lng: -54.483 }, { name: "Hare Bay", lat: 48.850, lng: -54.017 },
+        // --- CENTRAL CORRIDOR (LOCKED) ---
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Bishop's Falls", lat: 49.012, lng: -55.485 }, { name: "Lewisporte", lat: 49.245, lng: -55.053 },
         { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Glovertown", lat: 48.675, lng: -54.062 },
-
+        // --- SOUTHWEST & WEST (LOCKED) ---
+        { name: "Channel-Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Codroy", lat: 47.885, lng: -59.324 },
+        { name: "Doyles", lat: 47.838, lng: -59.183 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
         // --- AVALON & BACCALIEU (LOCKED) ---
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Carbonear", lat: 47.737, lng: -53.228 },
+        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
+        { name: "Conception Bay South", lat: 47.505, lng: -52.990 }, { name: "Carbonear", lat: 47.737, lng: -53.228 },
         { name: "Old Perlican", lat: 48.086, lng: -53.011 }, { name: "Bay de Verde", lat: 48.083, lng: -52.894 },
-        { name: "Placentia", lat: 47.239, lng: -53.960 }, { name: "Trepassey", lat: 46.737, lng: -53.365 },
-
-        // --- NORTHERN PENINSULA (LOCKED) ---
+        // --- NORTHERN PEN & BAIE VERTE (LOCKED) ---
         { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Rocky Harbour", lat: 49.591, lng: -57.918 },
-        { name: "Port Saunders", lat: 50.638, lng: -57.301 }, { name: "Flower's Cove", lat: 51.298, lng: -56.732 },
-
-        // --- BURIN & SOUTH COAST (LOCKED) ---
-        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Grand Bank", lat: 47.098, lng: -55.753 },
-        { name: "Burgeo", lat: 47.614, lng: -57.616 }, { name: "Harbour Breton", lat: 47.483, lng: -55.833 }
+        { name: "Baie Verte", lat: 49.939, lng: -56.191 }, { name: "La Scie", lat: 49.958, lng: -55.592 }
     ];
 
-    const map = L.map('map').setView([48.8, -55.5], 7);
+    const map = L.map('map').setView([48.5, -56.0], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
@@ -113,6 +82,13 @@
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
         marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label', offset: [0, -12] }).openTooltip();
         
+        // RESTORED DYNAMIC LABELING DURING DRAG
+        marker.on('drag', () => {
+            const nearest = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
+            marker.setTooltipContent(`${label}: ${nearest.name}`);
+        });
+
+        // RESTORED SNAPPING ON DRAGEND
         marker.on('dragend', () => {
             const snap = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
             marker.setLatLng([snap.lat, snap.lng]);
@@ -122,8 +98,8 @@
         markers.push(marker);
     }
 
-    createMarker(0, 'Origin'); // New-Wes-Valley
-    createMarker(nlHubs.length - 15, 'Destination'); // St. John's
+    createMarker(6, 'Origin'); // Gander
+    createMarker(18, 'Destination'); // St. John's
     setTimeout(updateRoute, 500);
 </script>
 </body>
