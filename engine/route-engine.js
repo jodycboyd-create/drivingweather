@@ -1,7 +1,7 @@
 /**
  * route-engine.js 
  * Project: [weong-route]
- * Updated: Dec 2025 - Fixed pathing for /drivingweather/ subdirectory
+ * Updated: Dec 2025 - Path correction for /data/nl/
  */
 
 export class RouteEngine {
@@ -11,7 +11,7 @@ export class RouteEngine {
 
     async loadCommunities() {
         try {
-            // Updated path: No leading dot, targeting data from project root
+            // Updated path to match your GitHub structure exactly
             const response = await fetch('data/nl/communities.json');
             if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
             
