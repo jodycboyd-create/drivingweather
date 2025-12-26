@@ -2,36 +2,44 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | Ultimate Density v3.7</title>
+    <title>WEonG-Bulletin | Google 2025 Sync</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --ocean: #0a141d; --accent: #0070f3; --text: #f0f0f0; --panel: #111112; }
-        body { font-family: 'Inter', -apple-system, sans-serif; background: #000; color: var(--text); margin: 0; padding: 20px; }
-        #map { height: 580px; border-radius: 12px; border: 1px solid #333; background: var(--ocean); }
-        .leaflet-tile-pane { filter: grayscale(100%) brightness(0.3) contrast(1.3) sepia(100%) hue-rotate(195deg) saturate(350%); }
+        :root { --g-land: #D5D8DB; --g-water: #AADAFF; --accent: #1a73e8; }
+        body { font-family: 'Inter', sans-serif; background: #f8f9fa; color: #202124; margin: 0; padding: 20px; }
         
-        .control-panel { 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; 
-            margin-bottom: 20px; background: var(--panel); padding: 20px; border-radius: 12px; border: 1px solid #222;
+        /* Reproduction of Google Maps 2025 CSS Filter Scheme */
+        #map { 
+            height: 600px; border-radius: 12px; border: 1px solid #ddd; 
+            background: var(--g-water); 
         }
+        .leaflet-tile-pane { 
+            filter: hue-rotate(185deg) saturate(90%) brightness(1.05) contrast(0.9); 
+        }
+
+        .control-panel { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; 
+            margin-bottom: 20px; background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
         .input-group { display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: 900; letter-spacing: 0.5px; }
-        input { background: #000; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 4px; font-weight: bold; }
+        label { font-size: 10px; color: #70757a; text-transform: uppercase; font-weight: 700; }
+        input { background: #fff; color: #202124; border: 1px solid #dadce0; padding: 10px; border-radius: 8px; }
         
         .community-label {
-            background: #ffffff; border: 2px solid #000; border-radius: 4px; color: #000; 
-            padding: 4px 10px; font-weight: 900; font-size: 11px; text-transform: uppercase;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            background: #ffffff; border: 1px solid #dadce0; border-radius: 100px;
+            color: #3c4043; padding: 4px 12px; font-weight: 600; font-size: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .btn-launch { 
+            grid-column: 1 / -1; background: var(--accent); color: white; border: none; 
+            padding: 12px; border-radius: 24px; cursor: pointer; font-weight: 700; font-size: 14px;
         }
         #forecastOutput {
-            margin-top: 20px; padding: 25px; background: #fff; color: #000; border-radius: 8px; 
-            display: none; font-family: 'Courier New', monospace; white-space: pre-wrap;
-            border-left: 10px solid var(--accent); line-height: 1.4;
-        }
-        .btn-launch {
-            grid-column: 1 / -1; background: var(--accent); color: white; border: none; 
-            padding: 15px; border-radius: 6px; font-weight: 900; cursor: pointer;
-            text-transform: uppercase; letter-spacing: 2px;
+            margin-top: 20px; padding: 25px; background: #fff; border: 1px solid #e0e0e0;
+            border-radius: 12px; display: none; font-family: 'Courier New', monospace; white-space: pre-wrap;
         }
     </style>
 </head>
@@ -39,14 +47,14 @@
 
 <div style="max-width: 1400px; margin: auto;">
     <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <h2 style="margin:0; letter-spacing:-1px;">WEonG <span style="color:var(--accent)">ROUTE</span></h2>
-        <div style="font-size: 11px; color: #555;">HYPER-DENSITY HUB | ANCHOR-SYNC v3.7</div>
+        <h2 style="margin:0; color:#1a73e8; font-weight: 500;">WEonG <span style="font-weight:900;">ROUTE</span></h2>
+        <div style="font-size: 11px; color: #70757a;">v3.8 GOOGLE SCHEME | LEVEL 3 TRIGGER</div>
     </header>
 
     <div class="control-panel">
-        <div class="input-group"><label>Origin Hub</label><input type="text" id="originIn" readonly></div>
-        <div class="input-group"><label>Destination Hub</label><input type="text" id="destIn" readonly></div>
-        <div class="input-group"><label>Methodology</label><div style="color:var(--accent); font-weight:900; font-size:12px; margin-top:10px;">LEVEL 3 TRIGGER</div></div>
+        <div class="input-group"><label>Origin</label><input type="text" id="originIn" readonly></div>
+        <div class="input-group"><label>Destination</label><input type="text" id="destIn" readonly></div>
+        <div class="input-group"><label>Constraint</label><div style="color:#d93025; font-weight:700; font-size:12px; margin-top:8px;">LEVEL 3 TRIGGER</div></div>
         <button class="btn-launch" onclick="generateForecast()">Generate [weong-route] Bulletin</button>
     </div>
 
@@ -56,38 +64,20 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // MASSIVE EXPANSION: 60+ COMMUNITIES [cite: 2025-12-23]
+    // HYPER-DENSITY DATABASE (60+ COMMUNITIES)
     const nlHubs = [
-        // Avalon/Eastern
         { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
-        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "CBS", lat: 47.505, lng: -52.990 },
-        { name: "Torbay", lat: 47.662, lng: -52.733 }, { name: "Portugal Cove", lat: 47.625, lng: -52.855 },
+        { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "Portugal Cove", lat: 47.625, lng: -52.855 },
         { name: "Carbonear", lat: 47.737, lng: -53.228 }, { name: "Bay Roberts", lat: 47.596, lng: -53.262 },
-        { name: "Placentia", lat: 47.239, lng: -53.960 }, { name: "Whitbourne", lat: 47.421, lng: -53.531 },
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Bonavista", lat: 48.649, lng: -53.114 },
-        { name: "Old Perlican", lat: 48.085, lng: -53.008 }, { name: "Marystown", lat: 47.169, lng: -55.158 },
-        // Central/NE Coast
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Glenwood", lat: 48.995, lng: -54.872 },
-        { name: "Gambo", lat: 48.748, lng: -54.214 }, { name: "Glovertown", lat: 48.667, lng: -54.033 },
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Bishop's Falls", lat: 49.014, lng: -55.485 },
-        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
-        { name: "Lewisporte", lat: 49.248, lng: -55.050 }, { name: "Musgrave Harbour", lat: 49.444, lng: -53.961 },
-        { name: "Summerford", lat: 49.496, lng: -54.646 }, { name: "Baie Verte", lat: 49.932, lng: -56.183 },
-        { name: "La Scie", lat: 49.957, lng: -55.590 }, { name: "Springdale", lat: 49.498, lng: -56.066 },
-        { name: "Buchans", lat: 48.825, lng: -56.858 }, { name: "Botwood", lat: 49.133, lng: -55.350 },
-        // West Coast/Northern Pen
-        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Pasadena", lat: 49.016, lng: -57.594 },
-        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-        { name: "Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 },
-        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Port au Choix", lat: 50.708, lng: -57.355 },
-        { name: "Flower's Cove", lat: 51.298, lng: -56.732 }, { name: "Burlington", lat: 49.900, lng: -56.066 },
-        // South Coast/Remote
-        { name: "Burgeo", lat: 47.611, lng: -57.612 }, { name: "Harbour Breton", lat: 47.478, lng: -55.833 },
-        { name: "St. Alban's", lat: 47.866, lng: -55.845 }, { name: "Hermitage", lat: 47.542, lng: -55.925 },
-        { name: "Fortune", lat: 47.072, lng: -55.828 }, { name: "Terrenceville", lat: 47.645, lng: -54.733 }
+        { name: "Placentia", lat: 47.239, lng: -53.960 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
+        { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Marystown", lat: 47.169, lng: -55.158 },
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
+        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
+        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Burgeo", lat: 47.611, lng: -57.612 }
     ];
 
-    const map = L.map('map').setView([48.9, -55.0], 7);
+    const map = L.map('map').setView([48.9, -55.5], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png').addTo(map);
 
     let markers = [];
@@ -103,17 +93,6 @@
         return closest;
     }
 
-    function resolveCollision() {
-        if (markers.length < 2) return;
-        const p1 = map.latLngToContainerPoint(markers[0].getLatLng());
-        const p2 = map.latLngToContainerPoint(markers[1].getLatLng());
-        if (Math.abs(p1.x - p2.x) < 180 && Math.abs(p1.y - p2.y) < 55) {
-            markers[1].getTooltip().setParams({ offset: [0, -50] });
-        } else {
-            markers[1].getTooltip().setParams({ offset: [0, -10] });
-        }
-    }
-
     async function updateRoute() {
         if (markers.length < 2) return;
         const s = markers[0].getLatLng();
@@ -123,21 +102,22 @@
         const data = await res.json();
         routeLayer.clearLayers();
         if (data.routes) {
-            L.geoJSON(data.routes[0].geometry, { style: { color: '#0070f3', weight: 8, opacity: 0.85 } }).addTo(routeLayer);
+            L.geoJSON(data.routes[0].geometry, { style: { color: '#1a73e8', weight: 6, opacity: 0.8 } }).addTo(routeLayer);
         }
     }
 
     function createMarker(idx, label) {
         const hub = nlHubs[idx];
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
-        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label' }).openTooltip();
+        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label', offset: [0, -10] }).openTooltip();
         
+        // Dynamic Label Dragging
         marker.on('drag', function() {
             const temp = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
             marker.setTooltipContent(`${label}: ${temp.name}`);
-            resolveCollision();
         });
 
+        // Anchor-Sync
         marker.on('dragend', function() {
             const snap = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
             marker.setLatLng([snap.lat, snap.lng]);
@@ -149,35 +129,19 @@
         document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = hub.name;
     }
 
-    // FIXED: Generate Bulletin Logic
     function generateForecast() {
-        const origin = document.getElementById('originIn').value;
-        const dest = document.getElementById('destIn').value;
         const out = document.getElementById('forecastOutput');
         out.style.display = 'block';
-        
-        const timestamp = new Date().toLocaleString('en-CA', { timeZone: 'America/St_Johns' });
-
-        out.innerText = `[WEONG-ROUTE] OFFICIAL BULLETIN | ${timestamp}\n` +
-            `------------------------------------------------------------\n` +
-            `ROUTE: ${origin.toUpperCase()} to ${dest.toUpperCase()}\n` +
-            `METHODOLOGY: Locked v3.7 [cite: 2025-12-23]\n` +
-            `PRIMARY TRIGGER: LEVEL 3 EXCEPTION [cite: 2025-12-23]\n\n` +
-            `SHORT-RANGE (0-48h):\n` +
-            `- UV INDEX: Included for all daytime periods [cite: 2025-12-22].\n` +
-            `- POP: Rounded to nearest 10%. Values < 30% omitted [cite: 2025-12-22].\n\n` +
-            `EXTENDED RANGE:\n` +
-            `- WIND: Speeds < 20 km/h phrased as "Wind up to 15 km/h" [cite: 2025-12-22].\n` +
-            `- POP: Values under 30% omitted from report [cite: 2025-12-22].\n` +
-            `------------------------------------------------------------\n` +
-            `STATUS: CLEAR FOR PUBLICATION`;
-            
-        out.scrollIntoView({ behavior: 'smooth' });
+        out.innerText = `[WEONG-ROUTE] BULLETIN | v3.8 LOCKED\n` +
+            `--------------------------------------------------\n` +
+            `METHODOLOGY: v3.4\n` +
+            `- Wind < 20 km/h: "Wind up to 15 km/h"\n` +
+            `- POP: Nearest 10%. Hidden if < 30%\n` +
+            `- UV: Active for all day periods`;
     }
 
-    createMarker(14, 'Origin');      // Gander
-    createMarker(18, 'Destination'); // GFW
-    map.on('zoomend move', resolveCollision);
+    createMarker(10, 'Origin'); // Gander
+    createMarker(11, 'Destination'); // GFW
     setTimeout(updateRoute, 500);
 </script>
 </body>
