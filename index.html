@@ -7,7 +7,9 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
+        /* Keep map clean by hiding the text instruction panel */
         .leaflet-routing-container { display: none !important; }
+        /* Style for the always-on community labels */
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 6px;
@@ -23,80 +25,76 @@
 
 <script>
     /**
-     * Build: [weong-route] Forced Magnet & Route Sync
-     * Methodology: Decoupled Marker Control [cite: 2025-12-25]
+     * Build: [weong-route] Forced Sync & Magnet Logic
+     * Methodology: Hijacked Marker Controller [cite: 2025-12-26]
      * Dataset: Locked Newfoundland Deep Dive [cite: 2025-12-26]
      */
     let map, communities = [], routingControl;
-    let markers = [];
 
     async function init() {
-        map = L.map('map').setView([48.9, -55.3], 8);
+        // Center on Central Newfoundland (Gander/GFW area)
+        map = L.map('map').setView([48.9, -55.0], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // Load the comprehensive Newfoundland dataset [cite: 2025-12-26]
-        const response = await fetch('data/nl/communities.json');
-        const data = await response.json();
-        communities = data.features;
-        
-        setupEngine();
+        try {
+            // Load the locked Newfoundland dataset [cite: 2025-12-26]
+            const response = await fetch('data/nl/communities.json');
+            const data = await response.json();
+            communities = data.features;
+            setupRouting();
+        } catch (e) {
+            console.error("Data load failed", e);
+        }
     }
 
-    function setupEngine() {
-        // Grand Falls-Windsor to Gander baseline [cite: 2025-12-26]
+    function setupRouting() {
+        // Locked Defaults: Grand Falls-Windsor and Gander [cite: 2025-12-26]
         const p1 = L.latLng(48.9351, -55.6562); 
         const p2 = L.latLng(48.9566, -54.6089);
 
-        // 1. Initialize custom markers FIRST as the primary controllers
-        markers[0] = createMagnetMarker(p1, 0);
-        markers[1] = createMagnetMarker(p2, 1);
-
-        // 2. Initialize Routing WITHOUT internal markers [cite: 2025-12-25]
         routingControl = L.Routing.control({
             waypoints: [p1, p2],
             router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            createMarker: () => null, 
-            addWaypoints: false,
-            routeWhileDragging: false,
+            routeWhileDragging: true, // Enable real-time line stretching
             show: false,
-            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+            createMarker: function(i, wp) {
+                // This 'hijacks' the routing markers to add our custom snapping [cite: 2025-12-26]
+                const marker = L.marker(wp.latLng, { draggable: true });
+
+                const updateLabel = (ll) => {
+                    const nearest = findNearest(ll);
+                    marker.bindTooltip(nearest.properties.name, { 
+                        permanent: true, direction: 'top', className: 'snapping-label' 
+                    }).openTooltip();
+                    return nearest;
+                };
+
+                updateLabel(wp.latLng);
+
+                // Update label dynamically as you move the pin [cite: 2025-12-26]
+                marker.on('drag', (e) => updateLabel(e.latlng));
+
+                // THE MAGNET SNAP: Forces marker and route to the town node [cite: 2025-12-26]
+                marker.on('dragend', function(e) {
+                    const nearest = findNearest(e.latlng);
+                    const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
+                    
+                    // 1. Physically snap the marker
+                    marker.setLatLng(snappedPos);
+                    updateLabel(snappedPos);
+                    
+                    // 2. Force the routing engine to refresh the line to the snapped point [cite: 2025-12-25]
+                    const wps = routingControl.getWaypoints();
+                    wps[i].latLng = snappedPos;
+                    routingControl.setWaypoints(wps);
+                });
+
+                return marker;
+            },
+            lineOptions: {
+                styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }]
+            }
         }).addTo(map);
-    }
-
-    function createMagnetMarker(latlng, index) {
-        const marker = L.marker(latlng, { draggable: true }).addTo(map);
-        
-        const updateUI = (ll) => {
-            const nearest = findNearest(ll);
-            marker.bindTooltip(nearest.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label' 
-            }).openTooltip();
-            return nearest;
-        };
-
-        updateUI(latlng);
-
-        // Continuous label tracking during drag [cite: 2025-12-26]
-        marker.on('drag', (e) => updateUI(e.latlng));
-
-        // THE MAGNET SYNC: This forces the snap and then forces the route to update
-        marker.on('dragend', function(e) {
-            const nearest = findNearest(e.latlng);
-            const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
-            
-            // Step 1: Force pin to the magnet node [cite: 2025-12-26]
-            marker.setLatLng(snappedPos);
-            updateUI(snappedPos);
-            
-            // Step 2: Manually sync the routing engine with the new coordinates [cite: 2025-12-25]
-            const waypoints = [
-                markers[0].getLatLng(),
-                markers[1].getLatLng()
-            ];
-            routingControl.setWaypoints(waypoints);
-        });
-
-        return marker;
     }
 
     function findNearest(latlng) {
