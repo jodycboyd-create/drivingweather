@@ -3,69 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Newfoundland Route</title>
+    <title>WEonG - Newfoundland Route Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f4f4f4; padding: 20px; }
-        #bulletin-board { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
-            gap: 15px; 
-        }
-        .community-card { 
-            background: white; padding: 15px; border-radius: 8px; 
-            border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
-        }
-        .exception { border: 2px solid #d9534f; background: #fff5f5; }
-        .alert-tag { color: #d9534f; font-weight: bold; font-size: 0.8em; }
-        h1 { text-align: center; color: #333; }
-        #status-msg { text-align: center; margin-bottom: 20px; font-weight: bold; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+        #map { width: 100%; height: 100vh; }
+        .popup-critical { color: #d9534f; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>Newfoundland Weather Bulletin</h1>
-    <div id="status-msg">Initializing Newfoundland Dataset...</div>
-    <div id="bulletin-board"></div>
+    <div id="map"></div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
         import { RouteEngine } from './engine/route-engine.js';
         import { BulletinLogic } from './engine/weather-bulletin.js';
 
-        async function init() {
-            const status = document.getElementById('status-msg');
-            const container = document.getElementById('bulletin-board');
-            
+        async function initMap() {
+            // Initialize map centered on Newfoundland
+            const map = L.map('map').setView([49.0, -56.0], 7);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
             const engine = new RouteEngine();
-            const communities = await engine.loadCommunities();
+            // Fetching the comprehensive NL dataset (Deep Dive [2025-12-26])
+            const response = await fetch('data/nl/communities.json');
+            const geoData = await response.json();
 
-            if (communities.length === 0) return;
+            L.geoJSON(geoData, {
+                onEachFeature: (feature, layer) => {
+                    // Simulation for Route Weather logic
+                    const mockWeather = {
+                        pop: 45, // Will round to 50%
+                        uvIndex: 6,
+                        isDaytime: true,
+                        levels: { wind: 3 } // Exception Trigger
+                    };
 
-            status.style.display = 'none';
+                    const report = BulletinLogic.generate(feature.properties, mockWeather);
 
-            communities.forEach(loc => {
-                // Simulated weather data (Level 3 Exception Test)
-                const mockWeather = {
-                    pop: 45,
-                    uvIndex: 5,
-                    isDaytime: true,
-                    levels: { precip: 3, wind: 1 } 
-                };
+                    let popupContent = `<strong>${report.location}</strong><br>`;
+                    if (report.pop) popupContent += `POP: ${report.pop}<br>`; // Nearest 10%
+                    if (report.uvIndex) popupContent += `UV Index: ${report.uvIndex}<br>`;
+                    if (report.isCritical) {
+                        popupContent += `<span class="popup-critical">⚠️ LEVEL 3 PRIORITY</span>`; //
+                    }
 
-                const report = BulletinLogic.generate(loc, mockWeather);
-                
-                const div = document.createElement('div');
-                div.className = `community-card ${report.isCritical ? 'exception' : ''}`;
-                div.innerHTML = `
-                    <h3 style="margin:0;">${report.location}</h3>
-                    <p style="margin: 10px 0 5px 0;">POP: ${report.pop || '---'}</p>
-                    ${report.uvIndex ? `<p style="margin:0;">UV Index: ${report.uvIndex}</p>` : ''}
-                    ${report.isCritical ? '<div class="alert-tag">⚠️ LEVEL 3 PRIORITY</div>' : ''}
-                `;
-                container.appendChild(div);
-            });
+                    layer.bindPopup(popupContent);
+                }
+            }).addTo(map);
         }
 
-        init();
+        initMap();
     </script>
 </body>
 </html>
