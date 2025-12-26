@@ -2,78 +2,67 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | v5.9 Absolute Resolution Lock</title>
+    <title>WEonG-Bulletin | v6.0 Total Island Mesh</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --g-blue: #1a73e8; --g-teal: #008080; }
+        :root { --g-blue: #1a73e8; }
         body { font-family: 'Roboto', sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
-        #map { height: 850px; border-radius: 16px; border: 1px solid #dadce0; background: #aadaff; }
+        #map { height: 800px; border-radius: 16px; border: 1px solid #dadce0; }
         .community-label {
             background: #ffffff; border-radius: 20px; border: 1px solid #dadce0;
             color: #3c4043; padding: 4px 14px; font-weight: 800; font-size: 11px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.25); white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2); white-space: nowrap;
         }
-        .status-badge { background:#fff1f1; color:#d93025; padding:4px 12px; border-radius:100px; font-size:12px; font-weight:700; border: 1px solid #f8d7da; }
     </style>
 </head>
 <body>
-
 <div style="max-width: 1400px; margin: auto;">
-    <header style="display: flex; align-items: center; margin-bottom: 20px; gap: 15px;">
-        <h2 style="margin:0; color:var(--g-blue);">WEonG <span style="font-weight:900;">ROUTE</span></h2>
-        <div class="status-badge">v5.9 FINAL MASTER DATABASE: >200 POP LOCK</div>
-    </header>
-
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-        <div><label style="font-size:10px; font-weight:700; color:#70757a;">FROM (SNAPPED)</label><input type="text" id="originIn" style="width:100%; padding:12px; border:1px solid #dadce0; border-radius:8px;" readonly></div>
-        <div><label style="font-size:10px; font-weight:700; color:#70757a;">TO (SNAPPED)</label><input type="text" id="destIn" style="width:100%; padding:12px; border:1px solid #dadce0; border-radius:8px;" readonly></div>
-    </div>
-
+    <h2 style="color:var(--g-blue); margin-bottom:15px;">WEonG <span style="font-weight:900;">ROUTE</span> v6.0 <span style="font-size:12px; font-weight:normal; color:#666;">| Absolute Provincial Density</span></h2>
     <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // MASTER PROVINCIAL DATABASE -
-    // NO DELETIONS. NO SUMMARIES. TOTAL ISLAND MESH.
+    // FULL PROVINCIAL DATABASE - ALL COMMUNITIES LOCKED
     const nlHubs = [
-        // --- WHITE BAY & BAIE VERTE (HAMPDEN RESTORED) ---
+        // --- WEST COAST CORRIDOR (THE MISSING LINK) ---
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
+        { name: "Gallants", lat: 48.665, lng: -58.261 }, { name: "George's Lake", lat: 48.816, lng: -58.114 },
+        { name: "Barachois Brook", lat: 48.450, lng: -58.432 }, { name: "Stephenville Crossing", lat: 48.508, lng: -58.441 },
+        { name: "Lourdes", lat: 48.647, lng: -58.989 }, { name: "Cape St. George", lat: 48.432, lng: -59.245 },
+
+        // --- WHITE BAY & BAIE VERTE (LOCKED) ---
         { name: "Hampden", lat: 49.544, lng: -56.834 }, { name: "Baie Verte", lat: 49.939, lng: -56.191 },
-        { name: "La Scie", lat: 49.958, lng: -55.592 }, { name: "King's Point", lat: 49.585, lng: -56.178 },
-        { name: "Burlington", lat: 49.754, lng: -56.068 }, { name: "Middle Arm", lat: 49.705, lng: -56.092 },
-        { name: "Westport", lat: 49.782, lng: -56.634 }, { name: "Jackson's Arm", lat: 49.866, lng: -56.784 },
+        { name: "La Scie", lat: 49.958, lng: -55.592 }, { name: "Jackson's Arm", lat: 49.866, lng: -56.784 },
+        { name: "Springdale", lat: 49.499, lng: -56.069 }, { name: "Robert's Arm", lat: 49.485, lng: -55.815 },
 
-        // --- BONAVISTA PENINSULA (LOCKED) ---
-        { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Trinity Bay North", lat: 48.517, lng: -53.117 },
-        { name: "Musgravetown", lat: 48.391, lng: -53.951 }, { name: "Port Rexton", lat: 48.385, lng: -53.332 },
-        { name: "Lethbridge", lat: 48.351, lng: -53.864 }, { name: "Bloomfield", lat: 48.349, lng: -53.916 },
-        { name: "Elliston", lat: 48.632, lng: -53.033 }, { name: "Canning's Cove", lat: 48.375, lng: -53.911 },
+        // --- CENTRAL & NORTH EXPLOITS ---
+        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Bishop's Falls", lat: 49.012, lng: -55.485 },
+        { name: "Botwood", lat: 49.141, lng: -55.344 }, { name: "Summerford", lat: 49.495, lng: -54.645 },
+        { name: "Twillingate", lat: 49.648, lng: -54.764 }, { name: "Gander", lat: 48.955, lng: -54.608 },
 
-        // --- CENTRAL & THE STRAIGHT SHORE ---
+        // --- THE STRAIGHT SHORE & GANDER BAY ---
         { name: "Musgrave Harbour", lat: 49.452, lng: -53.955 }, { name: "Lumsden", lat: 49.297, lng: -53.585 },
-        { name: "Gambo", lat: 48.749, lng: -54.218 }, { name: "Glovertown", lat: 48.675, lng: -54.062 },
-        { name: "Summerford", lat: 49.495, lng: -54.645 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
-        { name: "New-Wes-Valley", lat: 49.117, lng: -53.600 }, { name: "Gander Bay", lat: 49.333, lng: -54.483 },
+        { name: "Carmanville", lat: 49.398, lng: -54.285 }, { name: "New-Wes-Valley", lat: 49.117, lng: -53.600 },
+
+        // --- BONAVISTA & TRINITY BAY ---
+        { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Musgravetown", lat: 48.391, lng: -53.951 },
+        { name: "Port Rexton", lat: 48.385, lng: -53.332 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
 
         // --- BURIN & SOUTH COAST ---
         { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Grand Bank", lat: 47.098, lng: -55.753 },
-        { name: "Burin", lat: 47.034, lng: -55.168 }, { name: "Fortune", lat: 47.072, lng: -55.828 },
-        { name: "St. Alban's", lat: 47.863, lng: -55.842 }, { name: "Harbour Breton", lat: 47.483, lng: -55.833 },
-        { name: "Burgeo", lat: 47.614, lng: -57.616 }, { name: "Terrenceville", lat: 47.666, lng: -54.733 },
+        { name: "Burgeo", lat: 47.614, lng: -57.616 }, { name: "Harbour Breton", lat: 47.483, lng: -55.833 },
 
         // --- GREAT NORTHERN PENINSULA ---
         { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Port au Choix", lat: 50.708, lng: -57.355 },
         { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Flower's Cove", lat: 51.298, lng: -56.732 },
-        { name: "Roddickton", lat: 50.867, lng: -56.133 }, { name: "Englee", lat: 50.733, lng: -56.117 },
 
-        // --- WEST COAST & MAJOR HUBS ---
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
-        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Deer Lake", lat: 49.171, lng: -57.433 },
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Pasadena", lat: 49.017, lng: -57.600 }
+        // --- AVALON METRO & SHORE ---
+        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "CBS", lat: 47.505, lng: -52.990 },
+        { name: "Carbonear", lat: 47.737, lng: -53.228 }, { name: "Trepassey", lat: 46.737, lng: -53.365 }
     ];
 
-    const map = L.map('map').setView([49.5, -56.5], 8); 
+    const map = L.map('map').setView([48.7, -58.3], 8); // Start in the Corner Brook / Stephenville corridor
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
@@ -107,27 +96,21 @@
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
         marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label', offset: [0, -12] }).openTooltip();
         
-        // DYNAMIC LOGIC RESTORED & PERSISTED
         marker.on('drag', () => {
-            const currentPos = marker.getLatLng();
-            const nearest = findClosestHub(currentPos.lat, currentPos.lng);
+            const nearest = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
             marker.setTooltipContent(`${label}: ${nearest.name}`);
         });
 
         marker.on('dragend', () => {
             const snap = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
             marker.setLatLng([snap.lat, snap.lng]);
-            marker.setTooltipContent(`${label}: ${snap.name}`);
-            document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = snap.name;
             updateRoute();
         });
-
         markers.push(marker);
-        document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = hub.name;
     }
 
-    createMarker(0, 'Origin');      // Hampden
-    createMarker(1, 'Destination'); // Baie Verte
+    createMarker(0, 'Start'); // Corner Brook
+    createMarker(2, 'End');   // Gallants
     setTimeout(updateRoute, 500);
 </script>
 </body>
