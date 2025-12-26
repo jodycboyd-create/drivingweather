@@ -2,12 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Route Map</title>
+    <title>WEonG - Automatic Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
-        /* Clean UI: Hide the text directions box */
+        /* This hides the text instructions box that clutter your screenshots */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -19,42 +19,38 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-    // 1. Initialize the map centered on Newfoundland
+    // 1. Initialize map centered on the island
     var map = L.map('map').setView([48.5, -55.8], 7);
 
-    // 2. Add Map Tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // 3. Setup Default Waypoints (Corner Brook to St. John's)
-    var waypoints = [
-        L.latLng(48.9515, -57.9482), // Origin: Corner Brook
-        L.latLng(47.5615, -52.7126)  // Destination: St. John's
-    ];
+    // 2. Define the exact default coordinates for our hubs
+    var startPoint = L.latLng(48.9515, -57.9482); // Corner Brook
+    var endPoint = L.latLng(47.5615, -52.7126);   // St. John's
 
-    // 4. Create the Routing Control
+    // 3. Initialize the routing with BOTH waypoints already included
     var control = L.Routing.control({
-        waypoints: waypoints,
+        waypoints: [startPoint, endPoint],
         routeWhileDragging: true,
-        show: false, // Keep instruction panel hidden
+        show: false,
         createMarker: function(i, wp) {
-            // This creates the draggable pins at startup
+            // This ensures draggable pins appear immediately on load
             return L.marker(wp.latLng, {
                 draggable: true
-            }).bindPopup(i === 0 ? "<b>Origin</b> (Draggable)" : "<b>Destination</b> (Draggable)").openPopup();
+            }).bindPopup(i === 0 ? "<b>Origin</b>" : "<b>Destination</b>").openPopup();
         },
         lineOptions: {
-            styles: [{ color: '#0047AB', weight: 6, opacity: 0.8 }]
+            styles: [{ color: '#0047AB', weight: 7, opacity: 0.8 }]
         }
     }).addTo(map);
 
-    // 5. Auto-zoom to the route once it's calculated
+    // 4. Force map to fit the route once the TCH path is found
     control.on('routeselected', function(e) {
         var bounds = L.latLngBounds(e.route.coordinates);
         map.fitBounds(bounds, { padding: [50, 50] });
     });
 </script>
-
 </body>
 </html>
