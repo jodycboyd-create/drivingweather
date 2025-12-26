@@ -2,26 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Road Engine</title>
+    <title>WEonG - Final Magnet Sync</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
         .leaflet-routing-container { display: none !important; }
         .snapping-label {
-            font-weight: bold;
-            color: #0047AB;
-            background: white;
-            border: 2px solid #0047AB;
-            padding: 4px 10px;
-            border-radius: 6px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            white-space: nowrap;
+            font-weight: bold; color: #0047AB; background: white;
+            border: 2px solid #0047AB; padding: 4px 10px; border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3); white-space: nowrap;
         }
     </style>
 </head>
 <body>
-
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -29,15 +23,15 @@
 
 <script>
     /**
-     * Build: [weong-route] Synchronization & Magnet Logic
-     * Methodology: Custom Marker Source-of-Truth
-     * Dataset: Comprehensive Newfoundland [cite: 2025-12-26]
+     * Build: [weong-route] Forced Sync Logic
+     * Goal: Magnet snap to community first, then update road route.
+     * Dataset: 2025-12-26 Locked Newfoundland Database
      */
     let map, communities = [], routingControl;
     let markers = [];
 
     async function init() {
-        map = L.map('map').setView([48.9, -55.0], 8);
+        map = L.map('map').setView([48.9, -55.3], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         const response = await fetch('data/nl/communities.json');
@@ -48,26 +42,24 @@
     }
 
     function setupEngine() {
-        // Locked Defaults: Grand Falls-Windsor and Gander [cite: 2025-12-26]
-        const startPos = L.latLng(48.9351, -55.6562); 
-        const endPos = L.latLng(48.9566, -54.6089);
+        // Yesterday's working default: Grand Falls-Windsor to Gander [cite: 2025-12-26]
+        const p1 = L.latLng(48.9351, -55.6562); 
+        const p2 = L.latLng(48.9566, -54.6089);
 
-        // 1. Initialize Routing Engine WITHOUT its own markers [cite: 2025-12-25]
+        // 1. Create Routing Control WITHOUT markers to prevent ghosting [cite: 2025-12-25]
         routingControl = L.Routing.control({
-            waypoints: [startPos, endPos],
-            router: L.Routing.osrmv1({ 
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'driving'
-            }),
-            createMarker: () => null, // Disables ghost markers
+            waypoints: [p1, p2],
+            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+            createMarker: () => null, 
+            addWaypoints: false,
             routeWhileDragging: false,
             show: false,
             lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
         }).addTo(map);
 
-        // 2. Create Managed Custom Markers [cite: 2025-12-26]
-        markers[0] = createMagnetMarker(startPos, 0);
-        markers[1] = createMagnetMarker(endPos, 1);
+        // 2. Add our own Snapping Markers as the source of truth [cite: 2025-12-26]
+        markers[0] = createMagnetMarker(p1, 0);
+        markers[1] = createMagnetMarker(p2, 1);
     }
 
     function createMagnetMarker(latlng, index) {
@@ -83,21 +75,23 @@
 
         updateUI(latlng);
 
-        // Continuous label track [cite: 2025-12-26]
+        // Labels update while dragging [cite: 2025-12-26]
         marker.on('drag', (e) => updateUI(e.latlng));
 
-        // MAGNET SNAP & SYNC: Force line to marker [cite: 2025-12-25]
+        // CRITICAL FIX: The Magnet Snap + Routing Force Update
         marker.on('dragend', function(e) {
             const nearest = updateUI(e.latlng);
             const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
             
-            // Reposition physical marker to magnet point [cite: 2025-12-26]
+            // Step A: Magnetically snap the pin [cite: 2025-12-26]
             marker.setLatLng(snappedPos);
             
-            // RE-CALCULATE ROAD ROUTE: Force engine to new snapped point
-            const wps = routingControl.getWaypoints();
-            wps[index].latLng = snappedPos;
-            routingControl.setWaypoints(wps);
+            // Step B: Update the routing engine's internal waypoint array
+            const currentWps = routingControl.getWaypoints();
+            currentWps[index] = L.routing.waypoint(snappedPos); // Force type matching
+            
+            // Step C: Force a fresh road-network calculation [cite: 2025-12-23]
+            routingControl.setWaypoints(currentWps);
         });
 
         return marker;
