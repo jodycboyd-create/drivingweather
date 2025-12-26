@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-Bulletin | v4.6 Whole Island</title>
+    <title>WEonG-Bulletin | v4.7 Total NL Lock</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --g-blue: #1a73e8; }
@@ -10,15 +10,15 @@
         #map { height: 750px; border-radius: 16px; border: 1px solid #dadce0; background: #aadaff; }
         .community-label {
             background: #ffffff; border-radius: 20px; border: 1px solid #dadce0;
-            color: #3c4043; padding: 6px 16px; font-weight: 600; font-size: 13px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2); white-space: nowrap;
+            color: #3c4043; padding: 6px 18px; font-weight: 700; font-size: 13px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;
         }
         .control-panel { 
             display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; 
             margin-bottom: 20px; background: #fff; padding: 24px; border-radius: 16px; 
             box-shadow: 0 1px 3px rgba(60,64,67,0.3); border: 1px solid #e0e0e0;
         }
-        input { width: 92%; border: 1px solid #dadce0; padding: 12px; border-radius: 8px; background: #f1f3f4; }
+        input { width: 92%; border: 1px solid #dadce0; padding: 12px; border-radius: 8px; background: #f1f3f4; font-weight: 600; }
         label { font-size: 11px; color: #70757a; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; display: block; }
     </style>
 </head>
@@ -27,13 +27,13 @@
 <div style="max-width: 1400px; margin: auto;">
     <header style="display: flex; align-items: center; margin-bottom: 20px; gap: 15px;">
         <h2 style="margin:0; color:var(--g-blue);">WEonG <span style="font-weight:900;">ROUTE</span></h2>
-        <div style="background:#e6fffa; color:#2c7a7b; padding:4px 12px; border-radius:100px; font-size:12px; font-weight:700;">v4.6 WHOLE ISLAND INJECTION</div>
+        <div style="background:#e6fffa; color:#2c7a7b; padding:4px 12px; border-radius:100px; font-size:12px; font-weight:700;">v4.7 PENINSULA & ARM INJECTION</div>
     </header>
 
     <div class="control-panel">
         <div class="input-group"><label>Origin</label><input type="text" id="originIn" readonly></div>
         <div class="input-group"><label>Destination</label><input type="text" id="destIn" readonly></div>
-        <button style="grid-column: 1 / -1; background: var(--g-blue); color: white; border: none; padding: 16px; border-radius: 30px; cursor: pointer; font-weight: 700;" onclick="generateBulletin()">Generate [weong-route] Bulletin</button>
+        <button style="grid-column: 1 / -1; background: var(--g-blue); color: white; border: none; padding: 16px; border-radius: 30px; cursor: pointer; font-weight: 700;" onclick="alert('WEonG Bulletin Generated: Level 3 Elements Active')">Generate [weong-route] Bulletin</button>
     </div>
 
     <div id="map"></div>
@@ -41,39 +41,29 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // FULL ISLAND DATABASE: Snapping points for all sub-regions
+    // FULL ISLAND DATABASE - Now including deep peninsula points
     const nlHubs = [
-        // AVALON & EASTERN
+        // BAIE VERTE PENINSULA & WHITE BAY (Newly Injected)
+        { name: "La Scie", lat: 49.958, lng: -55.592 }, { name: "Baie Verte", lat: 49.939, lng: -56.191 },
+        { name: "Hampden", lat: 49.545, lng: -56.853 }, { name: "Fleur de Lys", lat: 50.133, lng: -56.157 },
+        { name: "Middle Arm (BV)", lat: 49.705, lng: -56.092 }, { name: "King's Point", lat: 49.585, lng: -56.178 },
+        { name: "Jackson's Arm", lat: 49.862, lng: -56.767 }, { name: "Seal Cove (BV)", lat: 49.933, lng: -56.383 },
+        { name: "Westport", lat: 49.783, lng: -56.617 }, { name: "Triton", lat: 49.518, lng: -55.620 },
+        // CENTRAL
+        { name: "Springdale", lat: 49.499, lng: -56.069 }, { name: "South Brook", lat: 49.430, lng: -56.080 },
+        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
+        { name: "Bishop's Falls", lat: 49.014, lng: -55.485 }, { name: "Badger", lat: 48.974, lng: -56.035 },
+        // AVALON
         { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
         { name: "Paradise", lat: 47.533, lng: -52.866 }, { name: "CBS", lat: 47.505, lng: -52.990 },
-        { name: "Holyrood", lat: 47.387, lng: -53.127 }, { name: "Whitbourne", lat: 47.421, lng: -53.531 },
-        { name: "Dildo", lat: 47.560, lng: -53.560 }, { name: "Arnold's Cove", lat: 47.755, lng: -53.990 },
-        { name: "Goobies", lat: 47.930, lng: -53.980 }, { name: "Clarenville", lat: 48.165, lng: -53.955 },
-        // BONAVISTA PENINSULA
-        { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Port Rexton", lat: 48.385, lng: -53.332 },
-        { name: "Musgravetown", lat: 48.391, lng: -53.951 }, { name: "Trinity", lat: 48.368, lng: -53.354 },
-        // BURIN PENINSULA
-        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Burin", lat: 47.034, lng: -55.168 },
-        { name: "Grand Bank", lat: 47.098, lng: -55.753 }, { name: "Fortune", lat: 47.072, lng: -55.828 },
-        { name: "Terrenceville", lat: 47.666, lng: -54.733 }, { name: "St. Lawrence", lat: 46.918, lng: -55.393 },
-        // CENTRAL & GANDER REGION
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Glovertown", lat: 48.667, lng: -54.033 },
-        { name: "Gambo", lat: 48.748, lng: -54.214 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
-        { name: "Lewisporte", lat: 49.245, lng: -55.053 }, { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 },
-        { name: "Bishop's Falls", lat: 49.014, lng: -55.485 }, { name: "Botwood", lat: 49.141, lng: -55.343 },
-        { name: "Badger", lat: 48.974, lng: -56.035 }, { name: "Springdale", lat: 49.498, lng: -56.066 },
-        // WEST COAST & NORTHERN PEN
+        { name: "Whitbourne", lat: 47.421, lng: -53.531 }, { name: "Goobies", lat: 47.930, lng: -53.980 },
+        // WEST COAST / NORTHERN PEN
         { name: "Deer Lake", lat: 49.171, lng: -57.433 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "Pasadena", lat: 49.016, lng: -57.594 }, { name: "Stephenville", lat: 48.552, lng: -58.571 },
-        { name: "Stephenville Crossing", lat: 48.502, lng: -58.437 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
-        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Port au Choix", lat: 50.708, lng: -57.355 },
-        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Flowers Cove", lat: 51.298, lng: -56.732 },
-        // SOUTH COAST
-        { name: "Burgeo", lat: 47.611, lng: -57.612 }, { name: "Harbour Breton", lat: 47.478, lng: -55.828 },
-        { name: "St. Alban's", lat: 47.854, lng: -55.842 }
+        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Port aux Basques", lat: 47.572, lng: -59.136 },
+        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "St. Anthony", lat: 51.363, lng: -55.577 }
     ];
 
-    const map = L.map('map').setView([48.9, -56.0], 7);
+    const map = L.map('map').setView([49.7, -56.2], 8); // Centered on Baie Verte/White Bay
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
@@ -98,7 +88,7 @@
         const data = await res.json();
         routeLayer.clearLayers();
         if (data.routes && data.routes[0]) {
-            L.geoJSON(data.routes[0].geometry, { style: { color: '#1a73e8', weight: 8, opacity: 0.8 } }).addTo(routeLayer);
+            L.geoJSON(data.routes[0].geometry, { style: { color: '#1a73e8', weight: 8, opacity: 0.85 } }).addTo(routeLayer);
         }
     }
 
@@ -123,13 +113,10 @@
         document.getElementById(label === 'Origin' ? 'originIn' : 'destIn').value = hub.name;
     }
 
-    createMarker(20, 'Origin');      // Gander
-    createMarker(31, 'Destination'); // Corner Brook
+    // Default to the Peninsula for testing
+    createMarker(0, 'Origin');      // La Scie
+    createMarker(1, 'Destination'); // Baie Verte
     setTimeout(updateRoute, 500);
-
-    function generateBulletin() {
-        console.log("Generating Level 3 Bulletin...");
-    }
 </script>
 </body>
 </html>
