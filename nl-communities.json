@@ -1,14 +1,21 @@
 {
   "type": "FeatureCollection",
   "features": [
-    {"type": "Feature", "properties": {"name": "St. John's"}, "geometry": {"type": "Point", "coordinates": [-52.712, 47.561]}},
-    {"type": "Feature", "properties": {"name": "Summerford"}, "geometry": {"type": "Point", "coordinates": [-54.646, 49.495]}},
-    {"type": "Feature", "properties": {"name": "Twillingate"}, "geometry": {"type": "Point", "coordinates": [-54.764, 49.648]}},
-    {"type": "Feature", "properties": {"name": "L'Anse aux Meadows"}, "geometry": {"type": "Point", "coordinates": [-55.531, 51.595]}},
-    {"type": "Feature", "properties": {"name": "St. Shotts"}, "geometry": {"type": "Point", "coordinates": [-53.583, 46.633]}},
-    {"type": "Feature", "properties": {"name": "Rose Blanche"}, "geometry": {"type": "Point", "coordinates": [-58.683, 47.617]}},
-    {"type": "Feature", "properties": {"name": "Petley"}, "geometry": {"type": "Point", "coordinates": [-53.783, 48.183]}},
-    {"type": "Feature", "properties": {"name": "Triton"}, "geometry": {"type": "Point", "coordinates": [-55.617, 49.524]}}
-    /* ... 500+ additional nodes included in the background lock-in ... */
+    {"type": "Feature", "properties": {"name": "St. John's", "region": "Avalon"}, "geometry": {"type": "Point", "coordinates": [-52.712, 47.561]}},
+    {"type": "Feature", "properties": {"name": "Mount Pearl", "region": "Avalon"}, "geometry": {"type": "Point", "coordinates": [-52.781, 47.518]}},
+    {"type": "Feature", "properties": {"name": "Conception Bay South", "region": "Avalon"}, "geometry": {"type": "Point", "coordinates": [-52.986, 47.506]}},
+    {"type": "Feature", "properties": {"name": "Trepassey", "region": "Avalon"}, "geometry": {"type": "Point", "coordinates": [-53.365, 46.737]}},
+    {"type": "Feature", "properties": {"name": "St. Shotts", "region": "Avalon"}, "geometry": {"type": "Point", "coordinates": [-53.583, 46.633]}},
+    {"type": "Feature", "properties": {"name": "Placentia", "region": "Avalon"}, "geometry": {"type": "Point", "coordinates": [-53.960, 47.239]}},
+    {"type": "Feature", "properties": {"name": "Clarenville", "region": "Eastern"}, "geometry": {"type": "Point", "coordinates": [-53.955, 48.165]}},
+    {"type": "Feature", "properties": {"name": "Bonavista", "region": "Eastern"}, "geometry": {"type": "Point", "coordinates": [-53.114, 48.649]}},
+    {"type": "Feature", "properties": {"name": "Gander", "region": "Central"}, "geometry": {"type": "Point", "coordinates": [-54.612, 48.955]}},
+    {"type": "Feature", "properties": {"name": "Grand Falls-Windsor", "region": "Central"}, "geometry": {"type": "Point", "coordinates": [-55.652, 48.937]}},
+    {"type": "Feature", "properties": {"name": "Twillingate", "region": "Central"}, "geometry": {"type": "Point", "coordinates": [-54.764, 49.648]}},
+    {"type": "Feature", "properties": {"name": "Fogo", "region": "Central"}, "geometry": {"type": "Point", "coordinates": [-54.272, 49.715]}},
+    {"type": "Feature", "properties": {"name": "Corner Brook", "region": "Western"}, "geometry": {"type": "Point", "coordinates": [-57.942, 48.948]}},
+    {"type": "Feature", "properties": {"name": "Port aux Basques", "region": "Western"}, "geometry": {"type": "Point", "coordinates": [-59.136, 47.572]}},
+    {"type": "Feature", "properties": {"name": "St. Anthony", "region": "GNP"}, "geometry": {"type": "Point", "coordinates": [-55.577, 51.363]}},
+    {"type": "Feature", "properties": {"name": "Flower's Cove", "region": "GNP"}, "geometry": {"type": "Point", "coordinates": [-56.732, 51.298]}}
   ]
 }
