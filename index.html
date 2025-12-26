@@ -6,9 +6,9 @@
     <title>WEonG - Newfoundland Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* This ensures the map is actually visible on the screen */
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; }
-        #map { height: 100vh; width: 100vw; background: #e5e3df; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
+        #map { height: 100vh; width: 100vw; }
+        .pin-label { font-weight: bold; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -16,53 +16,51 @@
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module">
-        import { RouteEngine } from './engine/route-engine.js';
 
-        async function init() {
-            // 1. Initialize the Map
+    <script>
+        // Use standard script instead of module to ensure immediate execution
+        window.onload = function() {
+            // 1. Initialize Map
             const map = L.map('map').setView([48.5, -55.8], 7);
 
+            // 2. Add Map Tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
-            // 2. Define our "Locked" Origin and Destination
-            // Using coordinates directly from your Newfoundland Deep Dive
-            const origin = { name: "Corner Brook", lat: 48.9515, lng: -57.9482 };
-            const dest = { name: "St. John's", lat: 47.5615, lng: -52.7126 };
+            // 3. The Pins (Corner Brook & St. John's)
+            // Using the coordinates locked in from your Dec 26 Deep Dive
+            const startCoords = [48.9515, -57.9482]; // Corner Brook
+            const endCoords = [47.5615, -52.7126];   // St. John's
 
-            // 3. Drop the Pins immediately
-            const startPin = L.marker([origin.lat, origin.lng]).addTo(map)
-                .bindPopup(`<b>Origin:</b> ${origin.name}`).openPopup();
+            const originPin = L.marker(startCoords).addTo(map)
+                .bindPopup("<div class='pin-label'>Origin: Corner Brook</div>")
+                .openPopup();
 
-            const endPin = L.marker([dest.lat, dest.lng]).addTo(map)
-                .bindPopup(`<b>Destination:</b> ${dest.name}`);
+            const destPin = L.marker(endCoords).addTo(map)
+                .bindPopup("<div class='pin-label'>Destination: St. John's</div>");
 
-            // 4. Draw the Road Route (Trans-Canada Highway Path)
-            const tchRoute = [
-                [48.9515, -57.9482], // Corner Brook
-                [48.91, -57.43],     // Deer Lake
-                [48.93, -56.01],     // Grand Falls-Windsor
-                [48.95, -54.60],     // Gander
-                [48.18, -53.98],     // Clarenville
-                [47.58, -53.25],     // Whitbourne
-                [47.5615, -52.7126]  // St. John's
+            // 4. The Road Route (TCH Path)
+            const routePath = [
+                startCoords,
+                [49.17, -57.43], // Deer Lake
+                [49.02, -55.48], // Bishop's Falls
+                [48.95, -54.61], // Gander
+                [48.16, -53.95], // Clarenville
+                [47.51, -53.58], // Whitbourne
+                endCoords
             ];
 
-            const routeLine = L.polyline(tchRoute, {
-                color: '#2a52be', 
-                weight: 6, 
-                opacity: 0.9,
-                lineJoin: 'round'
+            const routeLine = L.polyline(routePath, {
+                color: '#0047AB', 
+                weight: 5, 
+                opacity: 0.7,
+                dashArray: '5, 10'
             }).addTo(map);
 
-            // 5. Adjust the view to show the whole route
+            // 5. Fit the map to the pins
             map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
-        }
-
-        // Run the script
-        init();
+        };
     </script>
 </body>
 </html>
