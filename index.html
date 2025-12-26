@@ -8,9 +8,8 @@
         body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
         #bulletin-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
         .community-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        /* Style for Level 3 Exceptions */
-        .exception { border: 2px solid red; background: #fff0f0; }
-        .alert-label { color: red; font-weight: bold; display: block; margin-top: 10px; }
+        .exception { border: 2px solid #d9534f; background: #fff5f5; }
+        .alert-label { color: #d9534f; font-weight: bold; display: block; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -27,7 +26,7 @@
             const container = document.getElementById('bulletin-board');
 
             communities.forEach(loc => {
-                // Test Data: Simulating a Level 3 event for Gander/Island locations
+                // Test Data triggering a Level 3 Exception
                 const weatherData = {
                     pop: 45,
                     uvIndex: 7,
@@ -39,7 +38,7 @@
                 const report = BulletinLogic.generate(loc, weatherData);
                 
                 const div = document.createElement('div');
-                // Aligned with BulletinLogic properties: isCritical and location
+                // Use the correct property names from weather-bulletin.js
                 div.className = `community-card ${report.isCritical ? 'exception' : ''}`;
                 div.innerHTML = `
                     <h3 style="margin-top:0;">${report.location}</h3>
@@ -52,7 +51,6 @@
                 container.appendChild(div);
             });
         }
-
         init();
     </script>
 </body>
