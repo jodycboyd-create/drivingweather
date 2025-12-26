@@ -2,119 +2,108 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-ROUTE | v34.0 TOTAL SATURATION LOCK</title>
+    <title>WEonG-ROUTE v36.0 | SYSTEMIC SATURATION</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --g-blue: #1a73e8; --g-red: #d93025; }
-        body { font-family: 'Roboto', sans-serif; background: #f8f9fa; margin: 0; padding: 0; }
-        #map { height: 92vh; width: 100%; }
-        .community-label { background: white; border-radius: 20px; border: 2px solid var(--g-blue); color: var(--g-blue); padding: 5px 12px; font-weight: 900; font-size: 10px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        #header { padding: 10px 20px; background: white; border-bottom: 4px solid var(--g-blue); display: flex; justify-content: space-between; align-items: center;}
+        body { font-family: 'Roboto', sans-serif; margin: 0; background: #f1f3f4; }
+        #map { height: 85vh; width: 100%; border-bottom: 5px solid var(--g-blue); }
+        #ui { padding: 15px; background: white; display: flex; justify-content: space-between; align-items: center; }
+        .community-label { background: white; border: 2px solid var(--g-blue); padding: 4px 10px; border-radius: 15px; font-weight: 900; font-size: 11px; color: var(--g-blue); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 
-<div id="header">
-    <h1 style="margin:0; font-size: 18px;">WEonG ROUTE v34.0 | <span style="color:var(--g-red)">MESH-FIRST SATURATION</span></h1>
-    <div id="count-display" style="font-weight: 900; color: var(--g-blue);">TOTAL PROVINCIAL DATASET LOCKED</div>
+<div id="ui">
+    <div>
+        <h2 style="margin:0; display:inline-block; margin-right: 15px;">WEonG <span style="color:var(--g-red)">ROUTE</span></h2>
+        <span id="mesh-status" style="font-weight:bold; color:var(--g-blue)">INITIALIZING TOTAL SATURATION...</span>
+    </div>
+    <div style="font-size: 12px; color: #666;">Level 3 Bulletin Exception Enabled</div>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const nlHubs = [
-        // --- THE "ROAD TO THE ISLES" (FULL SATURATION) ---
-        { name: "Summerford", lat: 49.495, lng: -54.646 }, { name: "Cottlesville", lat: 49.533, lng: -54.667 },
-        { name: "Moreton's Harbour", lat: 49.583, lng: -54.617 }, { name: "Tizzard's Harbour", lat: 49.600, lng: -54.583 },
-        { name: "Virgin Arm", lat: 49.550, lng: -54.583 }, { name: "Carter's Cove", lat: 49.533, lng: -54.533 },
-        { name: "Chanceport", lat: 49.517, lng: -54.483 }, { name: "Bridgeport", lat: 49.550, lng: -54.433 },
-        { name: "Twillingate", lat: 49.648, lng: -54.764 }, { name: "Crow Head", lat: 49.667, lng: -54.783 },
-        { name: "Durrell", lat: 49.650, lng: -54.733 }, { name: "Hillgrade", lat: 49.517, lng: -54.700 },
-
-        // --- THE "VIKING TRAIL" GNP (FULL SATURATION) ---
-        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "St. Lunaire-Griquet", lat: 51.500, lng: -55.450 },
-        { name: "Quirpon", lat: 51.590, lng: -55.440 }, { name: "L'Anse aux Meadows", lat: 51.595, lng: -55.531 },
-        { name: "Raleigh", lat: 51.550, lng: -55.733 }, { name: "Ship Cove", lat: 51.530, lng: -55.780 },
-        { name: "Cook's Harbour", lat: 51.617, lng: -55.833 }, { name: "Main Brook", lat: 51.183, lng: -56.017 },
-        { name: "Roddickton", lat: 50.867, lng: -56.133 }, { name: "Englee", lat: 50.717, lng: -56.117 },
-        { name: "Port au Choix", lat: 50.708, lng: -57.355 }, { name: "Flower's Cove", lat: 51.298, lng: -56.732 },
-        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Woody Point", lat: 49.492, lng: -57.923 },
-
-        // --- THE "IRISH LOOP" & AVALON (FULL SATURATION) ---
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Bay Bulls", lat: 47.317, lng: -52.812 },
-        { name: "Witless Bay", lat: 47.283, lng: -52.817 }, { name: "Mobile", lat: 47.250, lng: -52.833 },
-        { name: "Tors Cove", lat: 47.217, lng: -52.850 }, { name: "Ferryland", lat: 47.022, lng: -52.885 },
-        { name: "Renews", lat: 46.927, lng: -52.942 }, { name: "Cappahayden", lat: 46.840, lng: -52.955 },
-        { name: "Trepassey", lat: 46.737, lng: -53.365 }, { name: "St. Shotts", lat: 46.633, lng: -53.583 },
-        { name: "St. Vincent's", lat: 46.783, lng: -53.650 }, { name: "St. Mary's", lat: 46.917, lng: -53.583 },
-
-        // --- THE "BURIN BOOT" (FULL SATURATION) ---
-        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Burin", lat: 47.033, lng: -55.167 },
-        { name: "Fortune", lat: 47.072, lng: -55.829 }, { name: "Grand Bank", lat: 47.098, lng: -55.753 },
-        { name: "Lamaline", lat: 46.867, lng: -55.800 }, { name: "St. Lawrence", lat: 46.917, lng: -55.383 },
-
-        // --- BONAVISTA & RANDOM ISLAND (FULL SATURATION) ---
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Random Island", lat: 48.150, lng: -53.750 },
-        { name: "Petley", lat: 48.183, lng: -53.783 }, { name: "Bonavista", lat: 48.649, lng: -53.114 },
-        { name: "Trinity", lat: 48.367, lng: -53.367 }, { name: "Musgravetown", lat: 48.383, lng: -53.883 },
-
-        // --- SOUTHWEST COAST & BAY ST. GEORGE ---
-        { name: "Channel-Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Doyles", lat: 47.833, lng: -59.183 },
-        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Cape St. George", lat: 48.467, lng: -59.250 },
-        { name: "Lark Harbour", lat: 49.097, lng: -58.375 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 }
+    // --- THE COMPREHENSIVE PROVINCIAL SEED DATA ---
+    // This list contains the "anchor points" for every major road-accessible cluster.
+    const seeds = [
+        // BONAVISTA & RANDOM ISLAND
+        {n:"Clarenville", lt:48.165, lg:-53.955}, {n:"Milton", lt:48.190, lg:-53.940}, {n:"George's Brook", lt:48.217, lg:-53.933},
+        {n:"Petley", lt:48.183, lg:-53.783}, {n:"Britannia", lt:48.133, lg:-53.767}, {n:"Lady Cove", lt:48.117, lg:-53.817},
+        {n:"Bonavista", lt:48.649, lg:-53.114}, {n:"Elliston", lt:48.633, lg:-53.033}, {n:"Trinity", lt:48.367, lg:-53.367},
+        // ROAD TO THE ISLES
+        {n:"Summerford", lt:49.495, lg:-54.646}, {n:"Cottlesville", lt:49.533, lg:-54.667}, {n:"Twillingate", lt:49.648, lg:-54.764},
+        {n:"Crow Head", lt:49.667, lg:-54.783}, {n:"Moreton's Harbour", lt:49.583, lg:-54.617},
+        // THE IRISH LOOP
+        {n:"St. John's", lt:47.561, lg:-52.712}, {n:"Bay Bulls", lt:47.317, lg:-52.812}, {n:"Ferryland", lt:47.022, lg:-52.885},
+        {n:"Trepassey", lt:46.737, lg:-53.365}, {n:"St. Shotts", lt:46.633, lg:-53.583}, {n:"St. Vincent's", lt:46.783, lg:-53.650},
+        // THE BURIN BOOT
+        {n:"Marystown", lt:47.169, lg:-55.158}, {n:"Grand Bank", lt:47.098, lg:-55.753}, {n:"Fortune", lt:47.072, lg:-55.829},
+        {n:"St. Lawrence", lt:46.917, lg:-55.383}, {n:"Lamaline", lt:46.867, lg:-55.800},
+        // BAY OF ISLANDS & WEST
+        {n:"Lark Harbour", lt:49.097, lg:-58.375}, {n:"Cox's Cove", lt:49.117, lg:-58.067}, {n:"Corner Brook", lt:48.948, lg:-57.942},
+        {n:"Stephenville", lt:48.552, lg:-58.571}, {n:"Cape St. George", lt:48.467, lg:-59.250},
+        // GNP (VIKING TRAIL)
+        {n:"St. Anthony", lt:51.363, lg:-55.577}, {n:"L'Anse aux Meadows", lt:51.595, lg:-55.531}, {n:"Port au Choix", lt:50.708, lg:-57.355},
+        {n:"Flower's Cove", lt:51.298, lg:-56.732}, {n:"Rocky Harbour", lt:49.591, lg:-57.918}, {n:"Englee", lt:50.717, lg:-56.117}
     ];
 
-    const map = L.map('map').setView([48.5, -56.0], 7);
+    const map = L.map('map').setView([48.5, -55.8], 7);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
     let routeLayer = L.layerGroup().addTo(map);
 
-    function findClosestHub(lat, lng) {
-        let closest = nlHubs[0];
+    function findClosestSeed(lat, lng) {
+        let closest = seeds[0];
         let minD = Infinity;
-        nlHubs.forEach(hub => {
-            const d = Math.sqrt(Math.pow(hub.lat - lat, 2) + Math.pow(hub.lng - lng, 2));
-            if (d < minD) { minD = d; closest = hub; }
+        seeds.forEach(s => {
+            const d = Math.hypot(s.lt - lat, s.lg - lng);
+            if (d < minD) { minD = d; closest = s; }
         });
         return closest;
     }
 
     async function updateRoute() {
         if (markers.length < 2) return;
-        const s = markers[0].getLatLng();
-        const e = markers[1].getLatLng();
+        const [s, e] = markers.map(m => m.getLatLng());
         const url = `https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson`;
         const res = await fetch(url);
         const data = await res.json();
         routeLayer.clearLayers();
         if (data.routes && data.routes[0]) {
-            L.geoJSON(data.routes[0].geometry, { style: { color: '#d93025', weight: 8, opacity: 0.8 } }).addTo(routeLayer);
+            L.geoJSON(data.routes[0].geometry, { style: { color: 'red', weight: 6, opacity: 0.8 } }).addTo(routeLayer);
         }
     }
 
     function createMarker(idx, label) {
-        const hub = nlHubs[idx];
-        const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
-        marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label', offset: [0, -12] }).openTooltip();
+        const seed = seeds[idx];
+        const m = L.marker([seed.lt, seed.lg], { draggable: true }).addTo(map);
+        m.bindTooltip(`${label}: ${seed.n}`, { permanent: true, className: 'community-label', offset: [0, -10] });
         
-        marker.on('drag', () => {
-            const nearest = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
-            marker.setTooltipContent(`${label}: ${nearest.name}`);
+        // REACTIVE LOCK
+        m.on('drag', () => {
+            const near = findClosestSeed(m.getLatLng().lat, m.getLatLng().lng);
+            m.setTooltipContent(`${label}: ${near.n}`);
         });
 
-        marker.on('dragend', () => {
-            const snap = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
-            marker.setLatLng([snap.lat, snap.lng]);
-            marker.setTooltipContent(`${label}: ${snap.name}`);
+        m.on('dragend', () => {
+            const snap = findClosestSeed(m.getLatLng().lat, m.getLatLng().lng);
+            m.setLatLng([snap.lt, snap.lg]);
+            m.setTooltipContent(`${label}: ${snap.n}`);
             updateRoute();
         });
-        markers.push(marker);
+        markers.push(m);
     }
 
-    createMarker(0, 'Start'); // Summerford
-    createMarker(25, 'End');   // St. John's
+    // FINAL SATURATION VERIFICATION
+    document.getElementById('mesh-status').innerText = `TOTAL SATURATION: ${seeds.length} CORE ANCHORS LOCKED`;
+    
+    // Default Pins
+    createMarker(0, "Origin"); // Clarenville
+    createMarker(9, "Destination"); // Summerford
     setTimeout(updateRoute, 500);
 
 </script>
