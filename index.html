@@ -53,7 +53,7 @@
         }).addTo(map);
 
         try {
-            // 2. Load the comprehensive Newfoundland dataset
+            // 2. Load the comprehensive Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
@@ -66,7 +66,7 @@
     }
 
     function setupRouting() {
-        // Default Points: Corner Brook and St. John's
+        // Default Points: Corner Brook and St. John's [cite: 2025-12-26]
         const origin = L.latLng(48.9515, -57.9482);
         const destination = L.latLng(47.5615, -52.7126);
 
@@ -99,7 +99,7 @@
                         nearest.geometry.coordinates[0]
                     );
                     
-                    // Force the pin to the magnet point
+                    // Force the pin to the magnet point [cite: 2025-12-26]
                     marker.setLatLng(snappedPos);
                     
                     // Immediately update the road network route
@@ -114,4 +114,18 @@
         }).addTo(map);
     }
 
-    // Helper to find nearest
+    // Helper to find nearest community in the locked dataset [cite: 2025-12-26]
+    function findNearest(latlng) {
+        return communities.reduce((prev, curr) => {
+            const prevCoords = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+            const currCoords = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+            return latlng.distanceTo(currCoords) < latlng.distanceTo(prevCoords) ? curr : prev;
+        });
+    }
+
+    // Launch Application
+    window.onload = init;
+</script>
+
+</body>
+</html>
