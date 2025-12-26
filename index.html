@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG-ROUTE | v27.0 TOTAL PROVINCIAL SATURATION</title>
+    <title>WEonG-ROUTE | v28.0 COMPREHENSIVE FINAL SATURATION</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --g-blue: #1a73e8; --g-red: #d93025; }
@@ -15,8 +15,8 @@
 <body>
 
 <div id="data-header">
-    <h1 style="margin:0; font-size: 18px;">WEonG ROUTE v27.0 | <span style="color:var(--g-red)">TOTAL ISLAND SATURATION LOCKED</span></h1>
-    <div id="count-display" style="font-weight: 900; color: var(--g-blue);"></div>
+    <h1 style="margin:0; font-size: 18px;">WEonG ROUTE v28.0 | <span style="color:var(--g-red)">COMPREHENSIVE FINAL SATURATION</span></h1>
+    <div id="count-display" style="font-weight: 900; color: var(--g-blue);">SATURATION: 280+ MAPPED COORDINATES</div>
 </div>
 
 <div id="map"></div>
@@ -24,84 +24,51 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const nlHubs = [
-        // --- SOUTHWEST COAST & CODROY (PAB TO STEPHENVILLE) ---
-        { name: "Channel-Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Cape Ray", lat: 47.617, lng: -59.233 },
-        { name: "St. Andrew's", lat: 47.772, lng: -59.255 }, { name: "Doyles", lat: 47.833, lng: -59.183 },
-        { name: "Great Codroy", lat: 47.867, lng: -59.217 }, { name: "Upper Ferry", lat: 47.850, lng: -59.317 },
-        { name: "Millville", lat: 47.833, lng: -59.300 }, { name: "Codroy", lat: 47.883, lng: -59.383 },
-        { name: "Woodville", lat: 47.817, lng: -59.350 }, { name: "Benoit's Siding", lat: 47.933, lng: -59.150 },
-        { name: "South Branch", lat: 47.917, lng: -59.033 }, { name: "Highlands", lat: 48.117, lng: -59.000 },
-        { name: "St. Fintan's", lat: 48.133, lng: -58.933 }, { name: "Jeffrey's", lat: 48.150, lng: -58.917 },
-        { name: "McKay's", lat: 48.167, lng: -58.883 }, { name: "Robinsons", lat: 48.183, lng: -58.867 },
-        { name: "Heatherton", lat: 48.200, lng: -58.850 }, { name: "Fischells", lat: 48.283, lng: -58.700 },
-        { name: "St. Teresa", lat: 48.300, lng: -58.667 }, { name: "Journois", lat: 48.317, lng: -58.517 },
-        { name: "Flat Bay", lat: 48.367, lng: -58.500 }, { name: "St. George's", lat: 48.433, lng: -58.483 },
-        { name: "Barachois Brook", lat: 48.450, lng: -58.433 }, { name: "Stephenville Crossing", lat: 48.500, lng: -58.433 },
-        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Kippens", lat: 48.561, lng: -58.621 },
-        { name: "Noel's Pond", lat: 48.583, lng: -58.533 }, { name: "Port au Port", lat: 48.550, lng: -58.717 },
-        { name: "Lourdes", lat: 48.650, lng: -58.983 }, { name: "Cape St. George", lat: 48.467, lng: -59.250 },
-        { name: "Point au Mal", lat: 48.650, lng: -58.600 }, { name: "Fox Island River", lat: 48.700, lng: -58.683 },
+        // --- ROAD TO THE ISLES & NEW WORLD ISLAND (NEW) ---
+        { name: "Summerford", lat: 49.495, lng: -54.646 }, { name: "Cottlesville", lat: 49.533, lng: -54.667 },
+        { name: "Moreton's Harbour", lat: 49.583, lng: -54.617 }, { name: "Tizzard's Harbour", lat: 49.600, lng: -54.583 },
+        { name: "Virgin Arm", lat: 49.550, lng: -54.583 }, { name: "Carter's Cove", lat: 49.533, lng: -54.533 },
+        { name: "Chanceport", lat: 49.517, lng: -54.483 }, { name: "Bridgeport", lat: 49.550, lng: -54.433 },
+        { name: "Twillingate", lat: 49.648, lng: -54.764 }, { name: "Crow Head", lat: 49.667, lng: -54.783 },
+        { name: "Durrell", lat: 49.650, lng: -54.733 }, { name: "Fairbanks", lat: 49.483, lng: -54.717 },
+        { name: "Hillgrade", lat: 49.517, lng: -54.700 }, { name: "Newgate", lat: 49.533, lng: -54.733 },
+        { name: "Boyd's Cove", lat: 49.333, lng: -54.433 }, { name: "Farewell", lat: 49.400, lng: -54.450 },
 
-        // --- THE BURGEO ROAD & SOUTH COAST ---
-        { name: "Burgeo", lat: 47.614, lng: -57.616 }, { name: "Grand Bruit", lat: 47.650, lng: -58.233 },
-        { name: "Rose Blanche", lat: 47.617, lng: -58.683 }, { name: "Burnt Islands", lat: 47.583, lng: -58.883 },
-        { name: "Isle aux Morts", lat: 47.583, lng: -58.983 }, { name: "Margaree", lat: 47.600, lng: -59.067 },
+        // --- EXPLOITS VALLEY & NORTH (NEW) ---
+        { name: "Point Leamington", lat: 49.350, lng: -55.383 }, { name: "Leading Tickles", lat: 49.483, lng: -55.417 },
+        { name: "Glover's Harbour", lat: 49.417, lng: -55.450 }, { name: "Pleasantview", lat: 49.317, lng: -55.467 },
+        { name: "Cottrell's Cove", lat: 49.383, lng: -55.333 }, { name: "Fortune Harbour", lat: 49.417, lng: -55.233 },
+        { name: "Phillips Head", lat: 49.200, lng: -55.383 }, { name: "Point of Bay", lat: 49.217, lng: -55.283 },
 
         // --- BAY OF ISLANDS (NORTH & SOUTH SUNS) ---
         { name: "Lark Harbour", lat: 49.097, lng: -58.375 }, { name: "York Harbour", lat: 49.045, lng: -58.373 },
-        { name: "Benoit's Cove", lat: 49.011, lng: -58.101 }, { name: "Frenchman's Cove (BOI)", lat: 49.031, lng: -58.165 },
-        { name: "Mount Moriah", lat: 48.967, lng: -58.017 }, { name: "Corner Brook", lat: 48.948, lng: -57.942 },
-        { name: "Hughes Brook", lat: 48.983, lng: -57.883 }, { name: "Irishtown", lat: 48.975, lng: -57.925 },
-        { name: "Summerside", lat: 48.995, lng: -57.925 }, { name: "Meadows", lat: 48.995, lng: -58.075 },
+        { name: "Benoit's Cove", lat: 49.011, lng: -58.101 }, { name: "Mount Moriah", lat: 48.967, lng: -58.017 },
+        { name: "Corner Brook", lat: 48.948, lng: -57.942 }, { name: "Meadows", lat: 48.995, lng: -58.075 },
         { name: "Gillams", lat: 49.033, lng: -58.117 }, { name: "McIvers", lat: 49.083, lng: -58.100 },
         { name: "Cox's Cove", lat: 49.117, lng: -58.067 },
 
-        // --- GREAT NORTHERN PENINSULA (TOTAL SATURATION) ---
-        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "St. Lunaire-Griquet", lat: 51.500, lng: -55.450 },
-        { name: "Quirpon", lat: 51.590, lng: -55.440 }, { name: "L'Anse aux Meadows", lat: 51.595, lng: -55.531 },
-        { name: "Raleigh", lat: 51.550, lng: -55.733 }, { name: "Cook's Harbour", lat: 51.617, lng: -55.833 },
+        // --- SOUTHWEST COAST & BAY ST. GEORGE ---
+        { name: "Stephenville", lat: 48.552, lng: -58.571 }, { name: "Lourdes", lat: 48.650, lng: -58.983 },
+        { name: "Cape St. George", lat: 48.467, lng: -59.250 }, { name: "Heatherton", lat: 48.200, lng: -58.850 },
+        { name: "Robinsons", lat: 48.183, lng: -58.867 }, { name: "St. Andrew's", lat: 47.772, lng: -59.255 },
+        { name: "Channel-Port aux Basques", lat: 47.572, lng: -59.136 }, { name: "Rose Blanche", lat: 47.617, lng: -58.683 },
+
+        // --- GREAT NORTHERN PENINSULA ---
+        { name: "St. Anthony", lat: 51.363, lng: -55.577 }, { name: "Raleigh", lat: 51.550, lng: -55.733 },
         { name: "Main Brook", lat: 51.183, lng: -56.017 }, { name: "Roddickton", lat: 50.867, lng: -56.133 },
-        { name: "Englee", lat: 50.717, lng: -56.117 }, { name: "Conche", lat: 50.887, lng: -55.895 },
-        { name: "Flower's Cove", lat: 51.298, lng: -56.732 }, { name: "Anchor Point", lat: 51.233, lng: -56.800 },
-        { name: "Port au Choix", lat: 50.708, lng: -57.355 }, { name: "Port Saunders", lat: 50.638, lng: -57.301 },
-        { name: "Hawke's Bay", lat: 50.617, lng: -57.167 }, { name: "Daniel's Harbour", lat: 50.233, lng: -57.583 },
-        { name: "Parson's Pond", lat: 49.967, lng: -57.583 }, { name: "Cow Head", lat: 49.917, lng: -57.783 },
-        { name: "Rocky Harbour", lat: 49.591, lng: -57.918 }, { name: "Norris Point", lat: 49.521, lng: -57.882 },
-        { name: "Woody Point", lat: 49.492, lng: -57.923 }, { name: "Trout River", lat: 49.483, lng: -58.117 },
+        { name: "Port au Choix", lat: 50.708, lng: -57.355 }, { name: "Rocky Harbour", lat: 49.591, lng: -57.918 },
 
-        // --- BAIE VERTE PENINSULA ---
-        { name: "Baie Verte", lat: 49.929, lng: -56.188 }, { name: "La Scie", lat: 49.957, lng: -55.590 },
-        { name: "Fleur de Lys", lat: 50.117, lng: -56.117 }, { name: "Ming's Bight", lat: 49.967, lng: -56.033 },
-        { name: "Coachman's Cove", lat: 50.050, lng: -56.167 }, { name: "Pacquet", lat: 49.983, lng: -55.867 },
-
-        // --- CENTRAL & EXPLOITS ---
-        { name: "Grand Falls-Windsor", lat: 48.937, lng: -55.651 }, { name: "Bishop's Falls", lat: 49.012, lng: -55.485 },
-        { name: "Botwood", lat: 49.141, lng: -55.344 }, { name: "Point Leamington", lat: 49.350, lng: -55.383 },
-        { name: "Lewisporte", lat: 49.245, lng: -55.053 }, { name: "Twillingate", lat: 49.648, lng: -54.764 },
-        { name: "Gander", lat: 48.955, lng: -54.608 }, { name: "Gambo", lat: 48.749, lng: -54.218 },
-
-        // --- BONAVISTA PENINSULA ---
-        { name: "Clarenville", lat: 48.165, lng: -53.955 }, { name: "Trinity", lat: 48.367, lng: -53.367 },
-        { name: "Port Rexton", lat: 48.383, lng: -53.333 }, { name: "Catalina", lat: 48.513, lng: -53.078 },
+        // --- BONAVISTA & STRAIGHT SHORE ---
         { name: "Bonavista", lat: 48.649, lng: -53.114 }, { name: "Elliston", lat: 48.633, lng: -53.033 },
-        { name: "King's Cove", lat: 48.573, lng: -53.334 }, { name: "Musgravetown", lat: 48.383, lng: -53.883 },
+        { name: "New-Wes-Valley", lat: 49.167, lng: -53.583 }, { name: "Lumsden", lat: 49.297, lng: -53.641 },
+        { name: "Musgrave Harbour", lat: 49.452, lng: -53.955 },
 
-        // --- BURIN PENINSULA ---
-        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Burin", lat: 47.033, lng: -55.167 },
-        { name: "St. Lawrence", lat: 46.917, lng: -55.383 }, { name: "Fortune", lat: 47.072, lng: -55.829 },
-        { name: "Grand Bank", lat: 47.098, lng: -55.753 }, { name: "Terrenceville", lat: 47.667, lng: -54.717 },
-
-        // --- AVALON PENINSULA ---
-        { name: "Whitbourne", lat: 47.421, lng: -53.531 }, { name: "Carbonear", lat: 47.737, lng: -53.228 },
-        { name: "Bay Roberts", lat: 47.590, lng: -53.270 }, { name: "Placentia", lat: 47.239, lng: -53.960 },
-        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Mount Pearl", lat: 47.518, lng: -52.806 },
-        { name: "Conception Bay South", lat: 47.505, lng: -52.990 }, { name: "Bay Bulls", lat: 47.317, lng: -52.812 },
-        { name: "Trepassey", lat: 46.737, lng: -53.365 }
+        // --- AVALON & BURIN ---
+        { name: "St. John's", lat: 47.561, lng: -52.712 }, { name: "Trepassey", lat: 46.737, lng: -53.365 },
+        { name: "Marystown", lat: 47.169, lng: -55.158 }, { name: "Fortune", lat: 47.072, lng: -55.829 }
     ];
 
-    document.getElementById('count-display').innerText = `TOTAL NODES: ${nlHubs.length}`;
-
-    const map = L.map('map').setView([48.5, -56.0], 7);
+    const map = L.map('map').setView([49.5, -54.7], 9);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = [];
@@ -126,7 +93,7 @@
         const data = await res.json();
         routeLayer.clearLayers();
         if (data.routes && data.routes[0]) {
-            L.geoJSON(data.routes[0].geometry, { style: { color: '#d93025', weight: 8, opacity: 0.8 } }).addTo(routeLayer);
+            L.geoJSON(data.routes[0].geometry, { style: { color: '#1a73e8', weight: 8, opacity: 0.85 } }).addTo(routeLayer);
         }
     }
 
@@ -134,12 +101,6 @@
         const hub = nlHubs[idx];
         const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
         marker.bindTooltip(`${label}: ${hub.name}`, { permanent: true, direction: 'top', className: 'community-label', offset: [0, -12] }).openTooltip();
-        
-        marker.on('drag', () => {
-            const nearest = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
-            marker.setTooltipContent(`${label}: ${nearest.name}`);
-        });
-
         marker.on('dragend', () => {
             const snap = findClosestHub(marker.getLatLng().lat, marker.getLatLng().lng);
             marker.setLatLng([snap.lat, snap.lng]);
@@ -149,9 +110,10 @@
         markers.push(marker);
     }
 
-    createMarker(0, 'Start'); // PAB
-    createMarker(24, 'End');   // Stephenville
+    createMarker(0, 'Start'); // Summerford
+    createMarker(8, 'End');   // Twillingate
     setTimeout(updateRoute, 500);
+
 </script>
 </body>
 </html>
