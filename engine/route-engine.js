@@ -1,9 +1,3 @@
-/**
- * route-engine.js 
- * Project: [weong-route]
- * Purpose: Manages the Newfoundland geographic dataset.
- */
-
 export class RouteEngine {
     constructor() {
         this.communities = [];
@@ -11,11 +5,11 @@ export class RouteEngine {
 
     async loadCommunities() {
         try {
-            // Path tailored to your GitHub structure: data/nl/communities.json
+            // Path relative to index.html
             const response = await fetch('./data/nl/communities.json');
             if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
             this.communities = await response.json();
-            console.log("Newfoundland Dataset Locked and Loaded.");
+            console.log("Newfoundland Dataset Locked.");
             return this.communities;
         } catch (error) {
             console.error("RouteEngine Error:", error);
