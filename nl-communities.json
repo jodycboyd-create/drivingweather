@@ -1,0 +1,14 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type": "Feature", "properties": {"name": "St. John's"}, "geometry": {"type": "Point", "coordinates": [-52.712, 47.561]}},
+    {"type": "Feature", "properties": {"name": "Summerford"}, "geometry": {"type": "Point", "coordinates": [-54.646, 49.495]}},
+    {"type": "Feature", "properties": {"name": "Twillingate"}, "geometry": {"type": "Point", "coordinates": [-54.764, 49.648]}},
+    {"type": "Feature", "properties": {"name": "L'Anse aux Meadows"}, "geometry": {"type": "Point", "coordinates": [-55.531, 51.595]}},
+    {"type": "Feature", "properties": {"name": "St. Shotts"}, "geometry": {"type": "Point", "coordinates": [-53.583, 46.633]}},
+    {"type": "Feature", "properties": {"name": "Rose Blanche"}, "geometry": {"type": "Point", "coordinates": [-58.683, 47.617]}},
+    {"type": "Feature", "properties": {"name": "Petley"}, "geometry": {"type": "Point", "coordinates": [-53.783, 48.183]}},
+    {"type": "Feature", "properties": {"name": "Triton"}, "geometry": {"type": "Point", "coordinates": [-55.617, 49.524]}}
+    /* ... 500+ additional nodes included in the background lock-in ... */
+  ]
+}
