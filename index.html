@@ -1,60 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Route</title>
+    <title>WEonG - Newfoundland Snapping Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
-        /* Hides the text instruction panel to keep the map clean */
-        .leaflet-routing-container { display: none !important; }
+        .weather-popup { font-family: sans-serif; line-height: 1.4; }
+        .critical { color: #d9534f; font-weight: bold; }
     </style>
 </head>
 <body>
+    <div id="map"></div>
 
-<div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module">
+        // We use your locked-in Bulletin logic for the popups
+        import { BulletinLogic } from './engine/weather-bulletin.js';
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+        let map, communities = [];
+        let originMarker, destMarker, routeLine;
 
-<script>
-    // 1. Initialize map centered on the island
-    var map = L.map('map').setView([48.5, -55.8], 7);
+        async function init() {
+            map = L.map('map').setView([48.5, -55.8], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
+            // Load the deep-dive Newfoundland dataset [2025-12-26]
+            const response = await fetch('data/nl/communities.json');
+            const data = await response.json();
+            communities = data.features;
 
-    // 2. Define our Default Waypoints (Corner Brook to St. John's)
-    // These are pulled from the locked-in 2025-12-26 dataset
-    var waypoints = [
-        L.latLng(48.9515, -57.9482), // Origin
-        L.latLng(47.5615, -52.7126)  // Destination
-    ];
+            // Define Default Points (Corner Brook & St. John's)
+            const startNode = communities.find(c => c.properties.name === "Corner Brook");
+            const endNode = communities.find(c => c.properties.name === "St. John's");
 
-    // 3. Create the Routing Control - This draws the pins and route ON LOAD
-    var control = L.Routing.control({
-        waypoints: waypoints,
-        routeWhileDragging: true,
-        show: false, 
-        createMarker: function(i, wp) {
-            // This ensures both pins are draggable immediately
-            return L.marker(wp.latLng, {
-                draggable: true
-            }).bindPopup(i === 0 ? "<b>Origin</b>" : "<b>Destination</b>").openPopup();
-        },
-        lineOptions: {
-            styles: [{ color: '#0047AB', weight: 7, opacity: 0.8 }]
+            // Create Draggable Pins with Snapping Logic
+            originMarker = createDraggablePin(startNode, "Origin");
+            destMarker = createDraggablePin(endNode, "Destination");
+
+            drawRoute();
         }
-    }).addTo(map);
 
-    // 4. Automatically zoom to show the route
-    control.on('routeselected', function(e) {
-        var bounds = L.latLngBounds(e.route.coordinates);
-        map.fitBounds(bounds, { padding: [50, 50] });
-    });
-</script>
+        function createDraggablePin(feature, label) {
+            const coords = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
+            const marker = L.marker(coords, { draggable: true }).addTo(map);
+            
+            updatePopup(marker, feature.properties, label);
 
+            marker.on('dragend', function() {
+                const snapped = findNearestCommunity(marker.getLatLng());
+                marker.setLatLng([snapped.geometry.coordinates[1], snapped.geometry.coordinates[0]]);
+                updatePopup(marker, snapped.properties, label);
+                drawRoute();
+            });
+
+            return marker;
+        }
+
+        function findNearestCommunity(latlng) {
+            return communities.reduce((prev, curr) => {
+                const prevDist = latlng.distanceTo([prev.geometry.coordinates[1], prev.geometry.coordinates[0]]);
+                const currDist = latlng.distanceTo([curr.geometry.coordinates[1], curr.geometry.coordinates[0]]);
+                return currDist < prevDist ? curr : prev;
+            });
+        }
+
+        function updatePopup(marker, props, label) {
+            // Rule: Nearest 10% POP, Omit < 30%, Level 3 Exception Trigger
+            const mockWeather = { pop: 50, uvIndex: 6, isDaytime: true, levels: { wind: 3 } };
+            const report = BulletinLogic.generate(props, mockWeather);
+
+            marker.bindPopup(`
+                <div class="weather-popup">
+                    <b>${label}: ${report.location}</b><br>
+                    POP: ${report.pop || '---'}<br>
+                    UV Index: ${report.uvIndex || '---'}<br>
+                    ${report.isCritical ? '<span class="critical">⚠️ LEVEL 3 PRIORITY</span>' : ''}
+                </div>
+            `).openPopup();
+        }
+
+        function drawRoute() {
+            if (routeLine) map.removeLayer(routeLine);
+            routeLine = L.polyline([originMarker.getLatLng(), destMarker.getLatLng()], {
+                color: '#0047AB', weight: 5, opacity: 0.7, dashArray: '10, 10'
+            }).addTo(map);
+        }
+
+        init();
+    </script>
 </body>
 </html>
