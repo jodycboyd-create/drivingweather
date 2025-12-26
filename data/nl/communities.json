@@ -285,6 +285,6 @@
 {"type":"Feature","properties":{"name":"Belleoram","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.4162,47.5161]}},
 {"type":"Feature","properties":{"name":"St. Jacques","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.4111,47.4832]}},
 {"type":"Feature","properties":{"name":"Pool's Cove","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.4331,47.6832]}},
-{"type":"Feature","properties":{"name":"Gaultois","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.9162,47.6012]}}    
+{"type":"Feature","properties":{"name":"Gaultois","region":"Coast of Bays"},"geometry":{"type":"Point","coordinates":[-55.9162,47.6012]}}
   ]
 }
