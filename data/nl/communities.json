@@ -81,8 +81,8 @@
 {"type":"Feature","properties":{"name":"Chapel Arm","region":"Isthmus"},"geometry":{"type":"Point","coordinates":[-53.6831,47.5161]}},
 {"type":"Feature","properties":{"name":"Norman's Cove-Long Cove","region":"Isthmus"},"geometry":{"type":"Point","coordinates":[-53.6662,47.5512]}},
 {"type":"Feature","properties":{"name":"Come By Chance","region":"Isthmus"},"geometry":{"type":"Point","coordinates":[-54.0162,47.8331]}},
-{"type":"Feature","properties":{"name":"Arnold's Cove","region":"Isthmus"},"geometry":{"type":"Point","coordinates":[-54.0012,47.7552]}}
-{"type":"Feature","properties": {"name": "Argentia", "region": "Avalon West"}, "geometry": {"type": "Point", "coordinates": [-53.9882, 47.3001]}}
+{"type":"Feature","properties":{"name":"Arnold's Cove","region":"Isthmus"},"geometry":{"type":"Point","coordinates":[-54.0012,47.7552]}},
+{"type":"Feature","properties": {"name": "Argentia", "region": "Avalon West"}, "geometry": {"type": "Point", "coordinates": [-53.9882, 47.3001]}},
   
   ]
-
+}
