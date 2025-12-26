@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Synchronized Newfoundland Route</title>
+    <title>WEonG - Synchronized NL Route</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -23,8 +23,9 @@
 
 <script>
     /**
-     * Build: [weong-route] Synchronization Fix
-     * Methodology: Single Source of Truth + Magnet Snap [cite: 2025-12-26]
+     * Build: [weong-route] Forced Magnet & Route Sync
+     * Methodology: Decoupled Marker Control [cite: 2025-12-25]
+     * Dataset: Locked Newfoundland Deep Dive [cite: 2025-12-26]
      */
     let map, communities = [], routingControl;
     let markers = [];
@@ -33,7 +34,7 @@
         map = L.map('map').setView([48.9, -55.3], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // Load the locked Newfoundland dataset [cite: 2025-12-26]
+        // Load the comprehensive Newfoundland dataset [cite: 2025-12-26]
         const response = await fetch('data/nl/communities.json');
         const data = await response.json();
         communities = data.features;
@@ -42,26 +43,27 @@
     }
 
     function setupEngine() {
-        // Working Baseline: Grand Falls-Windsor to Gander [cite: 2025-12-26]
+        // Grand Falls-Windsor to Gander baseline [cite: 2025-12-26]
         const p1 = L.latLng(48.9351, -55.6562); 
         const p2 = L.latLng(48.9566, -54.6089);
 
-        // 1. Initialize Routing WITHOUT markers to avoid the "detached line" [cite: 2025-12-25]
+        // 1. Initialize custom markers FIRST as the primary controllers
+        markers[0] = createMagnetMarker(p1, 0);
+        markers[1] = createMagnetMarker(p2, 1);
+
+        // 2. Initialize Routing WITHOUT internal markers [cite: 2025-12-25]
         routingControl = L.Routing.control({
             waypoints: [p1, p2],
             router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
             createMarker: () => null, 
-            routeWhileDragging: true,
+            addWaypoints: false,
+            routeWhileDragging: false,
             show: false,
             lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
         }).addTo(map);
-
-        // 2. Setup our custom markers as the primary controllers [cite: 2025-12-26]
-        markers[0] = createManagedMarker(p1, 0);
-        markers[1] = createManagedMarker(p2, 1);
     }
 
-    function createManagedMarker(latlng, index) {
+    function createMagnetMarker(latlng, index) {
         const marker = L.marker(latlng, { draggable: true }).addTo(map);
         
         const updateUI = (ll) => {
@@ -74,27 +76,24 @@
 
         updateUI(latlng);
 
-        // FORCED SYNC: Update the blue line WHILE dragging to prevent detaching
-        marker.on('drag', (e) => {
-            updateUI(e.latlng);
-            const wps = routingControl.getWaypoints();
-            wps[index].latLng = e.latlng;
-            routingControl.setWaypoints(wps);
-        });
+        // Continuous label tracking during drag [cite: 2025-12-26]
+        marker.on('drag', (e) => updateUI(e.latlng));
 
-        // MAGNET SNAP: Force pin and line to the community node [cite: 2025-12-26]
+        // THE MAGNET SYNC: This forces the snap and then forces the route to update
         marker.on('dragend', function(e) {
             const nearest = findNearest(e.latlng);
             const snappedPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
             
-            // Move marker to community coordinate
+            // Step 1: Force pin to the magnet node [cite: 2025-12-26]
             marker.setLatLng(snappedPos);
             updateUI(snappedPos);
             
-            // Move road route to community coordinate [cite: 2025-12-25]
-            const wps = routingControl.getWaypoints();
-            wps[index].latLng = snappedPos;
-            routingControl.setWaypoints(wps);
+            // Step 2: Manually sync the routing engine with the new coordinates [cite: 2025-12-25]
+            const waypoints = [
+                markers[0].getLatLng(),
+                markers[1].getLatLng()
+            ];
+            routingControl.setWaypoints(waypoints);
         });
 
         return marker;
