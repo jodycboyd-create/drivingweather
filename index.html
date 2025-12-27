@@ -120,6 +120,73 @@
 </script>
 
 <script src="velocity-widget.js"></script>
+<script>
+    /**
+     * [weong-route] - PERMANENT STABILITY ANCHOR
+     * Exposes window.map and window.routingControl for modular access.
+     */
+    let map, communities = [], markers = [null, null], routingControl;
 
+    async function init() {
+        map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
+        window.map = map; // EXPOSE [cite: 2025-12-27]
+        
+        L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
+        }).addTo(map);
+
+        try {
+            const response = await fetch('data/nl/communities.json');
+            const data = await response.json();
+            communities = data.features;
+            if (communities.length > 0) setupRoutingPins();
+        } catch (e) { console.error("Data Load Error"); }
+    }
+
+    function findNearestNode(latlng) {
+        return communities.reduce((prev, curr) => {
+            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
+        });
+    }
+
+    function setupRoutingPins() {
+        const anchors = [[48.9500, -57.9500], [47.5615, -52.7126]];
+        anchors.forEach((coord, i) => {
+            const nearest = findNearestNode(L.latLng(coord));
+            const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { draggable: true }).addTo(map);
+            marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
+            markers[i] = marker;
+            marker.on('dragend', () => {
+                const final = findNearestNode(marker.getLatLng());
+                marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
+                syncRoute();
+            });
+        });
+        syncRoute();
+    }
+
+    function syncRoute() {
+        if (!markers[0] || !markers[1]) return;
+        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
+        if (routingControl) {
+            routingControl.setWaypoints(wps);
+        } else {
+            routingControl = L.Routing.control({
+                waypoints: wps, createMarker: () => null, addWaypoints: false,
+                lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }] }
+            }).addTo(map);
+            
+            window.routingControl = routingControl; // EXPOSE [cite: 2025-12-27]
+
+            routingControl.on('routesfound', (e) => {
+                map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { padding: [100, 100] });
+            });
+        }
+    }
+    window.onload = init;
+</script>
 </body>
 </html>
