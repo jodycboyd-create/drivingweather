@@ -6,17 +6,16 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
         .snapping-label {
-            font-weight: bold; padding: 6px 10px; background: white;
-            border: 2px solid #0047AB; border-radius: 6px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); white-space: nowrap;
+            font-weight: bold; color: #0047AB; background: white;
+            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: none;
         }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
-
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -24,8 +23,8 @@
 
 <script>
     /**
-     * [weong-route] - FIXED SNAP Logic
-     * Strategy: Destroy and Rebuild markers on dragend to force physical land-locking.
+     * [weong-route] - FIXED SNAP & ROAD LOCK [cite: 2025-12-23]
+     * Strategy: Total bypass of LRM marker management to end "Ghosting"
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -34,22 +33,21 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Loading the locked-in 2025 Newfoundland dataset
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Spawn initial pins at GFW and Gander
-            spawnOrUpdateMarker(0, [48.9351, -55.6562]); 
-            spawnOrUpdateMarker(1, [48.9566, -54.6089]);
+            // Initial setup [cite: 2025-12-26]
+            createMarker(0, [48.9351, -55.6562]); 
+            createMarker(1, [48.9566, -54.6089]);
             
             updateRoute();
         } catch (e) {
-            console.error("Critical: Dataset missing.");
+            console.error("Dataset load error.");
         }
     }
 
-    function findNearestLandNode(latlng) {
+    function findNearestTown(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
@@ -57,29 +55,29 @@
         });
     }
 
-    function spawnOrUpdateMarker(index, coords) {
-        const town = findNearestLandNode(L.latLng(coords));
-        const snappedPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+    function createMarker(index, coords) {
+        const town = findNearestTown(L.latLng(coords));
+        const townPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
 
-        // PHYSICAL DESTROY: Prevents "Bishop's Falls" duplicates
+        // Kill existing layer to prevent duplicates like in image_ea7f67.png [cite: 2025-12-25]
         if (markers[index]) map.removeLayer(markers[index]);
 
-        const marker = L.marker(snappedPos, { draggable: true }).addTo(map);
+        const marker = L.marker(townPos, { draggable: true }).addTo(map);
         marker.bindTooltip(town.properties.name, { 
             permanent: true, direction: 'top', className: 'snapping-label' 
         }).openTooltip();
 
         markers[index] = marker;
 
-        // Visual name update while moving
-        marker.on('drag', () => {
-            const currentTown = findNearestLandNode(marker.getLatLng());
-            marker.setTooltipContent(currentTown.properties.name);
+        // Feedback during drag
+        marker.on('drag', (e) => {
+            const tempTown = findNearestTown(e.latlng);
+            marker.setTooltipContent(tempTown.properties.name);
         });
 
-        // THE PHYSICAL LOCK: Force snap to land on release
+        // THE SNAP: On release, we destroy the ghost and rebuild at the town node [cite: 2025-12-25]
         marker.on('dragend', (e) => {
-            spawnOrUpdateMarker(index, e.latlng);
+            createMarker(index, e.latlng);
             updateRoute();
         });
     }
@@ -93,7 +91,7 @@
         } else {
             routingControl = L.Routing.control({
                 waypoints: pts,
-                createMarker: () => null, // NEVER let the engine create markers
+                createMarker: () => null, // NEVER let LRM create markers [cite: 2025-12-25]
                 addWaypoints: false,
                 lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
