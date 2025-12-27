@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Stability Anchor [Locked]</title>
+    <title>WEonG - Performance Stability [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,13 +14,13 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* THE DRIFT KILLER: Keeps SVG in sync with tiles during motion */
-        .map-is-moving .leaflet-overlay-pane svg {
-            will-change: transform;
-            pointer-events: none !important;
+        /* Performance Fix: Hardware accelerate the route line */
+        .leaflet-overlay-pane svg { 
+            will-change: transform; 
+            transition: none !important; 
         }
+        .map-is-moving .leaflet-overlay-pane svg { pointer-events: none; }
         .leaflet-routing-container { display: none !important; }
-        .leaflet-overlay-pane svg { transition: none !important; }
     </style>
 </head>
 <body>
@@ -31,13 +31,18 @@
 
 <script>
     /**
-     * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Fixed: Pin-Movement Sync + Drift Protection [cite: 2025-12-27]
+     * [weong-route] - PERFORMANCE OPTIMIZED
+     * Goal: Eliminate lag during pin drop [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
+        // Disable unnecessary animations that compete for CPU [cite: 2025-12-27]
+        map = L.map('map', { 
+            zoomControl: false, 
+            fadeAnimation: false,
+            markerZoomAnimation: false 
+        }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -87,8 +92,8 @@
                     permanent: true, className: 'snapping-label' 
                 }).openTooltip();
                 
-                // CRITICAL: Manual call to update route after pin drop [cite: 2025-12-27]
-                syncRoute();
+                // PERFORMANCE FIX: Immediate UI update, deferred route calc [cite: 2025-12-27]
+                requestAnimationFrame(() => syncRoute());
             });
         });
         syncRoute();
@@ -99,14 +104,13 @@
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
         if (routingControl) {
-            // Update the existing engine without re-creating it [cite: 2025-12-27]
             routingControl.setWaypoints(wps);
         } else {
             routingControl = L.Routing.control({
                 waypoints: wps,
                 createMarker: () => null,
                 addWaypoints: false,
-                routeWhileDragging: true, 
+                routeWhileDragging: false, // Set to false to reduce calculation spam [cite: 2025-12-27]
                 show: false,
                 lineOptions: {
                     styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
@@ -116,23 +120,20 @@
 
             window.weongRouter = routingControl;
 
-            // DRIFT LOCK HANDLERS: Controlled UI toggling [cite: 2025-12-27]
             map.on('movestart', () => map.getContainer().classList.add('map-is-moving'));
             map.on('moveend', () => {
                 map.getContainer().classList.remove('map-is-moving');
-                // Only snap to waypoints if a route actually exists [cite: 2025-12-27]
-                if (routingControl && !map.dragging.moving()) {
-                    const currentWps = [markers[0].getLatLng(), markers[1].getLatLng()];
-                    routingControl.getPlan().setWaypoints(currentWps);
-                }
+                // Clean snap after camera settles
+                if (routingControl) routingControl.getPlan().setWaypoints(wps);
             });
 
             routingControl.on('routesfound', (e) => {
-                // Auto-zoom only if user isn't manual panning [cite: 2025-12-27]
                 if (!map.dragging.moving()) {
+                    // PERFORMANCE FIX: Faster zoom to make the app feel snappier [cite: 2025-12-27]
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
-                        duration: 0.8 
+                        duration: 0.4,
+                        easeLinearity: 0.5
                     });
                 }
             });
