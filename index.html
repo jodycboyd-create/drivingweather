@@ -27,14 +27,16 @@
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
      * Methodology: Dual-Pin Snapping, Full NL Dataset (Hidden), Google Basemap
-     * Fixed: Ocean drift decoupling via Ironclad Glue settings
+     * Fixed: Ocean drift via Move-End Snapping & High-Performance Zoom [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
+        // Initialize Map and expose as window.weongMap [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
+        // Google Maps Standard Basemap
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             attribution: '&copy; Google Maps'
@@ -44,6 +46,7 @@
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
+            
             if (communities.length > 0) setupRoutingPins();
         } catch (e) { 
             console.error("Critical Error: Core dataset failed to load."); 
@@ -60,13 +63,16 @@
 
     function setupRoutingPins() {
         const anchors = [[48.9500, -57.9500], [47.5615, -52.7126]];
+        
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
             const pos = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
+            
             const marker = L.marker(pos, { draggable: true }).addTo(map);
             marker.bindTooltip(nearest.properties.name, { 
                 permanent: true, className: 'snapping-label' 
             }).openTooltip();
+            
             markers[i] = marker;
             
             marker.on('drag', (e) => {
@@ -90,30 +96,35 @@
         if (routingControl) {
             routingControl.setWaypoints(wps);
         } else {
-            // [weong-route] IRONCLAD GLUE BLOCK: Prevents ocean drift
+            // [weong-route] IRONCLAD GLUE BLOCK [cite: 2025-12-27]
             routingControl = L.Routing.control({
                 waypoints: wps, 
                 createMarker: () => null, 
                 addWaypoints: false,
                 routeWhileDragging: false, 
                 autoRoute: true,
-                fitSelectedRoutes: false, // STOPS ENGINE-USER CONFLICT
+                fitSelectedRoutes: false, // Prevents engine-user fight [cite: 2025-12-27]
                 show: false,
                 lineOptions: { 
                     styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
                     addWaypoints: false,
-                    extendToWaypoints: true // GLUES LINE TO PINS
+                    extendToWaypoints: true 
                 }
             }).addTo(map);
 
             window.weongRouter = routingControl;
 
             routingControl.on('routesfound', (e) => {
-                // INTERACTION GUARD: Only moves if user is idle
+                // INTERACTION GUARD & HIGH-PERFORMANCE SNAP [cite: 2025-12-27]
                 if (!map.dragging.moving()) {
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
-                        duration: 1.5 
+                        duration: 0.5 // Faster zoom to minimize drift window [cite: 2025-12-27]
+                    });
+
+                    // Force redraw once movement stops to "yank" the line out of the ocean [cite: 2025-12-27]
+                    map.once('moveend', () => {
+                        routingControl.spliceWaypoints(0, 0); 
                     });
                 }
             });
