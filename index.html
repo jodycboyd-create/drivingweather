@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - [weong-route] Absolute Snap</title>
+    <title>WEonG - Physical Lock Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
         .snapping-label {
-            font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); white-space: nowrap;
+            font-weight: bold; padding: 6px 10px; background: white;
+            border: 2px solid #0047AB; border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); white-space: nowrap;
         }
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -23,32 +23,45 @@
 
 <script>
     /**
-     * [weong-route] - Absolute Gravity Reset
-     * Method: State-Locked Re-rendering [cite: 2025-12-25]
+     * [weong-route] - Physical Lock Reset
+     * Method: Click-to-Teleport (Replaces Dragging to end Atlantic drifting) [cite: 2025-12-25]
      */
-    let map, communities = [], markers = [null, null], routingControl;
+    let map, communities = [], markers = [], routingControl;
 
     async function init() {
         map = L.map('map').setView([48.9, -55.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Loading the final, locked-in Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Spawn initial hard-locked pins [cite: 2025-12-26]
-            spawnOrUpdateMarker(0, [48.9351, -55.6562]); // GFW
-            spawnOrUpdateMarker(1, [48.9566, -54.6089]); // Gander
-            
-            syncRoutingLine();
+            // Start with two locked markers at GFW and Gander [cite: 2025-12-26]
+            placeMarker([48.9351, -55.6562]); 
+            placeMarker([48.9566, -54.6089]);
+            updateRoute();
+
+            // GLOBAL CLICK HANDLER: Instead of dragging, click a town to move the nearest pin
+            map.on('click', function(e) {
+                const nearestTown = findNearest(e.latlng);
+                const townCoords = [nearestTown.geometry.coordinates[1], nearestTown.geometry.coordinates[0]];
+                
+                // Identify which marker is closer to the click and move it [cite: 2025-12-25]
+                const targetMarker = markers.reduce((prev, curr) => 
+                    e.latlng.distanceTo(curr.getLatLng()) < e.latlng.distanceTo(prev.getLatLng()) ? curr : prev
+                );
+
+                targetMarker.setLatLng(townCoords);
+                targetMarker.setTooltipContent(nearestTown.properties.name);
+                updateRoute();
+            });
         } catch (e) {
-            console.error("Critical: Dataset load failed.");
+            console.error("Dataset load error.");
         }
     }
 
-    function findNearestTown(latlng) {
+    function findNearest(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
@@ -56,47 +69,23 @@
         });
     }
 
-    function spawnOrUpdateMarker(index, coords) {
-        // Find the town in the dataset [cite: 2025-12-26]
-        const town = findNearestTown(L.latLng(coords));
-        const snappedPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
-
-        // DELETE current marker to prevent duplicates seen in image_e9fbc0.png [cite: 2025-12-25]
-        if (markers[index]) {
-            map.removeLayer(markers[index]);
-        }
-
-        // SPAWN new marker at the precise dataset coordinate [cite: 2025-12-25]
-        const marker = L.marker(snappedPos, { draggable: true }).addTo(map);
+    function placeMarker(coords) {
+        const marker = L.marker(coords).addTo(map);
+        const town = findNearest(L.latLng(coords));
         marker.bindTooltip(town.properties.name, { 
             permanent: true, direction: 'top', className: 'snapping-label' 
         }).openTooltip();
-
-        markers[index] = marker;
-
-        // Visual feedback while dragging
-        marker.on('drag', (e) => {
-            const tempTown = findNearestTown(e.latlng);
-            marker.setTooltipContent(tempTown.properties.name);
-        });
-
-        // THE LOCK: On release, we destroy the ghost and rebuild at the town node [cite: 2025-12-25]
-        marker.on('dragend', (e) => {
-            spawnOrUpdateMarker(index, e.latlng);
-            syncRoutingLine();
-        });
+        markers.push(marker);
     }
 
-    function syncRoutingLine() {
-        if (!markers[0] || !markers[1]) return;
-        const pts = [markers[0].getLatLng(), markers[1].getLatLng()];
-
+    function updateRoute() {
+        const waypoints = markers.map(m => m.getLatLng());
         if (routingControl) {
-            routingControl.setWaypoints(pts);
+            routingControl.setWaypoints(waypoints);
         } else {
             routingControl = L.Routing.control({
-                waypoints: pts,
-                createMarker: () => null, // Prevents Routing engine's ghost pins [cite: 2025-12-25]
+                waypoints: waypoints,
+                createMarker: () => null, // Kills ghost pins seen in image_e930ee.png [cite: 2025-12-25]
                 addWaypoints: false,
                 lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
