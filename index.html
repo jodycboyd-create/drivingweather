@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - [weong-route] Absolute Snap</title>
+    <title>WEonG - [weong-route] Absolute Reset</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); white-space: nowrap; pointer-events: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4); white-space: nowrap; pointer-events: none;
         }
+        /* Completely suppress the default LRM UI to avoid "Ghost" sync issues */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -23,9 +24,8 @@
 
 <script>
     /**
-     * [weong-route] - Absolute Gravity Build
-     * Strategy: Destroy and Rebuild (No Floating Coordinates) [cite: 2025-12-25]
-     * Data: Locked Newfoundland Deep-Dive [cite: 2025-12-26]
+     * [weong-route] - Zero-Ghosting Engine
+     * Logic: The Marker coordinate is a slave to the Newfoundland Dataset [cite: 2025-12-26]
      */
     let map, communities = [], markers = [], routingControl;
 
@@ -34,22 +34,23 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
+            // Re-loading the locked 2025 Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Build the baseline pins [cite: 2025-12-26]
-            spawnMarker([48.9351, -55.6562]); // GFW
-            spawnMarker([48.9566, -54.6089]); // Gander
+            // Generate the baseline locked pins [cite: 2025-12-26]
+            spawnHardMarker([48.9351, -55.6562]); // GFW
+            spawnHardMarker([48.9566, -54.6089]); // Gander
             
-            initRouting();
+            forceRouteSync();
         } catch (e) {
-            console.error("Newfoundland dataset missing from GitHub structure.");
+            console.error("Fatal Error: /data/nl/communities.json not found.");
         }
     }
 
-    // THE MAGNET: Absolute rejection of non-town coordinates [cite: 2025-12-26]
-    function findTown(latlng) {
+    // THE GRAVITY CORE: Finds the EXACT node in your database [cite: 2025-12-26]
+    function findNearestNode(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
@@ -57,48 +58,53 @@
         });
     }
 
-    function spawnMarker(initialCoords) {
-        const town = findTown(L.latLng(initialCoords));
-        const pos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+    function spawnHardMarker(coords) {
+        const node = findNearestNode(L.latLng(coords));
+        const finalPos = [node.geometry.coordinates[1], node.geometry.coordinates[0]];
 
-        const marker = L.marker(pos, { draggable: true }).addTo(map);
+        // Create the marker specifically on a community coordinate [cite: 2025-12-26]
+        const marker = L.marker(finalPos, { draggable: true }).addTo(map);
         markers.push(marker);
 
-        const updateLabel = (ll) => {
-            const t = findTown(ll);
-            marker.bindTooltip(t.properties.name, { 
+        const updateTooltip = (ll) => {
+            const currentTown = findNearestNode(ll);
+            marker.bindTooltip(currentTown.properties.name, { 
                 permanent: true, direction: 'top', className: 'snapping-label' 
             }).openTooltip();
         };
 
-        updateLabel(L.latLng(pos));
+        updateTooltip(L.latLng(finalPos));
 
-        // Visual feedback while dragging
-        marker.on('drag', (e) => updateLabel(e.latlng));
+        // Drag Event: Visual only feedback
+        marker.on('drag', (e) => updateTooltip(e.latlng));
 
-        // THE SNAP: Reject the mouse drop and force the town node [cite: 2025-12-25]
+        // THE LOCK: On drop, the mouse release point is DISCARDED [cite: 2025-12-25]
         marker.on('dragend', function(e) {
-            const finalTown = findTown(e.latlng);
-            const finalPos = [finalTown.geometry.coordinates[1], finalTown.geometry.coordinates[0]];
+            const snappedNode = findNearestNode(e.latlng);
+            const snappedPos = [snappedNode.geometry.coordinates[1], snappedNode.geometry.coordinates[0]];
             
-            // Physical Teleport [cite: 2025-12-25]
-            marker.setLatLng(finalPos);
-            updateLabel(L.latLng(finalPos));
+            // Hard teleport to land-locked coordinate [cite: 2025-12-25]
+            marker.setLatLng(snappedPos);
+            updateTooltip(L.latLng(snappedPos));
             
-            // Force Routing Re-Sync
-            if (routingControl) {
-                routingControl.setWaypoints(markers.map(m => m.getLatLng()));
-            }
+            // Force the route line to sync ONLY with the snapped pins
+            forceRouteSync();
         });
     }
 
-    function initRouting() {
-        routingControl = L.Routing.control({
-            waypoints: markers.map(m => m.getLatLng()),
-            createMarker: () => null, // CRITICAL: Stop LRM from making "Ghost" pins [cite: 2025-12-25]
-            addWaypoints: false,
-            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
-        }).addTo(map);
+    function forceRouteSync() {
+        if (!routingControl) {
+            // Suppression of "Ghost Pins": createMarker returns null [cite: 2025-12-25]
+            routingControl = L.Routing.control({
+                waypoints: markers.map(m => m.getLatLng()),
+                createMarker: () => null, 
+                addWaypoints: false,
+                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+            }).addTo(map);
+        } else {
+            // Overwrite the routing array with our markers' physically snapped positions
+            routingControl.setWaypoints(markers.map(m => m.getLatLng()));
+        }
     }
 
     window.onload = init;
