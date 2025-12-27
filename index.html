@@ -37,7 +37,7 @@
      */
     let map, communities = [], markers = [null, null], routingControl;
 
-    // PRECISION ANCHORS: Ensuring small communities are never skipped
+    // PRECISION ANCHORS: Ensuring small communities are never skipped [cite: 2025-12-26]
     const PRECISION_NODES = [
         { name: "Bridgeport", lat: 49.5520, lng: -54.8750 },
         { name: "Moreton's Harbour", lat: 49.5667, lng: -54.8667 },
@@ -46,7 +46,7 @@
     ];
 
     async function init() {
-        // Starts showing the entire island
+        // Starts showing the entire island [cite: 2025-12-26]
         map = L.map('map').setView([48.8, -55.8], 6);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -60,7 +60,7 @@
             
             setupFoundationMarkers();
         } catch (e) {
-            console.error("Dataset load error.");
+            console.error("Dataset load error. [cite: 2025-12-26]");
         }
     }
 
@@ -78,7 +78,7 @@
             ...PRECISION_NODES
         ];
 
-        // 2. Find the absolute closest point to the mouse/marker
+        // 2. Find the absolute closest point to the mouse/marker [cite: 2025-12-25]
         let nearest = allPoints[0];
         let minDistance = latlng.distanceTo(L.latLng(nearest.lat, nearest.lng));
 
@@ -97,7 +97,7 @@
     }
 
     function setupFoundationMarkers() {
-        // Anchors: Corner Brook to St. John's
+        // Anchors: Corner Brook to St. John's [cite: 2025-12-26]
         const anchors = [
             { lat: 48.9515, lng: -57.9485 },
             { lat: 47.5615, lng: -52.7126 }
@@ -150,3 +150,11 @@
             routingControl.on('routesfound', function(e) {
                 const bounds = L.latLngBounds(e.routes[0].coordinates);
                 map.flyToBounds(bounds, { padding: [80, 80], duration: 1.5 });
+            });
+        }
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
