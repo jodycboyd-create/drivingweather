@@ -27,12 +27,12 @@
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
      * Methodology: Dual-Pin Snapping, Full NL Dataset (Hidden), Google Basemap
-     * Added: Global Bridge for Modular Architecture [cite: 2025-12-27]
+     * Added: Interaction Guard to prevent ocean drift decoupling [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // Initialize Map and expose as window.weongMap [cite: 2025-12-27]
+        // Initialize Map and expose as window.weongMap for modular access [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
@@ -43,6 +43,7 @@
         }).addTo(map);
 
         try {
+            // Loading Locked Newfoundland Dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
@@ -88,40 +89,7 @@
         });
         syncRoute();
     }
-function syncRoute() {
-        if (!markers[0] || !markers[1]) return;
-        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
-        if (routingControl) {
-            routingControl.setWaypoints(wps);
-        } else {
-            routingControl = L.Routing.control({
-                waypoints: wps, 
-                createMarker: () => null, 
-                addWaypoints: false,
-                // [weong-route] GLUE FIX: Prevents the line from detaching on pan
-                routeWhileDragging: false, 
-                autoRoute: true,
-                show: false,
-                lineOptions: { 
-                    styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
-                    addWaypoints: false 
-                }
-            }).addTo(map);
-
-            window.weongRouter = routingControl;
-
-            routingControl.on('routesfound', (e) => {
-                // Only fly to bounds if the map isn't currently being panned by the user
-                if (!map.dragging.moving()) {
-                    map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
-                        padding: [100, 100], 
-                        duration: 1.5 
-                    });
-                }
-            });
-        }
-    }
     function syncRoute() {
         if (!markers[0] || !markers[1]) return;
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
@@ -133,17 +101,27 @@ function syncRoute() {
                 waypoints: wps, 
                 createMarker: () => null, 
                 addWaypoints: false,
-                lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }] }
+                // [weong-route] GLUE FIX: Prevents line detaching during movement [cite: 2025-12-27]
+                routeWhileDragging: false, 
+                autoRoute: true,
+                show: false,
+                lineOptions: { 
+                    styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
+                    addWaypoints: false 
+                }
             }).addTo(map);
 
-            // Expose as window.weongRouter for modules [cite: 2025-12-27]
+            // Expose as window.weongRouter for modular polling [cite: 2025-12-27]
             window.weongRouter = routingControl;
 
             routingControl.on('routesfound', (e) => {
-                map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
-                    padding: [100, 100], 
-                    duration: 1.5 
-                });
+                // INTERACTION GUARD: Only auto-zoom if user is not panning [cite: 2025-12-27]
+                if (!map.dragging.moving()) {
+                    map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
+                        padding: [100, 100], 
+                        duration: 1.5 
+                    });
+                }
             });
         }
     }
