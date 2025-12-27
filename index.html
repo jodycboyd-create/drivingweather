@@ -19,6 +19,7 @@
             pointer-events: none;
             white-space: nowrap;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            font-family: sans-serif;
         }
 
         .leaflet-routing-container { display: none !important; }
@@ -34,18 +35,23 @@
 <script>
     /**
      * [weong-route] - Gold Standard Anchor Point
-     * Features: Dual-pin Snapping, Dynamic Zoom, Premium Basemap [cite: 2025-12-27]
+     * Restored: Esri High-Contrast Basemap & Fly-to-Bounds Zoom [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // 1. Initialize Map with the Premium CartoDB Dark Matter Basemap [cite: 2025-12-27]
+        // 1. Initialize Map with Esri World Dark Gray Base [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
         
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; CartoDB',
-            subdomains: 'abcd',
-            maxZoom: 20
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+            maxZoom: 16
+        }).addTo(map);
+
+        // Add Reference Layer (Roads/Labels) for better navigation [cite: 2025-12-27]
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Esri, HERE, Garmin',
+            maxZoom: 16
         }).addTo(map);
 
         try {
@@ -114,9 +120,9 @@
                 lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
 
-            // DYNAMIC ZOOM: Automatic "Fly-to-Bounds" [cite: 2025-12-27]
             routingControl.on('routesfound', function(e) {
                 const route = e.routes[0];
+                // Fly-to-Bounds Logic [cite: 2025-12-27]
                 map.flyToBounds(L.latLngBounds(route.coordinates), {
                     padding: [100, 100],
                     duration: 1.5
