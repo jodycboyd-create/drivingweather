@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Road Network Build</title>
+    <title>WEonG - Final Locked Road Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -12,7 +12,6 @@
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5); white-space: nowrap;
         }
-        /* Keep focus on the map, not the text turn-by-turn list */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -24,8 +23,8 @@
 
 <script>
     /**
-     * [weong-route] - Road Network Integration
-     * Locked Strategy: Absolute Snap + OSRM Road Following [cite: 2025-12-25]
+     * [weong-route] - Physical Road Lockdown
+     * Rule: Re-sync on every drag event to prevent regression [cite: 2025-12-25]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -34,22 +33,22 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Load the locked Newfoundland dataset [cite: 2025-12-26]
+            // Load the deep-dive locked Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Spawn initial road-locked markers [cite: 2025-12-26]
-            spawnLockedMarker(0, [48.9351, -55.6562]); // GFW
-            spawnLockedMarker(1, [48.9566, -54.6089]); // Gander
+            // Re-Initialize at GFW and Gander [cite: 2025-12-26]
+            spawnOrUpdateMarker(0, [48.9351, -55.6562]); 
+            spawnOrUpdateMarker(1, [48.9566, -54.6089]);
             
-            calculateRoadRoute();
+            forceRouteUpdate();
         } catch (e) {
-            console.error("Dataset failure. Road routing offline.");
+            console.error("Critical: Newfoundland data missing.");
         }
     }
 
-    function findNearestTown(latlng) {
+    function findNearestLandNode(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
@@ -57,11 +56,11 @@
         });
     }
 
-    function spawnLockedMarker(index, coords) {
-        const town = findNearestTown(L.latLng(coords));
+    function spawnOrUpdateMarker(index, coords) {
+        const town = findNearestLandNode(L.latLng(coords));
         const snappedPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
 
-        // Cleanup to prevent Bishop's Falls duplication bug [cite: 2025-12-25]
+        // DELETE current marker to prevent duplicates seen in image_e9fbc0.png [cite: 2025-12-25]
         if (markers[index]) map.removeLayer(markers[index]);
 
         const marker = L.marker(snappedPos, { draggable: true }).addTo(map);
@@ -71,34 +70,35 @@
 
         markers[index] = marker;
 
-        marker.on('drag', (e) => {
-            const tempTown = findNearestTown(e.latlng);
-            marker.setTooltipContent(tempTown.properties.name);
+        // REAL-TIME SYNC: Forces the blue line to move while you drag [cite: 2025-12-25]
+        marker.on('drag', () => {
+            const currentTown = findNearestLandNode(marker.getLatLng());
+            marker.setTooltipContent(currentTown.properties.name);
+            forceRouteUpdate();
         });
 
-        // The Absolute Snap Lock [cite: 2025-12-25]
+        // LOCK-IN: Forces the physical snap to the road node on release [cite: 2025-12-25]
         marker.on('dragend', (e) => {
-            spawnLockedMarker(index, e.latlng);
-            calculateRoadRoute();
+            spawnOrUpdateMarker(index, e.latlng);
+            forceRouteUpdate();
         });
     }
 
-    function calculateRoadRoute() {
+    function forceRouteUpdate() {
         if (!markers[0] || !markers[1]) return;
         const pts = [markers[0].getLatLng(), markers[1].getLatLng()];
 
-        if (routingControl) {
-            routingControl.setWaypoints(pts);
-        } else {
-            routingControl = L.Routing.control({
-                waypoints: pts,
-                router: L.Routing.osrmv1({ serviceUrl: `https://router.project-osrm.org/route/v1` }),
-                createMarker: () => null, // Preserve custom snapping markers [cite: 2025-12-25]
-                addWaypoints: false,
-                routeWhileDragging: false, // Performance lock for Newfoundland roads
-                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
-            }).addTo(map);
-        }
+        // Kill the old route entirely to ensure no legacy lines remain [cite: 2025-12-25]
+        if (routingControl) map.removeControl(routingControl);
+
+        routingControl = L.Routing.control({
+            waypoints: pts,
+            router: L.Routing.osrmv1({ serviceUrl: `https://router.project-osrm.org/route/v1` }),
+            createMarker: () => null, // Kills the "Ghost Pins" from your images [cite: 2025-12-25]
+            addWaypoints: false,
+            routeWhileDragging: true, // Forces the line to follow the pin during the drag
+            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+        }).addTo(map);
     }
 
     window.onload = init;
