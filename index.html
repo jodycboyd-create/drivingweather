@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Persistence Lock [Final]</title>
+    <title>WEonG - Persistence Lock [Clean Slate]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,8 +14,8 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* Prevents the route line from "floating" by keeping the SVG layer locked [cite: 2025-12-27] */
-        .leaflet-overlay-pane svg { will-change: transform; transition: none !important; }
+        /* Prevents the "Ocean Drift" by ensuring the SVG layer doesn't lag [cite: 2025-12-27] */
+        .leaflet-overlay-pane svg { transition: none !important; pointer-events: none !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -27,11 +27,10 @@
 
 <script>
     /**
-     * [weong-route] - ATOMIC PERSISTENCE
-     * Fix: Prevents route from resetting after pin drop [cite: 2025-12-27]
+     * [weong-route] - CLEAN SLATE STRATEGY
+     * Destroys and recreates routing on every move to prevent reverts. [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
-    let isAutoZooming = false; // Guard to separate user action from engine action
 
     async function init() {
         map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
@@ -47,7 +46,7 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Critical: Dataset failed."); }
+        } catch (e) { console.error("Data Load Failure"); }
     }
 
     function findNearestNode(latlng) {
@@ -62,14 +61,8 @@
         const anchors = [[48.9454, -57.9415], [47.5615, -52.7126]];
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
-            const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { 
-                draggable: true 
-            }).addTo(map);
-            
-            marker.bindTooltip(nearest.properties.name, { 
-                permanent: true, className: 'snapping-label' 
-            }).openTooltip();
-            
+            const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { draggable: true }).addTo(map);
+            marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
             
             marker.on('drag', (e) => {
@@ -80,11 +73,7 @@
             marker.on('dragend', () => {
                 const final = findNearestNode(marker.getLatLng());
                 marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
-                marker.unbindTooltip().bindTooltip(final.properties.name, { 
-                    permanent: true, className: 'snapping-label' 
-                }).openTooltip();
-                
-                // Set explicitly and recalculate immediately
+                marker.unbindTooltip().bindTooltip(final.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
                 syncRoute();
             });
         });
@@ -95,42 +84,39 @@
         if (!markers[0] || !markers[1]) return;
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
+        // KILL: Completely remove the old routing instance and its visual artifacts [cite: 2025-12-27]
         if (routingControl) {
-            // [weong-route] The "Atomic Push": Force engine waypoints directly [cite: 2025-12-27]
-            routingControl.getPlan().setWaypoints(wps);
-        } else {
-            routingControl = L.Routing.control({
-                waypoints: wps,
-                createMarker: () => null,
-                addWaypoints: false,
-                routeWhileDragging: false, 
-                show: false,
-                lineOptions: {
-                    styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
-                    extendToWaypoints: true
-                }
-            }).addTo(map);
-
-            window.weongRouter = routingControl;
-
-            routingControl.on('routesfound', (e) => {
-                // Ensure the map only zooms if the user isn't currently dragging it [cite: 2025-12-27]
-                if (!map.dragging.moving()) {
-                    isAutoZooming = true;
-                    map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
-                        padding: [100, 100], 
-                        duration: 0.6 
-                    });
-                    
-                    // Unlock the guard once the map stops moving
-                    map.once('moveend', () => { isAutoZooming = false; });
-                }
-            });
+            map.removeControl(routingControl);
+            routingControl = null;
         }
+
+        // REBUILD: Create a fresh instance with the new locations [cite: 2025-12-27]
+        routingControl = L.Routing.control({
+            waypoints: wps,
+            createMarker: () => null,
+            addWaypoints: false,
+            routeWhileDragging: false,
+            fitSelectedRoutes: false, // We handle the zoom ourselves to avoid drift
+            show: false,
+            lineOptions: {
+                styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
+                extendToWaypoints: true
+            }
+        }).addTo(map);
+
+        window.weongRouter = routingControl;
+
+        routingControl.on('routesfound', (e) => {
+            if (!map.dragging.moving()) {
+                map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
+                    padding: [100, 100], 
+                    duration: 0.5 
+                });
+            }
+        });
     }
     window.onload = init;
 </script>
-
 <script src="velocity-widget.js"></script>
 </body>
 </html>
