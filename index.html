@@ -3,105 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Stable Reversion [Locked]</title>
+    <title>WEonG - Zero Point Recovery</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #000; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: none;
-            white-space: nowrap;
         }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
-<div id="map"></div>
+    <div id="map" style="height: 100vh;"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
-<script>
-    /**
-     * [weong-route] - REVERTED STABLE FOUNDATION
-     * This version is confirmed to load the map and dataset correctly.
-     */
-    let map, communities = [], markers = [null, null], routingControl;
+    <script>
+        /**
+         * [weong-route] EMERGENCY RECOVERY
+         * Pure Leaflet + Basic Routing only. [cite: 2025-12-25]
+         */
+        let map, communities = [], markers = [null, null], routingControl;
 
-    async function init() {
-        // Initial Island View [cite: 2025-12-26]
-        map = L.map('map').setView([49.5, -56.0], 5);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        async function init() {
+            // Standardizing on the 2025 Island View center [cite: 2025-12-26]
+            map = L.map('map').setView([49.0, -56.0], 5);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        try {
-            const response = await fetch('data/nl/communities.json');
-            const data = await response.json();
-            communities = data.features;
-            setupMarkers();
-        } catch (e) {
-            console.error("Dataset load error.");
+            try {
+                const response = await fetch('data/nl/communities.json');
+                const data = await response.json();
+                communities = data.features;
+                setupMarkers();
+            } catch (e) {
+                console.error("Critical: communities.json not found.");
+            }
         }
-    }
 
-    function findNearestLandNode(latlng) {
-        return communities.reduce((prev, curr) => {
-            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
-        });
-    }
-
-    function setupMarkers() {
-        // Locked positions: Corner Brook and St. John's [cite: 2025-12-26]
-        const anchors = [[48.9515, -57.9485], [47.5615, -52.7126]];
-        
-        anchors.forEach((coord, i) => {
-            const town = findNearestLandNode(L.latLng(coord));
-            const pos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
-            
-            const marker = L.marker(pos, { draggable: true }).addTo(map);
-            marker.bindTooltip(town.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label' 
-            }).openTooltip();
-            
-            markers[i] = marker;
-
-            marker.on('drag', (e) => {
-                const liveTown = findNearestLandNode(e.latlng);
-                marker.setTooltipContent(liveTown.properties.name);
-            });
-
-            marker.on('dragend', () => {
-                const finalTown = findNearestLandNode(marker.getLatLng());
-                marker.setLatLng([finalTown.geometry.coordinates[1], finalTown.geometry.coordinates[0]]); 
-                syncHighway();
-            });
-        });
-        syncHighway();
-    }
-
-    function syncHighway() {
-        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
-        if (routingControl) {
-            routingControl.setWaypoints(wps);
-        } else {
-            routingControl = L.Routing.control({
-                waypoints: wps,
-                createMarker: () => null,
-                addWaypoints: false,
-                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
-            }).addTo(map);
-
-            routingControl.on('routesfound', function(e) {
-                const bounds = L.latLngBounds(e.routes[0].coordinates);
-                map.flyToBounds(bounds, { padding: [80, 80], duration: 1.5 }); [cite: 2025-12-25]
+        function findNearest(latlng) {
+            return communities.reduce((prev, curr) => {
+                const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+                const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+                return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
             });
         }
-    }
 
-    window.onload = init;
-</script>
+        function setupMarkers() {
+            // Locked coordinates for St. John's and Corner Brook [cite: 2025-12-26]
+            const starts = [[48.95, -57.95], [47.56, -52.71]];
+            
+            starts.forEach((coord, i) => {
+                const town = findNearest(L.latLng(coord));
+                const marker = L.marker([town.geometry.coordinates[1], town.geometry.coordinates[0]], { draggable: true }).addTo(map);
+                marker.bindTooltip(town.properties.name, { permanent: true, direction: 'top', className: 'snapping-label' }).openTooltip();
+                markers[i] = marker;
+
+                marker.on('dragend', () => {
+                    const snapped = findNearest(marker.getLatLng());
+                    marker.setLatLng([snapped.geometry.coordinates[1], snapped.geometry.coordinates[0]]);
+                    sync();
+                });
+            });
+            sync();
+        }
+
+        function sync() {
+            const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
+            if (routingControl) {
+                routingControl.setWaypoints(wps);
+            } else {
+                routingControl = L.Routing.control({
+                    waypoints: wps,
+                    createMarker: () => null,
+                    addWaypoints: false,
+                    lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+                }).addTo(map);
+            }
+        }
+
+        window.onload = init;
+    </script>
 </body>
 </html>
