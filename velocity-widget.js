@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Stability Anchor [Locked]</title>
+    <title>WEonG - Frame-Locked Stability [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,8 +14,12 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* Prevents the route line from "floating" during pans */
-        .leaflet-overlay-pane svg { transition: none !important; pointer-events: none !important; }
+        /* Lock the SVG to the map tiles to prevent "Ocean Drift" [cite: 2025-12-27] */
+        .leaflet-overlay-pane svg { 
+            transition: none !important; 
+            pointer-events: none !important; 
+            will-change: transform;
+        }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -27,16 +31,16 @@
 
 <script>
     /**
-     * [weong-route] - STABILITY ANCHOR
-     * Fix: Decoupling prevented via Interruptible Animation & Zero-Ghost Init.
+     * [weong-route] - FRAME-LOCKED STABILITY ANCHOR
+     * Logic: High-frequency re-projection during map animations [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // [1] Initialize map view immediately to Newfoundland
         map = L.map('map', { 
             zoomControl: false, 
-            fadeAnimation: false 
+            fadeAnimation: false,
+            zoomAnimation: true 
         }).setView([48.8, -55.5], 7); 
         
         window.weongMap = map; 
@@ -51,7 +55,20 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Critical: Dataset Missing."); }
+        } catch (e) { console.error("Dataset Load Error"); }
+
+        // [1] THE FRAME LOCK: Constantly re-sync the SVG layer during map changes [cite: 2025-12-27]
+        function syncLoop() {
+            if (routingControl && (map.dragging.moving() || map._animatingZoom)) {
+                // Accessing internal renderer to force pixel realignment
+                if (routingControl._line) {
+                    routingControl._line.pxBounds = null; 
+                    routingControl._line.draw(); 
+                }
+            }
+            requestAnimationFrame(syncLoop);
+        }
+        syncLoop();
     }
 
     function findNearestNode(latlng) {
@@ -64,17 +81,13 @@
 
     function setupRoutingPins() {
         const anchors = [[48.9454, -57.9415], [47.5615, -52.7126]];
-        
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
             const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { 
                 draggable: true 
             }).addTo(map);
             
-            marker.bindTooltip(nearest.properties.name, { 
-                permanent: true, className: 'snapping-label' 
-            }).openTooltip();
-            
+            marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
             
             marker.on('dragend', () => {
@@ -85,7 +98,6 @@
             });
         });
 
-        // [2] INITIALIZE ENGINE EMPTY: Prevents the Corner Brook "Ghost" route
         routingControl = L.Routing.control({
             waypoints: [], 
             createMarker: () => null,
@@ -103,41 +115,36 @@
 
         routingControl.on('routesfound', (e) => {
             if (routingControl._shouldFly) {
-                // [3] INTERRUPT: Kill auto-zoom if user touches the map
-                map.once('mousedown touchstart dragstart', () => {
-                    map.stop(); 
-                    routingControl._shouldFly = false;
-                });
+                // [2] INTERRUPT: Kill zoom instantly if user touches the map [cite: 2025-12-27]
+                map.once('mousedown touchstart dragstart', () => { map.stop(); });
 
                 map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                     padding: [100, 100], 
                     duration: 0.8 
                 });
-                
                 routingControl._shouldFly = false;
             }
         });
 
-        // [4] RE-PROJECTION LOCK: Force SVG alignment after every move
+        // [3] MOVEEND FAILSAVE: Hard alignment of pixels when movement stops [cite: 2025-12-27]
         map.on('moveend', () => {
             if (routingControl && markers[0] && markers[1]) {
-                const currentWps = [markers[0].getLatLng(), markers[1].getLatLng()];
-                routingControl.getPlan().setWaypoints(currentWps);
+                routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
             }
         });
 
-        // First-time sync (No zoom)
         setTimeout(() => syncRoute(false), 500); 
     }
 
     function syncRoute(shouldFly = false) {
         if (!markers[0] || !markers[1] || !routingControl) return;
-        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
         routingControl._shouldFly = shouldFly;
-        routingControl.setWaypoints(wps);
+        routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
     }
 
     window.onload = init;
 </script>
 
-<script src="velocity-widget
+<script src="velocity-widget.js"></script>
+</body>
+</html>
