@@ -2,14 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Simple Baseline</title>
+    <title>WEonG - Draggable Baseline</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; }
         .simple-label {
             font-weight: bold; padding: 4px 8px; background: white;
             border: 2px solid #0047AB; border-radius: 4px;
         }
+        /* Keep the UI clean by hiding the routing instructions panel */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
@@ -17,25 +20,44 @@
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
     /**
-     * [weong-route] - Simple Baseline Reset
-     * Purpose: Place two markers and stop [cite: 2025-12-25]
+     * [weong-route] - Draggable Reset
+     * Purpose: Two draggable markers connected by a simple route [cite: 2025-12-25]
      */
     const map = L.map('map').setView([48.9, -55.5], 7);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Initial Coordinates [cite: 2025-12-26]
+    const pos1 = [48.9351, -55.6562]; // GFW
+    const pos2 = [48.9566, -54.6089]; // Gander
+
+    // Create Draggable Markers [cite: 2025-12-25]
+    const marker1 = L.marker(pos1, { draggable: true }).addTo(map)
+        .bindTooltip("Point A", { permanent: true, className: 'simple-label' });
+
+    const marker2 = L.marker(pos2, { draggable: true }).addTo(map)
+        .bindTooltip("Point B", { permanent: true, className: 'simple-label' });
+
+    // Initialize Routing [cite: 2025-12-25]
+    const control = L.Routing.control({
+        waypoints: [marker1.getLatLng(), marker2.getLatLng()],
+        createMarker: () => null, // Important: Don't let the engine create extra pins [cite: 2025-12-25]
+        addWaypoints: false,
+        routeWhileDragging: true,
+        lineOptions: { styles: [{ color: '#0047AB', weight: 6 }] }
     }).addTo(map);
 
-    // Marker 1: Grand Falls-Windsor [cite: 2025-12-26]
-    L.marker([48.9351, -55.6562]).addTo(map)
-        .bindTooltip("Grand Falls-Windsor", { permanent: true, className: 'simple-label' });
+    // Sync the route line whenever a marker is moved [cite: 2025-12-25]
+    function updateRoute() {
+        control.setWaypoints([marker1.getLatLng(), marker2.getLatLng()]);
+    }
 
-    // Marker 2: Gander [cite: 2025-12-26]
-    L.marker([48.9566, -54.6089]).addTo(map)
-        .bindTooltip("Gander", { permanent: true, className: 'simple-label' });
+    marker1.on('drag', updateRoute);
+    marker2.on('drag', updateRoute);
 
 </script>
 </body>
