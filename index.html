@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - [weong-route] Absolute Highway Lock</title>
+    <title>WEonG - Absolute Snap Lock</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
@@ -21,7 +21,7 @@
 <script>
     /**
      * [weong-route] - FIXED SNAP & ROAD LOCK [cite: 2025-12-23]
-     * Strategy: Direct OSRM Bypass to prevent Bishop's Falls/Atlantic floating bugs
+     * Strategy: Absolute Marker Control to prevent Atlantic Floating and Duplicates.
      */
     let map, communities = [], markers = [null, null], routeLine = null;
 
@@ -30,14 +30,14 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Loading the locked 2025 NL Deep-Dive Dataset [cite: 2025-12-26]
+            // Load the locked Newfoundland deep-dive dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Hard-locked Initial Spawn [cite: 2025-12-26]
-            renderLockedMarker(0, [48.9351, -55.6562]); // GFW
-            renderLockedMarker(1, [48.9566, -54.6089]); // Gander
+            // Hard-locked Initial Spawn at GFW and Gander [cite: 2025-12-26]
+            renderLockedMarker(0, [48.9351, -55.6562]); 
+            renderLockedMarker(1, [48.9566, -54.6089]);
             
             updateHighwayPath();
         } catch (e) {
@@ -57,7 +57,7 @@
         const town = findNearestLandNode(L.latLng(coords));
         const townPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
 
-        // THE DUPLICATE KILLER: Always remove old layer before spawning new [cite: 2025-12-25]
+        // DELETE current marker before spawning new to kill duplicates [cite: 2025-12-25]
         if (markers[index]) map.removeLayer(markers[index]);
 
         const marker = L.marker(townPos, { draggable: true }).addTo(map);
@@ -67,13 +67,13 @@
 
         markers[index] = marker;
 
-        // Visual name-feedback while dragging [cite: 2025-12-25]
+        // Visual feedback while dragging
         marker.on('drag', (e) => {
             const tempTown = findNearestLandNode(e.latlng);
             marker.setTooltipContent(tempTown.properties.name);
         });
 
-        // THE PHYSICAL LOCK: Force snap to land-node on release [cite: 2025-12-25]
+        // THE LOCK: Force physical snap to land-node on release [cite: 2025-12-25]
         marker.on('dragend', (e) => {
             renderLockedMarker(index, e.latlng);
             updateHighwayPath();
@@ -86,7 +86,7 @@
         const start = markers[0].getLatLng();
         const end = markers[1].getLatLng();
 
-        // Direct API Call: Bypasses Routing Machine's buggy marker placement [cite: 2025-12-25]
+        // Direct OSRM Call to avoid Leaflet Routing Machine's marker bugs [cite: 2025-12-25]
         const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
 
         try {
@@ -97,13 +97,13 @@
 
             const coordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
             
-            // Draw the highway connection strictly between snapped markers [cite: 2025-12-25]
+            // Draw the road network path between the two locked pins [cite: 2025-12-25]
             routeLine = L.polyline(coordinates, { 
                 color: '#0047AB', weight: 8, opacity: 0.8, lineJoin: 'round' 
             }).addTo(map);
 
         } catch (e) {
-            console.error("Highway route calculation failed.");
+            console.error("Route calculation failed.");
         }
     }
 
