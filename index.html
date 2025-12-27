@@ -1,63 +1,59 @@
 /**
- * [weong-route] - Absolute Gravity Restoration
- * Goal: Fix the "Floating Pin" issue seen in image_e90f5f.png
- * Logic: Force-Teleport on DragEnd [cite: 2025-12-25]
+ * [weong-route] - Absolute Gravity Build
+ * Strategy: Forced Coordinate Overwrite [cite: 2025-12-25]
+ * Status: Newfoundland Locked & Enforced [cite: 2025-12-26]
  */
 
-function createLockedMarker(initialCoords, index) {
-    // 1. Find nearest locked community node for initial placement [cite: 2025-12-26]
-    const startNode = findNearestCommunity(L.latLng(initialCoords));
-    const startPos = [startNode.geometry.coordinates[1], startNode.geometry.coordinates[0]];
-
-    const marker = L.marker(startPos, { 
-        draggable: true,
-        autoPan: true 
-    }).addTo(map);
-
-    // Update the visual label [cite: 2025-12-26]
-    const updateLabel = (latlng) => {
-        const node = findNearestCommunity(latlng);
-        marker.bindTooltip(node.properties.name, { 
-            permanent: true, 
-            direction: 'top', 
-            className: 'snapping-label' 
-        }).openTooltip();
-    };
-
-    updateLabel(L.latLng(startPos));
-
-    // Real-time name changes while dragging
-    marker.on('drag', (e) => updateLabel(e.latlng));
-
-    // THE RESTORED SNAP: This is what was lost [cite: 2025-12-25]
-    marker.on('dragend', function(e) {
-        // A. Identify the nearest physical community from the deep-dive dataset
-        const finalNode = findNearestCommunity(e.latlng);
-        const snappedCoords = [finalNode.geometry.coordinates[1], finalNode.geometry.coordinates[0]];
-        
-        // B. FORCE TELEPORT: This kills the "floating in water" bug
-        // We override the mouse drop position entirely [cite: 2025-12-25].
-        marker.setLatLng(snappedCoords);
-        
-        // C. RE-SYNC: Ensure label and internal state are locked [cite: 2025-12-26]
-        updateLabel(L.latLng(snappedCoords));
-        
-        console.log(`[weong-route] Locked to: ${finalNode.properties.name}`);
-        
-        // Trigger route update if engine is active
-        if(window.routingControl) updateRoute();
-    });
-
-    return marker;
-}
-
-/**
- * Dataset Search: Only recognizes communities in the locked NL file [cite: 2025-12-26]
- */
-function findNearestCommunity(latlng) {
+// 1. THE MAGNET (The Core Logic)
+function getNearestTown(targetLatLng) {
+    // Only searches your final, locked-in Newfoundland community dataset [cite: 2025-12-26]
     return communities.reduce((prev, curr) => {
         const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
         const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-        return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
+        return targetLatLng.distanceTo(c) < targetLatLng.distanceTo(p) ? curr : prev;
     });
+}
+
+// 2. THE ENFORCER (The Marker Logic)
+function spawnLockedMarker(coords) {
+    // Ensure initial spawn is perfectly on a community node [cite: 2025-12-26]
+    const town = getNearestTown(L.latLng(coords));
+    const fixedPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+
+    const marker = L.marker(fixedPos, { 
+        draggable: true,
+        riseOnHover: true 
+    }).addTo(map);
+
+    // Dynamic Labeling Logic [cite: 2025-12-26]
+    const refreshUI = (ll) => {
+        const nearestTown = getNearestTown(ll);
+        marker.bindTooltip(nearestTown.properties.name, { 
+            permanent: true, direction: 'top', className: 'snapping-label' 
+        }).openTooltip();
+    };
+
+    refreshUI(L.latLng(fixedPos));
+
+    // Update town name while dragging across the coast
+    marker.on('drag', (e) => refreshUI(e.latlng));
+
+    // THE ABSOLUTE FIX: Reject any coordinate not in the dataset [cite: 2025-12-25]
+    marker.on('dragend', function(e) {
+        const finalTown = getNearestTown(e.latlng);
+        const snappedPos = [finalTown.geometry.coordinates[1], finalTown.geometry.coordinates[0]];
+        
+        // PHYSICAL TELEPORT: Overwrite the Atlantic drop [cite: 2025-12-25]
+        marker.setLatLng(snappedPos);
+        
+        // Final UI Lock [cite: 2025-12-26]
+        refreshUI(L.latLng(snappedPos));
+        
+        console.log(`[weong-route] Gravity Success: ${finalTown.properties.name}`);
+        
+        // Trigger Route Line Update (Coming in Phase 2)
+        if (typeof updateRouteLine === "function") updateRouteLine();
+    });
+
+    return marker;
 }
