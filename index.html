@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Physical Lock Build</title>
+    <title>WEonG - Coastline Enforcer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -10,12 +10,13 @@
         .snapping-label {
             font-weight: bold; padding: 6px 10px; background: white;
             border: 2px solid #0047AB; border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3); white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); white-space: nowrap;
         }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -23,45 +24,29 @@
 
 <script>
     /**
-     * [weong-route] - Physical Lock Reset
-     * Method: Click-to-Teleport (Replaces Dragging to end Atlantic drifting) [cite: 2025-12-25]
+     * [weong-route] - Coastline Snapping Logic
+     * Goal: Prevent markers from staying in the Atlantic [cite: 2025-12-25]
      */
-    let map, communities = [], markers = [], routingControl;
+    let map, communities = [], marker1, marker2, routingControl;
 
     async function init() {
         map = L.map('map').setView([48.9, -55.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
+            // Loading the locked-in 2025 Newfoundland community dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Start with two locked markers at GFW and Gander [cite: 2025-12-26]
-            placeMarker([48.9351, -55.6562]); 
-            placeMarker([48.9566, -54.6089]);
-            updateRoute();
-
-            // GLOBAL CLICK HANDLER: Instead of dragging, click a town to move the nearest pin
-            map.on('click', function(e) {
-                const nearestTown = findNearest(e.latlng);
-                const townCoords = [nearestTown.geometry.coordinates[1], nearestTown.geometry.coordinates[0]];
-                
-                // Identify which marker is closer to the click and move it [cite: 2025-12-25]
-                const targetMarker = markers.reduce((prev, curr) => 
-                    e.latlng.distanceTo(curr.getLatLng()) < e.latlng.distanceTo(prev.getLatLng()) ? curr : prev
-                );
-
-                targetMarker.setLatLng(townCoords);
-                targetMarker.setTooltipContent(nearestTown.properties.name);
-                updateRoute();
-            });
+            setupMarkers();
         } catch (e) {
-            console.error("Dataset load error.");
+            console.error("Critical: Newfoundland dataset not found.");
         }
     }
 
-    function findNearest(latlng) {
+    // THE MAGNET: Finds the nearest town node from the database [cite: 2025-12-26]
+    function findNearestLandNode(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
@@ -69,26 +54,54 @@
         });
     }
 
-    function placeMarker(coords) {
-        const marker = L.marker(coords).addTo(map);
-        const town = findNearest(L.latLng(coords));
-        marker.bindTooltip(town.properties.name, { 
-            permanent: true, direction: 'top', className: 'snapping-label' 
-        }).openTooltip();
-        markers.push(marker);
+    function setupMarkers() {
+        // Points initialized at GFW and Gander [cite: 2025-12-26]
+        marker1 = createEnforcedMarker([48.9351, -55.6562], "Point A");
+        marker2 = createEnforcedMarker([48.9566, -54.6089], "Point B");
+
+        routingControl = L.Routing.control({
+            waypoints: [marker1.getLatLng(), marker2.getLatLng()],
+            createMarker: () => null, // Kills "Ghost Pins" from image_e930ee.png [cite: 2025-12-25]
+            addWaypoints: false,
+            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+        }).addTo(map);
     }
 
-    function updateRoute() {
-        const waypoints = markers.map(m => m.getLatLng());
+    function createEnforcedMarker(coords, defaultName) {
+        const marker = L.marker(coords, { draggable: true }).addTo(map);
+        
+        const updateUI = (ll) => {
+            const town = findNearestLandNode(ll);
+            marker.bindTooltip(town.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
+            }).openTooltip();
+        };
+
+        updateUI(L.latLng(coords));
+
+        // Drag event: Just update the label name while moving
+        marker.on('drag', () => {
+            updateUI(marker.getLatLng());
+            syncRoute();
+        });
+
+        // RELEASE EVENT: THE PHYSICAL SNAP [cite: 2025-12-25]
+        marker.on('dragend', () => {
+            const snappedNode = findNearestLandNode(marker.getLatLng());
+            const lockedPos = [snappedNode.geometry.coordinates[1], snappedNode.geometry.coordinates[0]];
+            
+            // This line physically teleports the pin out of the ocean [cite: 2025-12-25]
+            marker.setLatLng(lockedPos);
+            updateUI(L.latLng(lockedPos));
+            syncRoute();
+        });
+
+        return marker;
+    }
+
+    function syncRoute() {
         if (routingControl) {
-            routingControl.setWaypoints(waypoints);
-        } else {
-            routingControl = L.Routing.control({
-                waypoints: waypoints,
-                createMarker: () => null, // Kills ghost pins seen in image_e930ee.png [cite: 2025-12-25]
-                addWaypoints: false,
-                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
-            }).addTo(map);
+            routingControl.setWaypoints([marker1.getLatLng(), marker2.getLatLng()]);
         }
     }
 
