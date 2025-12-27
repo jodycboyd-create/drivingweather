@@ -1,59 +1,101 @@
 /**
- * [weong-route] - Absolute Gravity Build
- * Strategy: Forced Coordinate Overwrite [cite: 2025-12-25]
- * Status: Newfoundland Locked & Enforced [cite: 2025-12-26]
+ * [weong-route] - Full-Scale Gravity & Coastal Enforcement
+ * Built upon existing logic for Newfoundland deep-dive integration [cite: 2025-12-26]
  */
 
-// 1. THE MAGNET (The Core Logic)
-function getNearestTown(targetLatLng) {
-    // Only searches your final, locked-in Newfoundland community dataset [cite: 2025-12-26]
+// Global State
+let map;
+let communities = [];
+let activeMarkers = [];
+let routingControl;
+
+// 1. DATA INITIALIZATION
+async function initializeNewfoundlandEngine() {
+    // Corrected GitHub directory path for locked dataset [cite: 2025-12-26]
+    const response = await fetch('data/nl/communities.json');
+    const data = await response.json();
+    communities = data.features;
+    
+    setupMap();
+}
+
+// 2. CORE SPATIAL SEARCH (The Magnet)
+function getNearestNewfoundlandNode(latlng) {
+    // Strictly enforces that only NL community nodes are valid [cite: 2025-12-26]
     return communities.reduce((prev, curr) => {
         const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
         const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-        return targetLatLng.distanceTo(c) < targetLatLng.distanceTo(p) ? curr : prev;
+        return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
     });
 }
 
-// 2. THE ENFORCER (The Marker Logic)
-function spawnLockedMarker(coords) {
-    // Ensure initial spawn is perfectly on a community node [cite: 2025-12-26]
-    const town = getNearestTown(L.latLng(coords));
-    const fixedPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+// 3. MARKER LOGIC (The Enforcer)
+function createGravityMarker(coords, index) {
+    // Force initial landing on a town node [cite: 2025-12-26]
+    const initialNode = getNearestNewfoundlandNode(L.latLng(coords));
+    const initialPos = [initialNode.geometry.coordinates[1], initialNode.geometry.coordinates[0]];
 
-    const marker = L.marker(fixedPos, { 
+    const marker = L.marker(initialPos, { 
         draggable: true,
-        riseOnHover: true 
+        zIndexOffset: 1000 
     }).addTo(map);
 
-    // Dynamic Labeling Logic [cite: 2025-12-26]
-    const refreshUI = (ll) => {
-        const nearestTown = getNearestTown(ll);
-        marker.bindTooltip(nearestTown.properties.name, { 
+    // High-visibility labels for NL towns [cite: 2025-12-26]
+    const updateUI = (ll) => {
+        const node = getNearestNewfoundlandNode(ll);
+        marker.bindTooltip(node.properties.name, { 
             permanent: true, direction: 'top', className: 'snapping-label' 
         }).openTooltip();
     };
 
-    refreshUI(L.latLng(fixedPos));
+    updateUI(L.latLng(initialPos));
 
-    // Update town name while dragging across the coast
-    marker.on('drag', (e) => refreshUI(e.latlng));
+    // EVENT A: Real-time visual feedback (Labels change as you drag)
+    marker.on('drag', (e) => updateUI(e.latlng));
 
-    // THE ABSOLUTE FIX: Reject any coordinate not in the dataset [cite: 2025-12-25]
+    // EVENT B: THE PHYSICAL SNAP (Rejects ocean/wilderness drops) [cite: 2025-12-25]
     marker.on('dragend', function(e) {
-        const finalTown = getNearestTown(e.latlng);
-        const snappedPos = [finalTown.geometry.coordinates[1], finalTown.geometry.coordinates[0]];
+        const finalNode = getNearestNewfoundlandNode(e.latlng);
+        const snappedPos = [finalNode.geometry.coordinates[1], finalNode.geometry.coordinates[0]];
         
-        // PHYSICAL TELEPORT: Overwrite the Atlantic drop [cite: 2025-12-25]
+        // OVERRIDE: Physically teleport the pin to the community [cite: 2025-12-25]
         marker.setLatLng(snappedPos);
         
-        // Final UI Lock [cite: 2025-12-26]
-        refreshUI(L.latLng(snappedPos));
+        // Final label sync
+        updateUI(L.latLng(snappedPos));
         
-        console.log(`[weong-route] Gravity Success: ${finalTown.properties.name}`);
-        
-        // Trigger Route Line Update (Coming in Phase 2)
-        if (typeof updateRouteLine === "function") updateRouteLine();
+        // EVENT C: ROUTE ENGINE SYNC (Fixes the "Disconnected Line") [cite: 2025-12-25]
+        syncRouteLine();
     });
 
     return marker;
+}
+
+// 4. ROUTE SYNCHRONIZATION
+function syncRouteLine() {
+    if (!routingControl) return;
+    
+    // Grabs the physically snapped coordinates from our markers
+    const currentPoints = activeMarkers.map(m => m.getLatLng());
+    
+    // Commands the OSRM engine to redraw using ONLY the town nodes [cite: 2025-12-25]
+    routingControl.setWaypoints(currentPoints);
+}
+
+// 5. ENGINE STARTUP
+function setupMap() {
+    map = L.map('map').setView([48.9, -55.5], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Spawn the two baseline pins: GFW and Gander [cite: 2025-12-26]
+    activeMarkers.push(createGravityMarker([48.9351, -55.6562], 0));
+    activeMarkers.push(createGravityMarker([48.9566, -54.6089], 1));
+
+    // Initialize the route line with LRM [cite: 2025-12-25]
+    routingControl = L.Routing.control({
+        waypoints: activeMarkers.map(m => m.getLatLng()),
+        createMarker: () => null, // Prevents "shadow" markers from causing desync
+        addWaypoints: false,
+        lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+    }).addTo(map);
 }
