@@ -2,89 +2,80 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Phase 1: Magnet Snapping</title>
+    <title>WEonG - Pure Magnet Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #eef2f5; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 6px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2); white-space: nowrap;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3); white-space: nowrap;
         }
     </style>
 </head>
 <body>
 <div id="map"></div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
     /**
-     * Build: [weong-route] Phase 1 - Magnet Focus
-     * Goal: Solve the "Floating Pin" issue before introducing road logic.
-     * Dataset: Locked Newfoundland Comprehensive [cite: 2025-12-26]
+     * [weong-route] - Phase 1 Fix
+     * Logic: Absolute Coordinate Override [cite: 2025-12-25]
+     * Goal: Prevent pins from landing in "the woods" as seen in image_e8a96e.png
      */
     let map, communities = [];
 
     async function init() {
-        // Set view to Central Newfoundland [cite: 2025-12-26]
         map = L.map('map').setView([48.9, -55.3], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        try {
-            // Load the locked dataset [cite: 2025-12-26]
-            const response = await fetch('data/nl/communities.json');
-            const data = await response.json();
-            communities = data.features;
-            
-            // Initialize two points: Grand Falls-Windsor and Gander [cite: 2025-12-26]
-            createMagnetMarker([48.9351, -55.6562]);
-            createMagnetMarker([48.9566, -54.6089]);
-            
-        } catch (e) {
-            console.error("Dataset load error. Check community.json path.");
-        }
+        // Load your locked deep-dive Newfoundland dataset [cite: 2025-12-26]
+        const response = await fetch('data/nl/communities.json');
+        const data = await response.json();
+        communities = data.features;
+        
+        // Initial setup for Gander and Grand Falls-Windsor [cite: 2025-12-26]
+        spawnMagnetMarker([48.9351, -55.6562]);
+        spawnMagnetMarker([48.9566, -54.6089]);
     }
 
-    function createMagnetMarker(coords) {
-        // 1. Initial Snap: Find the town for the starting coordinate
-        const initialNode = findNearest(L.latLng(coords));
-        const initialPos = [initialNode.geometry.coordinates[1], initialNode.geometry.coordinates[0]];
+    function spawnMagnetMarker(coords) {
+        // Force initial placement onto a community node
+        const startNode = findNearest(L.latLng(coords));
+        const startPos = [startNode.geometry.coordinates[1], startNode.geometry.coordinates[0]];
 
-        const marker = L.marker(initialPos, { draggable: true }).addTo(map);
+        const marker = L.marker(startPos, { draggable: true }).addTo(map);
 
-        const updateUI = (ll) => {
-            const nearestNode = findNearest(ll);
-            // Persistent labels as requested [cite: 2025-12-26]
-            marker.bindTooltip(nearestNode.properties.name, { 
-                permanent: true, 
-                direction: 'top', 
-                className: 'snapping-label' 
+        const updateLabel = (ll) => {
+            const nearest = findNearest(ll);
+            marker.bindTooltip(nearest.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
             }).openTooltip();
         };
 
-        updateUI(L.latLng(initialPos));
+        updateLabel(L.latLng(startPos));
 
-        // 2. Real-time feedback while dragging
-        marker.on('drag', (e) => {
-            updateUI(e.latlng);
-        });
+        // Feedback while dragging
+        marker.on('drag', (e) => updateLabel(e.latlng));
 
-        // 3. THE MAGNET LOCK: Physically teleport the pin to the town node [cite: 2025-12-26]
-        marker.on('dragend', (e) => {
-            const nearestNode = findNearest(e.latlng);
-            const snappedPos = [nearestNode.geometry.coordinates[1], nearestNode.geometry.coordinates[0]];
+        // THE FIX: "The Hard Snap" [cite: 2025-12-25]
+        marker.on('dragend', function(e) {
+            // 1. Calculate the nearest locked community node
+            const nearest = findNearest(e.latlng);
+            const snappedCoords = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
             
-            // Hard set the marker position to the community coordinate
-            marker.setLatLng(snappedPos);
-            updateUI(L.latLng(snappedPos));
+            // 2. CRITICAL OVERRIDE: 
+            // We ignore where the user dropped it (e.latlng) and force the marker to the town.
+            marker.setLatLng(snappedCoords); 
             
-            console.log("Snapped to:", nearestNode.properties.name, snappedPos);
+            // 3. Update UI to confirm the snap
+            updateLabel(L.latLng(snappedCoords));
+            console.log("Forced Snap to:", nearest.properties.name);
         });
     }
 
     function findNearest(latlng) {
-        // Spatial search against the locked NL dataset [cite: 2025-12-26]
+        // Pure spatial search against your Newfoundland Deep Dive [cite: 2025-12-26]
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
