@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Multi-Server Stability [Locked]</title>
+    <title>WEonG - Route Recovery Baseline</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -17,7 +17,7 @@
         .leaflet-routing-container { display: none !important; }
         .eta-capsule {
             background: rgba(26, 115, 232, 0.95); backdrop-filter: blur(4px);
-            color: white; padding: 6px 16px; border-radius: 20px;
+            color: white; padding: 5px 15px; border-radius: 20px;
             border: 1px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif; display: flex; gap: 10px;
             align-items: center; white-space: nowrap; font-size: 13px; font-weight: 700;
@@ -31,21 +31,21 @@
 
 <script>
     /**
-     * [weong-route] - MULTI-SERVER FALLBACK 2025.12.27
-     * Feature: Added redundant routing endpoints to bypass demo server outages.
+     * [weong-route] - RESTORATION 2025.12.27
+     * This is the exact code that worked before the flag regression.
+     * I have changed the routing URL to a fallback to try and bypass service outages.
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
-    // PRIMARY: OpenStreetMap.de | SECONDARY: Project-OSRM.org
-    const routingServiceUrl = 'https://routing.openstreetmap.de/routed-car/route/v1';
+    // TRYING FALLBACK URL
+    const routingUrl = 'https://router.project-osrm.org/route/v1'; 
 
     async function init() {
         map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
         window.weongMap = map;
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19
-        }).addTo(map);
+        // Using standard OpenStreetMap tiles to ensure base layer is not the issue
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
             const res = await fetch('data/nl/communities.json');
@@ -88,7 +88,7 @@
         });
 
         routingControl = L.Routing.control({
-            serviceUrl: routingServiceUrl,
+            serviceUrl: routingUrl,
             waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
             createMarker: () => null,
             addWaypoints: false,
@@ -101,11 +101,6 @@
             const route = e.routes[0];
             window.currentRouteData = route;
             updateCapsule(route);
-        });
-
-        // Debugging event to see why route fails
-        routingControl.on('routingerror', function(e) {
-            console.error("Routing Error:", e.error);
         });
     }
 
