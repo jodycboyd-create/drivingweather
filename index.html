@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Route Restoration Anchor</title>
+    <title>WEonG - Route First Baseline [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -15,7 +15,7 @@
             font-family: sans-serif; font-size: 12px;
         }
         .leaflet-routing-container { display: none !important; }
-        .flag-icon-container { pointer-events: none !important; }
+        .flag-icon-container { pointer-events: none !important; z-index: 1000 !important; }
     </style>
 </head>
 <body>
@@ -25,8 +25,9 @@
 
 <script>
     /**
-     * [weong-route] - ROUTE STABILITY ANCHOR 2025.12.27
-     * Fix: Restored blue line and forced routing sync during drag events.
+     * [weong-route] - EMERGENCY RESTORATION 2025.12.27
+     * Logic Change: Route Engine takes precedence over UI Flag.
+     * Baseline: Dynamic Snapping & Real-time Labels (Locked).
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
@@ -60,18 +61,15 @@
         starts.forEach((c, i) => {
             const node = findNearest(L.latLng(c));
             const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
-
             m.bindTooltip(node.properties.name, { 
                 permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10]
             }).openTooltip();
-
             markers[i] = m;
             
-            m.on('drag', function() {
+            m.on('drag', () => {
                 const nearest = findNearest(m.getLatLng());
                 m.getTooltip().setContent(nearest.properties.name);
-                // Force line update during drag
-                syncRoute(); 
+                syncRoute(); // Force route calculation during active move
             });
 
             m.on('dragend', () => {
@@ -82,48 +80,40 @@
             });
         });
 
+        // Initialize Router FIRST [cite: 2025-12-27]
         routingControl = L.Routing.control({
             serviceUrl: 'https://routing.openstreetmap.de/routed-car/route/v1',
             waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
             createMarker: () => null,
             addWaypoints: false,
-            routeWhileDragging: true, // RE-ENABLED
-            show: false,
-            lineOptions: { 
-                styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }],
-                addWaypoints: false 
-            }
+            routeWhileDragging: true,
+            lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
         }).addTo(map);
 
         routingControl.on('routesfound', (e) => {
             const route = e.routes[0];
             window.currentRouteData = route;
-            updateCapsule(route);
+            updateFlag(route); // Only update flag AFTER route is found
         });
     }
 
-    function updateCapsule(route) {
+    function updateFlag(route) {
         const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
         const html = `
             <div style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); display: flex; flex-direction: column; align-items: flex-start;">
-                <div id="flagBody" style="background: #1a73e8; color: white; padding: 6px 14px; border-radius: 4px; border-left: 4px solid #0d47a1; font-family: sans-serif; display: flex; gap: 10px; align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700; width: fit-content; min-width: 80px;">
+                <div id="flagBody" style="background: #1a73e8; color: white; padding: 6px 14px; border-radius: 4px; border-left: 4px solid #0d47a1; font-family: sans-serif; display: flex; gap: 10px; align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700; width: fit-content;">
                     <span id="capTime">--h --m</span> <span style="opacity: 0.4;">|</span> <span id="capDist">-- km</span>
                 </div>
-                <div style="width: 4px; height: 18px; background: #333; margin-left: 0px; margin-top: -1px;"></div>
+                <div style="width: 4px; height: 18px; background: #333; margin-top: -1px;"></div>
             </div>`;
         
-        const flagIcon = L.divIcon({ 
-            className: 'flag-icon-container', 
-            html: html, 
-            iconSize: [250, 50], 
-            iconAnchor: [2, 50] 
-        });
+        const icon = L.divIcon({ className: 'flag-icon-container', html: html, iconSize: [250, 50], iconAnchor: [2, 50] });
 
         if (!etaMarker) {
-            etaMarker = L.marker(mid, { icon: flagIcon }).addTo(map);
+            etaMarker = L.marker(mid, { icon: icon }).addTo(map);
         } else {
             etaMarker.setLatLng(mid);
-            etaMarker.setIcon(flagIcon);
+            etaMarker.setIcon(icon);
         }
         if (window.updateVelocityDisplay) window.updateVelocityDisplay();
     }
