@@ -2,20 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Absolute Anchor</title>
+    <title>WEonG - [weong-route] Full Gravity Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
-        .anchor-label {
+        
+        /* High-visibility coastal labels [cite: 2025-12-26] */
+        .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 5px 10px; border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3); pointer-events: none;
+            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); white-space: nowrap;
+            pointer-events: none; font-size: 14px;
         }
+
+        /* Suppress the LRM UI to keep focus on the map engine [cite: 2025-12-25] */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -23,13 +29,18 @@
 
 <script>
     /**
-     * [weong-route] - Zero-Float Reset
-     * Method: Click-to-Anchor (Eliminates Drag-Drop bugs) [cite: 2025-12-25]
-     * Data: Locked 2025 Newfoundland Dataset [cite: 2025-12-26]
+     * [weong-route] - Full Scale Coastal Enforcement
+     * Strategy: Absolute Coordinate Overwrite [cite: 2025-12-25]
+     * Goal: Eradicate "Floating Pins" in the Atlantic [cite: 2025-12-25]
      */
-    let map, communities = [], waypoints = [], routingControl;
 
-    async function init() {
+    let map;
+    let communities = [];
+    let activeMarkers = [];
+    let routingControl;
+
+    // 1. DATA SOVEREIGNTY: Load the deep-dive locked dataset [cite: 2025-12-26]
+    async function initEngine() {
         map = L.map('map').setView([48.9, -55.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -38,55 +49,83 @@
             const data = await response.json();
             communities = data.features;
             
-            // Render the towns as invisible "Magnetic Zones" [cite: 2025-12-26]
-            renderMagneticZones();
+            startRouting();
         } catch (e) {
-            console.error("Newfoundland dataset failed to load.");
+            console.error("Critical Failure: Newfoundland dataset not found in /data/nl/");
         }
     }
 
-    function renderMagneticZones() {
-        communities.forEach(town => {
-            const coords = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
-            
-            // Create a small, invisible circle over every town node [cite: 2025-12-26]
-            const zone = L.circleMarker(coords, {
-                radius: 10, fillOpacity: 0, color: 'transparent', interactive: true
-            }).addTo(map);
-
-            // On click, this town becomes a locked waypoint
-            zone.on('click', () => {
-                addWaypoint(coords, town.properties.name);
-            });
+    // 2. THE MAGNET: Strict search against the locked community list [cite: 2025-12-26]
+    function findNearestLockedNode(latlng) {
+        return communities.reduce((prev, curr) => {
+            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
         });
     }
 
-    function addWaypoint(coords, name) {
-        // Limit to 2 points for now (Start and End)
-        if (waypoints.length >= 2) waypoints = []; 
-        
-        const marker = L.marker(coords).addTo(map);
-        marker.bindTooltip(name, { permanent: true, className: 'anchor-label' }).openTooltip();
-        
-        waypoints.push(L.latLng(coords));
+    // 3. THE ENFORCER: Pins that physically cannot exist in water [cite: 2025-12-25]
+    function createGravityMarker(coords) {
+        // Initial Snap to community node
+        const startNode = findNearestLockedNode(L.latLng(coords));
+        const startPos = [startNode.geometry.coordinates[1], startNode.geometry.coordinates[0]];
 
-        if (waypoints.length === 2) {
-            drawLockedRoute();
+        const marker = L.marker(startPos, { draggable: true, zIndexOffset: 1000 }).addTo(map);
+
+        const updateUI = (ll) => {
+            const node = findNearestLockedNode(ll);
+            marker.bindTooltip(node.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
+            }).openTooltip();
+        };
+
+        updateUI(L.latLng(startPos));
+
+        // EVENT A: Visual feedback while dragging
+        marker.on('drag', (e) => updateUI(e.latlng));
+
+        // EVENT B: THE PHYSICAL MAGNET (The Teleport) [cite: 2025-12-25]
+        marker.on('dragend', function(e) {
+            const targetNode = findNearestLockedNode(e.latlng);
+            const snappedPos = [targetNode.geometry.coordinates[1], targetNode.geometry.coordinates[0]];
+            
+            // CRITICAL OVERRIDE: 
+            // We ignore where the mouse let go and force the pin to the community node.
+            marker.setLatLng(snappedPos);
+            updateUI(L.latLng(snappedPos));
+            
+            // EVENT C: ROUTE SYNC [cite: 2025-12-25]
+            syncBlueLine();
+        });
+
+        return marker;
+    }
+
+    // 4. ROUTE RE-SYNC: Ensuring the line follows the teleported pins [cite: 2025-12-25]
+    function syncBlueLine() {
+        if (routingControl) {
+            const currentPoints = activeMarkers.map(m => m.getLatLng());
+            routingControl.setWaypoints(currentPoints);
         }
     }
 
-    function drawLockedRoute() {
-        if (routingControl) map.removeControl(routingControl);
+    // 5. BOOT SEQUENCE
+    function startRouting() {
+        // Spawn GFW and Gander [cite: 2025-12-26]
+        activeMarkers.push(createGravityMarker([48.9351, -55.6562]));
+        activeMarkers.push(createGravityMarker([48.9566, -54.6089]));
 
+        // Initialize LRM with Shadow Marker rejection [cite: 2025-12-25]
         routingControl = L.Routing.control({
-            waypoints: waypoints,
-            createMarker: () => null, // Prevents "Ghost Pins" [cite: 2025-12-25]
+            waypoints: activeMarkers.map(m => m.getLatLng()),
+            createMarker: () => null, 
             addWaypoints: false,
+            routeWhileDragging: false,
             lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
         }).addTo(map);
     }
 
-    window.onload = init;
+    window.onload = initEngine;
 </script>
 </body>
 </html>
