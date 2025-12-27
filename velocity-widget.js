@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Final State Anchor</title>
+    <title>WEonG - Zero Ghost [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,7 +14,6 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* Lock the SVG to the tiles to prevent "Ocean Drift" */
         .leaflet-overlay-pane svg { transition: none !important; pointer-events: none !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -27,18 +26,17 @@
 
 <script>
     /**
-     * [weong-route] - SILENT ENGINE STRATEGY
-     * Prevents engine from fighting the camera and reverting waypoints.
+     * [weong-route] - ZERO GHOST STRATEGY
+     * Completely prevents the default route from ever initializing.
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // [1] Set the view IMMEDIATELY so there is no default zoom conflict
+        // [1] Set the static starting view of Newfoundland
         map = L.map('map', { 
             zoomControl: false, 
-            fadeAnimation: false,
-            zoomAnimation: true 
-        }).setView([49.0, -56.0], 7); 
+            fadeAnimation: false 
+        }).setView([48.8, -55.5], 7); 
         
         window.weongMap = map; 
         
@@ -52,7 +50,7 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Dataset Load Error"); }
+        } catch (e) { console.error("Critical: Dataset Missing."); }
     }
 
     function findNearestNode(latlng) {
@@ -64,7 +62,9 @@
     }
 
     function setupRoutingPins() {
+        // Default anchors (Western and Eastern hubs)
         const anchors = [[48.9454, -57.9415], [47.5615, -52.7126]];
+        
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
             const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { 
@@ -89,29 +89,31 @@
                     permanent: true, className: 'snapping-label' 
                 }).openTooltip();
                 
-                // [2] Clear old route immediately to prevent any revert attempts
-                syncRoute();
+                syncRoute(true); // User-initiated drag should trigger flyToBounds
             });
         });
-        syncRoute();
+
+        // [2] FIRST-TIME CALL: Initialize the route silently without flyTo
+        syncRoute(false); 
     }
 
-    function syncRoute() {
+    function syncRoute(shouldFly = false) {
         if (!markers[0] || !markers[1]) return;
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
+        // [3] HARD RESET: Clean out any previous engine state
         if (routingControl) {
             map.removeControl(routingControl);
             routingControl = null;
         }
 
-        // [3] fitSelectedRoutes: false is the key. It stops the engine's "auto-zoom"
+        // [4] INITIALIZE: Create FRESH with explicit waypoints
         routingControl = L.Routing.control({
             waypoints: wps,
             createMarker: () => null,
             addWaypoints: false,
             routeWhileDragging: false,
-            fitSelectedRoutes: false, 
+            fitSelectedRoutes: false, // SILENCE the engine's internal camera
             show: false,
             lineOptions: {
                 styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
@@ -122,10 +124,10 @@
         window.weongRouter = routingControl;
 
         routingControl.on('routesfound', (e) => {
-            // [4] We control the camera manually. No competition with the engine.
-            if (!map.dragging.moving()) {
+            // [5] CUSTOM CAMERA: Only move if we explicitly asked for it
+            if (shouldFly && !map.dragging.moving()) {
                 map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
-                    padding: [120, 120], 
+                    padding: [100, 100], 
                     duration: 0.8 
                 });
             }
