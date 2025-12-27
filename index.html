@@ -3,21 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Global View Foundation</title>
+    <title>WEonG - Velocity Engine [Locked Anchor]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        
+        /* Glassmorphism Speed Panel [cite: 2025-12-27] */
+        .ui-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            z-index: 1000;
+            background: rgba(0, 18, 32, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 16px;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+            width: 240px;
+        }
+
+        .panel-label { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #00B4DB; margin-bottom: 8px; }
+        .speed-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+        .speed-val { font-size: 36px; font-weight: 300; }
+        .speed-unit { font-size: 14px; color: #888; margin-left: 4px; }
+        
+        .btn-group { display: flex; gap: 8px; }
+        .ctrl-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none; color: white; width: 36px; height: 36px;
+            border-radius: 8px; cursor: pointer; font-size: 18px;
+            transition: all 0.2s;
+        }
+        .ctrl-btn:hover { background: #0047AB; }
+
+        .stats-row { border-top: 1px solid rgba(255,255,255,0.1); pt: 15px; margin-top: 15px; }
+        .stat-item { font-size: 13px; color: #ccc; margin-top: 5px; }
+        .stat-bold { color: white; font-weight: bold; }
+
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: none;
-            white-space: nowrap;
+            pointer-events: none; white-space: nowrap;
         }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
+
+<div class="ui-panel">
+    <div class="panel-label">Drive Velocity</div>
+    <div class="speed-row">
+        <div>
+            <span class="speed-val" id="speedDisplay">100</span>
+            <span class="speed-unit">km/h</span>
+        </div>
+        <div class="btn-group">
+            <button class="ctrl-btn" onclick="adjustSpeed(-5)">−</button>
+            <button class="ctrl-btn" onclick="adjustSpeed(5)">+</button>
+        </div>
+    </div>
+    <div class="stats-row">
+        <div class="stat-item">Distance: <span id="distVal" class="stat-bold">0</span> km</div>
+        <div class="stat-item">Est. Time: <span id="timeVal" class="stat-bold">0</span></div>
+    </div>
+</div>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -25,26 +79,29 @@
 
 <script>
     /**
-     * [weong-route] - STABLE GLOBAL FOUNDATION
-     * Methodology: Label-Sync Snap + Island-Wide Start
+     * [weong-route] - Velocity Anchor Build
+     * Locked Strategy: Label-Sync Snap + Real-time ETA [cite: 2025-12-25, 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
+    let driveSpeed = 100;
+    let currentDistanceKm = 0;
 
     async function init() {
-        // SETTING: Global Island View [cite: 2025-12-26]
-        map = L.map('map').setView([49.0, -56.0], 5);
-        
+        map = L.map('map').setView([49.5, -56.0], 5); // Global Island Zoom [cite: 2025-12-26]
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Loading 2025 Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             setupMarkers();
-        } catch (e) {
-            console.error("Dataset load error.");
-        }
+        } catch (e) { console.error("Dataset load error."); }
+    }
+
+    function adjustSpeed(delta) {
+        driveSpeed = Math.max(30, Math.min(130, driveSpeed + delta));
+        document.getElementById('speedDisplay').innerText = driveSpeed;
+        updateETA();
     }
 
     function findNearestLandNode(latlng) {
@@ -56,18 +113,11 @@
     }
 
     function setupMarkers() {
-        // Anchors: Corner Brook and St. John's [cite: 2025-12-26]
         const anchors = [[48.9515, -57.9485], [47.5615, -52.7126]];
-        
         anchors.forEach((coord, i) => {
             const town = findNearestLandNode(L.latLng(coord));
-            const pos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
-            
-            const marker = L.marker(pos, { draggable: true }).addTo(map);
-            marker.bindTooltip(town.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label' 
-            }).openTooltip();
-            
+            const marker = L.marker([town.geometry.coordinates[1], town.geometry.coordinates[0]], { draggable: true }).addTo(map);
+            marker.bindTooltip(town.properties.name, { permanent: true, direction: 'top', className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
 
             marker.on('drag', (e) => {
@@ -90,18 +140,25 @@
             routingControl.setWaypoints(wps);
         } else {
             routingControl = L.Routing.control({
-                waypoints: wps,
-                createMarker: () => null,
-                addWaypoints: false,
+                waypoints: wps, createMarker: () => null, addWaypoints: false,
                 lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
 
             routingControl.on('routesfound', function(e) {
-                const bounds = L.latLngBounds(e.routes[0].coordinates);
-                // Smart Zoom logic preserved [cite: 2025-12-25]
-                map.flyToBounds(bounds, { padding: [80, 80], duration: 1.5 });
+                const route = e.routes[0];
+                currentDistanceKm = (route.summary.totalDistance / 1000).toFixed(1);
+                document.getElementById('distVal').innerText = currentDistanceKm;
+                updateETA();
+                map.flyToBounds(L.latLngBounds(route.coordinates), { padding: [80, 80], duration: 1.5 });
             });
         }
+    }
+
+    function updateETA() {
+        const hours = currentDistanceKm / driveSpeed;
+        const h = Math.floor(hours);
+        const m = Math.round((hours - h) * 60);
+        document.getElementById('timeVal').innerText = `${h}h ${m}m`;
     }
 
     window.onload = init;
