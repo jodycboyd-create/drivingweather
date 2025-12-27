@@ -14,8 +14,8 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* PERFORMANCE LOCK: Forces hardware acceleration for SVG layer [cite: 2025-12-27] */
-        .leaflet-overlay-pane svg { transition: none !important; }
+        /* Forces the SVG to stay strictly relative to the map container [cite: 2025-12-27] */
+        .leaflet-zoom-animated { will-change: transform !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -28,13 +28,12 @@
 <script>
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Fixed: Total decoupling via Frame-Locking and SVG reset [cite: 2025-12-27]
+     * Logic: Hard-Reset on Zoom to prevent Ocean Drift [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // Disable fadeAnimation to prevent coordinate lag during zooms [cite: 2025-12-27]
-        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
+        map = L.map('map', { zoomControl: false, markerZoomAnimation: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -47,7 +46,7 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Critical Error: Core dataset failed to load."); }
+        } catch (e) { console.error("Data Load Failure"); }
     }
 
     function findNearestNode(latlng) {
@@ -67,11 +66,6 @@
             marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
             
-            marker.on('drag', (e) => {
-                const live = findNearestNode(e.latlng);
-                marker.setTooltipContent(live.properties.name);
-            });
-
             marker.on('dragend', () => {
                 const final = findNearestNode(marker.getLatLng());
                 marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
@@ -98,7 +92,6 @@
                 show: false,
                 lineOptions: { 
                     styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
-                    addWaypoints: false,
                     extendToWaypoints: true 
                 }
             }).addTo(map);
@@ -107,20 +100,18 @@
 
             routingControl.on('routesfound', (e) => {
                 if (!map.dragging.moving()) {
-                    // Optimized speed: Fast fly and hard-refresh on end [cite: 2025-12-27]
-                    map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
-                        padding: [100, 100], 
-                        duration: 0.4 
-                    });
+                    // 1. Hide the route line before moving [cite: 2025-12-27]
+                    map.removeControl(routingControl);
 
-                    map.once('moveend', () => {
-                        // FORCE SYNC: Re-verifies positions relative to new center [cite: 2025-12-27]
-                        requestAnimationFrame(() => {
-                           routingControl.getPlan().setWaypoints(wps);
-                           // Manually trigger module updates to keep widget flags in sync [cite: 2025-12-27]
-                           routingControl.fire('routesfound', {routes: e.routes});
-                        });
-                    });
+                    // 2. Perform a fast, non-animated jump to bounds to prevent projection lag [cite: 2025-12-27]
+                    map.fitBounds(L.latLngBounds(e.routes[0].coordinates), { padding: [100, 100] });
+
+                    // 3. Re-add the route once the map is stationary [cite: 2025-12-27]
+                    setTimeout(() => {
+                        routingControl.addTo(map);
+                        // Refresh the widget [cite: 2025-12-27]
+                        routingControl.fire('routesfound', {routes: e.routes});
+                    }, 50);
                 }
             });
         }
@@ -129,6 +120,5 @@
 </script>
 
 <script src="velocity-widget.js"></script>
-
 </body>
 </html>
