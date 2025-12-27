@@ -9,7 +9,6 @@
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
         
-        /* Snapping Label Styling [cite: 2025-12-27] */
         .snapping-label {
             font-weight: bold;
             color: #0047AB;
@@ -19,9 +18,9 @@
             border-radius: 8px;
             pointer-events: none;
             white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        /* Hide the default routing container to keep the UI clean [cite: 2025-12-27] */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -34,16 +33,19 @@
 
 <script>
     /**
-     * [weong-route] - Gold Standard Methodology
-     * Features: Dual-pin Routing, Community Node Snapping, Dark Mode [cite: 2025-12-23, 2025-12-27]
+     * [weong-route] - Gold Standard Anchor Point
+     * Features: Dual-pin Snapping, Dynamic Zoom, Premium Basemap [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // 1. Initialize Map with high-contrast Dark Matter tiles
-        map = L.map('map').setView([49.0, -56.0], 6); 
+        // 1. Initialize Map with the Premium CartoDB Dark Matter Basemap [cite: 2025-12-27]
+        map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
+        
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap'
+            attribution: '&copy; CartoDB',
+            subdomains: 'abcd',
+            maxZoom: 20
         }).addTo(map);
 
         try {
@@ -56,11 +58,10 @@
                 setupRoutingPins();
             }
         } catch (e) { 
-            console.error("Critical: Dataset failed to load."); 
+            console.error("Critical: [weong-route] dataset failed to load."); 
         }
     }
 
-    // SNAP LOGIC: Finds the nearest land node from the GeoJSON [cite: 2025-12-27]
     function findNearestNode(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
@@ -70,7 +71,7 @@
     }
 
     function setupRoutingPins() {
-        // Anchor points: Corner Brook and St. John's [cite: 2025-12-26]
+        // Default Anchors: Corner Brook and St. John's [cite: 2025-12-26]
         const defaultCoords = [[48.9500, -57.9500], [47.5615, -52.7126]];
 
         defaultCoords.forEach((coord, i) => {
@@ -84,7 +85,6 @@
             
             markers[i] = marker;
 
-            // Real-time snapping during drag [cite: 2025-12-27]
             marker.on('drag', (e) => {
                 const liveNode = findNearestNode(e.latlng);
                 marker.setTooltipContent(liveNode.properties.name);
@@ -93,14 +93,14 @@
             marker.on('dragend', () => {
                 const finalNode = findNearestNode(marker.getLatLng());
                 marker.setLatLng([finalNode.geometry.coordinates[1], finalNode.geometry.coordinates[0]]);
-                calculateRoute();
+                syncRoute();
             });
         });
 
-        calculateRoute();
+        syncRoute();
     }
 
-    function calculateRoute() {
+    function syncRoute() {
         if (!markers[0] || !markers[1]) return;
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
@@ -111,8 +111,17 @@
                 waypoints: wps,
                 createMarker: () => null,
                 addWaypoints: false,
-                lineOptions: { styles: [{ color: '#0047AB', weight: 6, opacity: 0.7 }] }
+                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
+
+            // DYNAMIC ZOOM: Automatic "Fly-to-Bounds" [cite: 2025-12-27]
+            routingControl.on('routesfound', function(e) {
+                const route = e.routes[0];
+                map.flyToBounds(L.latLngBounds(route.coordinates), {
+                    padding: [100, 100],
+                    duration: 1.5
+                });
+            });
         }
     }
 
