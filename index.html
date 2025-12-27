@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Performance Stability [Locked]</title>
+    <title>WEonG - Persistence Lock [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,11 +14,7 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* Performance Fix: Hardware accelerate the route line */
-        .leaflet-overlay-pane svg { 
-            will-change: transform; 
-            transition: none !important; 
-        }
+        .leaflet-overlay-pane svg { will-change: transform; transition: none !important; }
         .map-is-moving .leaflet-overlay-pane svg { pointer-events: none; }
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -31,18 +27,14 @@
 
 <script>
     /**
-     * [weong-route] - PERFORMANCE OPTIMIZED
-     * Goal: Eliminate lag during pin drop [cite: 2025-12-27]
+     * [weong-route] - PERSISTENCE LOCK
+     * Fixed: Route resetting to default after drop [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
+    let currentWaypoints = []; // Global state to prevent resets
 
     async function init() {
-        // Disable unnecessary animations that compete for CPU [cite: 2025-12-27]
-        map = L.map('map', { 
-            zoomControl: false, 
-            fadeAnimation: false,
-            markerZoomAnimation: false 
-        }).setView([48.5, -56.0], 6); 
+        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -92,8 +84,7 @@
                     permanent: true, className: 'snapping-label' 
                 }).openTooltip();
                 
-                // PERFORMANCE FIX: Immediate UI update, deferred route calc [cite: 2025-12-27]
-                requestAnimationFrame(() => syncRoute());
+                syncRoute();
             });
         });
         syncRoute();
@@ -101,16 +92,18 @@
 
     function syncRoute() {
         if (!markers[0] || !markers[1]) return;
-        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
+        
+        // Update the GLOBAL state so moveend knows the new locations [cite: 2025-12-27]
+        currentWaypoints = [markers[0].getLatLng(), markers[1].getLatLng()];
 
         if (routingControl) {
-            routingControl.setWaypoints(wps);
+            routingControl.setWaypoints(currentWaypoints);
         } else {
             routingControl = L.Routing.control({
-                waypoints: wps,
+                waypoints: currentWaypoints,
                 createMarker: () => null,
                 addWaypoints: false,
-                routeWhileDragging: false, // Set to false to reduce calculation spam [cite: 2025-12-27]
+                routeWhileDragging: false, 
                 show: false,
                 lineOptions: {
                     styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
@@ -123,17 +116,17 @@
             map.on('movestart', () => map.getContainer().classList.add('map-is-moving'));
             map.on('moveend', () => {
                 map.getContainer().classList.remove('map-is-moving');
-                // Clean snap after camera settles
-                if (routingControl) routingControl.getPlan().setWaypoints(wps);
+                // Use global state to prevent resetting to Corner Brook [cite: 2025-12-27]
+                if (routingControl && currentWaypoints.length > 0) {
+                    routingControl.getPlan().setWaypoints(currentWaypoints);
+                }
             });
 
             routingControl.on('routesfound', (e) => {
                 if (!map.dragging.moving()) {
-                    // PERFORMANCE FIX: Faster zoom to make the app feel snappier [cite: 2025-12-27]
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
-                        duration: 0.4,
-                        easeLinearity: 0.5
+                        duration: 0.5 
                     });
                 }
             });
