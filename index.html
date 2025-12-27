@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Label-Sync Snap</title>
+    <title>WEonG - Corner Brook to St. John's</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
+        /* Maintaining the dark, clean visual foundation */
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
@@ -23,17 +24,17 @@
 
 <script>
     /**
-     * [weong-route] - Label-Sync Methodology
-     * Strategy: Force marker GPS to match the town name displayed in the tooltip.
+     * [weong-route] - Foundation: Corner Brook -> St. John's
+     * Methodology: Label-Sync Snap [Locked: 2025-12-26]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        map = L.map('map').setView([48.9, -55.5], 7);
+        // Updated view to show more of the island for the long route
+        map = L.map('map').setView([48.5, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Loading the locked-in 2025 Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
@@ -53,8 +54,9 @@
     }
 
     function setupHardMarkers() {
-        // Initial locked positions for GFW and Gander [cite: 2025-12-26]
-        const pts = [[48.9351, -55.6562], [48.9566, -54.6089]];
+        // NEW DEFAULT COORDINATES [cite: 2025-12-26]
+        // Corner Brook: [48.9515, -57.9485] | St. John's: [47.5615, -52.7126]
+        const pts = [[48.9515, -57.9485], [47.5615, -52.7126]];
         
         pts.forEach((coords, i) => {
             const town = findNearestLandNode(L.latLng(coords));
@@ -67,18 +69,14 @@
             
             markers[i] = marker;
 
-            // Continues the logic you observed: label updates as you move
             marker.on('drag', (e) => {
                 const liveTown = findNearestLandNode(e.latlng);
                 marker.setTooltipContent(liveTown.properties.name);
             });
 
-            // THE TRIGGER: Force GPS to follow the Label [cite: 2025-12-25]
             marker.on('dragend', () => {
                 const finalTown = findNearestLandNode(marker.getLatLng());
                 const lockedCoords = [finalTown.geometry.coordinates[1], finalTown.geometry.coordinates[0]];
-                
-                // Physical teleport to ensure no ocean floating [cite: 2025-12-25]
                 marker.setLatLng(lockedCoords); 
                 syncHighway();
             });
@@ -95,9 +93,11 @@
         } else {
             routingControl = L.Routing.control({
                 waypoints: wps,
-                createMarker: () => null, // Kills the duplicate "Ghost Pins" [cite: 2025-12-25]
+                createMarker: () => null, 
                 addWaypoints: false,
-                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+                lineOptions: { 
+                    styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] 
+                }
             }).addTo(map);
         }
     }
