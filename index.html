@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - [weong-route] Sequence Lock</title>
+    <title>WEonG - Industrial Magnet [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -12,7 +12,6 @@
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: none;
         }
-        /* Hide the ugly text instructions box */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -24,29 +23,28 @@
 
 <script>
     /**
-     * [weong-route] - Sequential Bootloader
-     * Prevents race conditions between the dataset and the routing engine.
+     * [weong-route] - Industrial Strength Magnet
+     * Strategy: Absolute Marker Destruction/Reconstruction on dragend [cite: 2025-12-23]
      */
-    let map, communities = [], markers = [null, null], routingControl = null;
+    let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
         map = L.map('map').setView([48.9, -55.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // STEP 1: LOAD DATA
+            // Load the locked 2025 Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // STEP 2: SPAWN LOCKED MARKERS
-            renderMarker(0, [48.9351, -55.6562]); // GFW
-            renderMarker(1, [48.9566, -54.6089]); // Gander
+            // Force initial snap to GFW and Gander [cite: 2025-12-26]
+            renderMagnetMarker(0, [48.9351, -55.6562]); 
+            renderMagnetMarker(1, [48.9566, -54.6089]);
             
-            // STEP 3: INITIALIZE ROUTE AFTER MARKERS EXIST
-            syncRoute();
+            updateRoute();
         } catch (e) {
-            console.error("Critical: Bootloader failed. Check if data/nl/communities.json exists.");
+            console.error("Critical: Dataset missing. Magnet offline.");
         }
     }
 
@@ -58,12 +56,14 @@
         });
     }
 
-    function renderMarker(index, coords) {
+    function renderMagnetMarker(index, coords) {
         const town = findNearestLandNode(L.latLng(coords));
         const townPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
 
+        // THE DUPLICATE KILLER: Physically remove marker from map [cite: 2025-12-25]
         if (markers[index]) map.removeLayer(markers[index]);
 
+        // THE MAGNET: Spawn brand new marker at dataset coordinate [cite: 2025-12-25]
         const marker = L.marker(townPos, { draggable: true }).addTo(map);
         marker.bindTooltip(town.properties.name, { 
             permanent: true, direction: 'top', className: 'snapping-label' 
@@ -71,33 +71,31 @@
 
         markers[index] = marker;
 
-        // Update name only while dragging
+        // Feedback during drag - only updates name, not location
         marker.on('drag', (e) => {
             const tempTown = findNearestLandNode(e.latlng);
             marker.setTooltipContent(tempTown.properties.name);
         });
 
-        // PHYSICAL RE-LOCK: Forces snap on release
+        // THE SNAP LOCK: On release, destroy current pin and spawn at town center [cite: 2025-12-25]
         marker.on('dragend', (e) => {
-            renderMarker(index, e.latlng);
-            syncRoute();
+            renderMagnetMarker(index, e.latlng);
+            updateRoute();
         });
     }
 
-    function syncRoute() {
+    function updateRoute() {
         if (!markers[0] || !markers[1]) return;
-        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
+        const pts = [markers[0].getLatLng(), markers[1].getLatLng()];
 
         if (routingControl) {
-            // Update the existing blue line
-            routingControl.setWaypoints(wps);
+            routingControl.setWaypoints(pts);
         } else {
-            // Create the engine for the first time
             routingControl = L.Routing.control({
-                waypoints: wps,
-                createMarker: () => null, // Prevents engine from creating its own buggy pins
+                waypoints: pts,
+                router: L.Routing.osrmv1({ serviceUrl: `https://router.project-osrm.org/route/v1` }),
+                createMarker: () => null, // Prevents "Ghost Pins" from image_ea7f67.png [cite: 2025-12-25]
                 addWaypoints: false,
-                routeWhileDragging: false, // Set to false to prevent "Bishop's Falls" ghosting during drag
                 lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
         }
