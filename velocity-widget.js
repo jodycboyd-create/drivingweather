@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Zero Ghost [Locked]</title>
+    <title>WEonG - Ironclad Persistence [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,6 +14,7 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
+        /* Prevents "Ocean Drift" by locking the SVG to the map's zoom level [cite: 2025-12-27] */
         .leaflet-overlay-pane svg { transition: none !important; pointer-events: none !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -26,13 +27,13 @@
 
 <script>
     /**
-     * [weong-route] - ZERO GHOST STRATEGY
-     * Completely prevents the default route from ever initializing.
+     * [weong-route] - MANUAL ENGINE INJECTION
+     * Prevents default route ghosts by starting the engine empty. [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // [1] Set the static starting view of Newfoundland
+        // [1] Set the Newfoundland anchor point immediately
         map = L.map('map', { 
             zoomControl: false, 
             fadeAnimation: false 
@@ -62,7 +63,6 @@
     }
 
     function setupRoutingPins() {
-        // Default anchors (Western and Eastern hubs)
         const anchors = [[48.9454, -57.9415], [47.5615, -52.7126]];
         
         anchors.forEach((coord, i) => {
@@ -77,43 +77,21 @@
             
             markers[i] = marker;
             
-            marker.on('drag', (e) => {
-                const live = findNearestNode(e.latlng);
-                marker.setTooltipContent(live.properties.name);
-            });
-
             marker.on('dragend', () => {
                 const final = findNearestNode(marker.getLatLng());
                 marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
-                marker.unbindTooltip().bindTooltip(final.properties.name, { 
-                    permanent: true, className: 'snapping-label' 
-                }).openTooltip();
-                
-                syncRoute(true); // User-initiated drag should trigger flyToBounds
+                marker.setTooltipContent(final.properties.name);
+                syncRoute(true); 
             });
         });
 
-        // [2] FIRST-TIME CALL: Initialize the route silently without flyTo
-        syncRoute(false); 
-    }
-
-    function syncRoute(shouldFly = false) {
-        if (!markers[0] || !markers[1]) return;
-        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
-
-        // [3] HARD RESET: Clean out any previous engine state
-        if (routingControl) {
-            map.removeControl(routingControl);
-            routingControl = null;
-        }
-
-        // [4] INITIALIZE: Create FRESH with explicit waypoints
+        // [2] INITIALIZE ENGINE EMPTY: No waypoints = No ghosts [cite: 2025-12-27]
         routingControl = L.Routing.control({
-            waypoints: wps,
+            waypoints: [], // CRITICAL: Start with nothing
             createMarker: () => null,
             addWaypoints: false,
             routeWhileDragging: false,
-            fitSelectedRoutes: false, // SILENCE the engine's internal camera
+            fitSelectedRoutes: false, 
             show: false,
             lineOptions: {
                 styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
@@ -124,15 +102,32 @@
         window.weongRouter = routingControl;
 
         routingControl.on('routesfound', (e) => {
-            // [5] CUSTOM CAMERA: Only move if we explicitly asked for it
-            if (shouldFly && !map.dragging.moving()) {
+            // Check a custom property to see if we should move the camera
+            if (routingControl._shouldFly && !map.dragging.moving()) {
                 map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                     padding: [100, 100], 
                     duration: 0.8 
                 });
+                routingControl._shouldFly = false; // Reset after flying
             }
         });
+
+        // [3] INJECT DATA: Push the western/eastern hubs into the empty engine [cite: 2025-12-27]
+        setTimeout(() => syncRoute(false), 500); 
     }
+
+    function syncRoute(shouldFly = false) {
+        if (!markers[0] || !markers[1] || !routingControl) return;
+        
+        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
+        
+        // Flag the router to tell it whether to move the camera [cite: 2025-12-27]
+        routingControl._shouldFly = shouldFly;
+        
+        // Use the Internal Plan to set waypoints—this is the most stable method
+        routingControl.setWaypoints(wps);
+    }
+
     window.onload = init;
 </script>
 
