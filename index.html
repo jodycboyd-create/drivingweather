@@ -8,22 +8,17 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
-        
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-
-        /* [weong-route] THE DRIFT KILLER 
-           Forces the SVG route line to move in 1:1 sync with map tiles during pans. 
-        */
+        /* THE DRIFT KILLER: Keeps SVG in sync with tiles during motion */
         .map-is-moving .leaflet-overlay-pane svg {
             will-change: transform;
             pointer-events: none !important;
         }
-
         .leaflet-routing-container { display: none !important; }
         .leaflet-overlay-pane svg { transition: none !important; }
     </style>
@@ -37,7 +32,7 @@
 <script>
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Logic: Projection-Locking on Move [cite: 2025-12-27]
+     * Fixed: Pin-Movement Sync + Drift Protection [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -91,6 +86,8 @@
                 marker.unbindTooltip().bindTooltip(final.properties.name, { 
                     permanent: true, className: 'snapping-label' 
                 }).openTooltip();
+                
+                // CRITICAL: Manual call to update route after pin drop [cite: 2025-12-27]
                 syncRoute();
             });
         });
@@ -102,6 +99,7 @@
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
         if (routingControl) {
+            // Update the existing engine without re-creating it [cite: 2025-12-27]
             routingControl.setWaypoints(wps);
         } else {
             routingControl = L.Routing.control({
@@ -118,18 +116,19 @@
 
             window.weongRouter = routingControl;
 
-            // [weong-route] DRIFT LOCK HANDLERS [cite: 2025-12-27]
+            // DRIFT LOCK HANDLERS: Controlled UI toggling [cite: 2025-12-27]
             map.on('movestart', () => map.getContainer().classList.add('map-is-moving'));
             map.on('moveend', () => {
                 map.getContainer().classList.remove('map-is-moving');
-                // Hard-sync on end to ensure perfect alignment
-                if (routingControl) {
-                    routingControl.getPlan().setWaypoints(wps);
+                // Only snap to waypoints if a route actually exists [cite: 2025-12-27]
+                if (routingControl && !map.dragging.moving()) {
+                    const currentWps = [markers[0].getLatLng(), markers[1].getLatLng()];
+                    routingControl.getPlan().setWaypoints(currentWps);
                 }
             });
 
             routingControl.on('routesfound', (e) => {
-                // INTERACTION GUARD: No auto-zoom if user is panning
+                // Auto-zoom only if user isn't manual panning [cite: 2025-12-27]
                 if (!map.dragging.moving()) {
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
