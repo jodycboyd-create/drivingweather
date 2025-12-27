@@ -5,25 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WEonG - Stability Anchor [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
         
-        .custom-popup .leaflet-popup-content-wrapper {
-            background: #001529;
-            color: #fff;
-            border: 1px solid #0047AB;
+        /* Snapping Label Styling [cite: 2025-12-27] */
+        .snapping-label {
+            font-weight: bold;
+            color: #0047AB;
+            background: white;
+            border: 2px solid #0047AB;
+            padding: 6px 12px;
             border-radius: 8px;
+            pointer-events: none;
+            white-space: nowrap;
         }
 
-        .level-3-indicator {
-            color: #ff4d4f;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            border-top: 1px solid rgba(255, 77, 79, 0.3);
-            margin-top: 5px;
-            display: block;
-        }
+        /* Hide the default routing container to keep the UI clean [cite: 2025-12-27] */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
@@ -31,61 +30,90 @@
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
 <script>
     /**
-     * [weong-route] - Gold Standard Anchor Point
-     * Reverting to locked island-wide methodology.
+     * [weong-route] - Gold Standard Methodology
+     * Features: Dual-pin Routing, Community Node Snapping, Dark Mode [cite: 2025-12-23, 2025-12-27]
      */
-    let map;
+    let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // 1. Initialize Map centered on Newfoundland
-        map = L.map('map').setView([48.5, -56.0], 7); 
-        
+        // 1. Initialize Map with high-contrast Dark Matter tiles
+        map = L.map('map').setView([49.0, -56.0], 6); 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
         try {
-            // 2. Fetch locked Newfoundland dataset
+            // 2. Fetch Newfoundland Deep-Dive Dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
+            communities = data.features;
             
-            // 3. Process markers using Level 3 methodology
-            renderCommunities(data.features);
+            if (communities.length > 0) {
+                setupRoutingPins();
+            }
         } catch (e) { 
-            console.error("Critical: [weong-route] dataset failed to load."); 
+            console.error("Critical: Dataset failed to load."); 
         }
     }
 
-    function renderCommunities(features) {
-        features.forEach(feature => {
-            const coords = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
-            const name = feature.properties.name;
-            const level = feature.properties.level || 1; // Default to 1 if level not present
-            
-            // LEVEL 3 EXCEPTION TRIGGER: Primary logic toggle
-            const isLevel3 = level === 3;
-
-            const marker = L.circleMarker(coords, {
-                radius: isLevel3 ? 8 : 4,
-                fillColor: isLevel3 ? "#ff4d4f" : "#0047AB",
-                color: "#fff",
-                weight: 1,
-                fillOpacity: 0.8
-            }).addTo(map);
-
-            marker.bindPopup(`
-                <div class="custom-popup">
-                    <b>${name}</b><br>
-                    Status: ${isLevel3 ? '<span class="level-3-indicator">Level 3 Exception</span>' : 'Normal'}
-                </div>
-            `);
-
-            if (isLevel3) {
-                console.log(`[weong-bulletin] Level 3 logic locked for: ${name}`);
-            }
+    // SNAP LOGIC: Finds the nearest land node from the GeoJSON [cite: 2025-12-27]
+    function findNearestNode(latlng) {
+        return communities.reduce((prev, curr) => {
+            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
         });
+    }
+
+    function setupRoutingPins() {
+        // Anchor points: Corner Brook and St. John's [cite: 2025-12-26]
+        const defaultCoords = [[48.9500, -57.9500], [47.5615, -52.7126]];
+
+        defaultCoords.forEach((coord, i) => {
+            const nearest = findNearestNode(L.latLng(coord));
+            const pos = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
+            
+            const marker = L.marker(pos, { draggable: true }).addTo(map);
+            marker.bindTooltip(nearest.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
+            }).openTooltip();
+            
+            markers[i] = marker;
+
+            // Real-time snapping during drag [cite: 2025-12-27]
+            marker.on('drag', (e) => {
+                const liveNode = findNearestNode(e.latlng);
+                marker.setTooltipContent(liveNode.properties.name);
+            });
+
+            marker.on('dragend', () => {
+                const finalNode = findNearestNode(marker.getLatLng());
+                marker.setLatLng([finalNode.geometry.coordinates[1], finalNode.geometry.coordinates[0]]);
+                calculateRoute();
+            });
+        });
+
+        calculateRoute();
+    }
+
+    function calculateRoute() {
+        if (!markers[0] || !markers[1]) return;
+        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
+
+        if (routingControl) {
+            routingControl.setWaypoints(wps);
+        } else {
+            routingControl = L.Routing.control({
+                waypoints: wps,
+                createMarker: () => null,
+                addWaypoints: false,
+                lineOptions: { styles: [{ color: '#0047AB', weight: 6, opacity: 0.7 }] }
+            }).addTo(map);
+        }
     }
 
     window.onload = init;
