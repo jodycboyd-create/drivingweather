@@ -1,5 +1,6 @@
 /**
- * [weong-route] Module: Velocity Widget (Passive Listener Fix)
+ * [weong-route] Module: Velocity Widget (Atomic Sync Fix)
+ * Updated to handle the "Kill and Rebuild" routing strategy. [cite: 2025-12-27]
  */
 (function() {
     let driveSpeed = 100;
@@ -27,34 +28,46 @@
         document.getElementById('minusBtn').onclick = () => adjustSpeed(-5);
         document.getElementById('plusBtn').onclick = () => adjustSpeed(5);
 
+        // RE-ATTACH LOGIC: Monitor for new router instances [cite: 2025-12-27]
+        const attachRouterListener = () => {
+            if (!window.weongRouter) return;
+            
+            window.weongRouter.on('routesfound', function(e) {
+                const route = e.routes[0];
+                const dist = route.summary.totalDistance / 1000;
+                document.getElementById('totalDist').innerText = dist.toFixed(1);
+                
+                const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
+                
+                if (!etaMarker) {
+                    etaMarker = L.marker(mid, {
+                        icon: L.divIcon({ 
+                            className: 'eta-flag', 
+                            html: '<div id="flagTime" style="background:#1A73E8; color:white; padding:5px 10px; border-radius:15px; border:2px solid white; font-weight:bold; white-space:nowrap; box-shadow:0 2px 5px rgba(0,0,0,0.3);">--</div>',
+                            iconSize: [80, 30],
+                            iconAnchor: [40, 15]
+                        })
+                    }).addTo(window.weongMap);
+                } else {
+                    etaMarker.setLatLng(mid);
+                }
+                updateETA(dist);
+            });
+        };
+
+        // Watch for the "Kill and Rebuild" cycle
+        const observer = setInterval(() => {
+            if (window.weongRouter && !window.weongRouter._hasWidgetListener) {
+                attachRouterListener();
+                window.weongRouter._hasWidgetListener = true;
+            }
+        }, 100);
+
         function adjustSpeed(delta) {
             driveSpeed = Math.max(30, Math.min(130, driveSpeed + delta));
             document.getElementById('speedVal').innerText = driveSpeed;
             updateETA();
         }
-
-        // Passive Listener: Only updates when the router says it is ready [cite: 2025-12-27]
-        window.weongRouter.on('routesfound', function(e) {
-            const route = e.routes[0];
-            const dist = route.summary.totalDistance / 1000;
-            document.getElementById('totalDist').innerText = dist.toFixed(1);
-            
-            const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
-            
-            if (!etaMarker) {
-                etaMarker = L.marker(mid, {
-                    icon: L.divIcon({ 
-                        className: 'eta-flag', 
-                        html: '<div id="flagTime" style="background:#1A73E8; color:white; padding:5px 10px; border-radius:15px; border:2px solid white; font-weight:bold; white-space:nowrap; box-shadow:0 2px 5px rgba(0,0,0,0.3);">--</div>',
-                        iconSize: [80, 30],
-                        iconAnchor: [40, 15]
-                    })
-                }).addTo(window.weongMap);
-            } else {
-                etaMarker.setLatLng(mid);
-            }
-            updateETA(dist);
-        });
     }
 
     function updateETA(dist) {
@@ -68,7 +81,7 @@
     }
 
     const waiter = setInterval(() => {
-        if (window.weongMap && window.weongRouter) {
+        if (window.weongMap) {
             clearInterval(waiter);
             initWidget();
         }
