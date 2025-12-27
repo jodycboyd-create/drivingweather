@@ -2,17 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Route Engine (Restored)</title>
+    <title>WEonG - [weong-route] Absolute Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4); white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); white-space: nowrap; pointer-events: none;
         }
-        /* Keep the UI clean by hiding the default LRM panel */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -24,8 +23,9 @@
 
 <script>
     /**
-     * [weong-route] - Full Gravity Restoration
-     * Re-linking the GitHub directory structure with the Deep-Dive NL Dataset [cite: 2025-12-26]
+     * [weong-route] - Absolute Gravity Build
+     * Strategy: Destroy and Rebuild (No Floating Coordinates) [cite: 2025-12-25]
+     * Data: Locked Newfoundland Deep-Dive [cite: 2025-12-26]
      */
     let map, communities = [], markers = [], routingControl;
 
@@ -34,19 +34,22 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Restore pathing to the locked 2025 dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            setupRouteEngine();
+            // Build the baseline pins [cite: 2025-12-26]
+            spawnMarker([48.9351, -55.6562]); // GFW
+            spawnMarker([48.9566, -54.6089]); // Gander
+            
+            initRouting();
         } catch (e) {
-            console.error("Dataset load failed. Check /data/nl/ directory structure.");
+            console.error("Newfoundland dataset missing from GitHub structure.");
         }
     }
 
-    // THE MAGNET: Absolute search against the deep-dive dataset [cite: 2025-12-26]
-    function findNearest(latlng) {
+    // THE MAGNET: Absolute rejection of non-town coordinates [cite: 2025-12-26]
+    function findTown(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
@@ -54,59 +57,46 @@
         });
     }
 
-    function createLockedMarker(coords) {
-        // Initial snap to town node [cite: 2025-12-26]
-        const town = findNearest(L.latLng(coords));
+    function spawnMarker(initialCoords) {
+        const town = findTown(L.latLng(initialCoords));
         const pos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
 
         const marker = L.marker(pos, { draggable: true }).addTo(map);
+        markers.push(marker);
 
-        const syncUI = (ll) => {
-            const nearest = findNearest(ll);
-            marker.bindTooltip(nearest.properties.name, { 
+        const updateLabel = (ll) => {
+            const t = findTown(ll);
+            marker.bindTooltip(t.properties.name, { 
                 permanent: true, direction: 'top', className: 'snapping-label' 
             }).openTooltip();
         };
 
-        syncUI(L.latLng(pos));
+        updateLabel(L.latLng(pos));
 
-        // Real-time name changes while dragging across the coast
-        marker.on('drag', (e) => syncUI(e.latlng));
+        // Visual feedback while dragging
+        marker.on('drag', (e) => updateLabel(e.latlng));
 
-        // THE PHYSICAL SNAP: Rejects ocean drops (image_e925c6.png) [cite: 2025-12-25]
+        // THE SNAP: Reject the mouse drop and force the town node [cite: 2025-12-25]
         marker.on('dragend', function(e) {
-            const snappedNode = findNearest(e.latlng);
-            const snappedCoords = [snappedNode.geometry.coordinates[1], snappedNode.geometry.coordinates[0]];
+            const finalTown = findTown(e.latlng);
+            const finalPos = [finalTown.geometry.coordinates[1], finalTown.geometry.coordinates[0]];
             
-            // 1. Force Marker to Town Node
-            marker.setLatLng(snappedCoords);
-            // 2. Force Label Sync
-            syncUI(L.latLng(snappedCoords));
-            // 3. Force Route Engine to follow the snap
-            updateRouteWaypoints();
+            // Physical Teleport [cite: 2025-12-25]
+            marker.setLatLng(finalPos);
+            updateLabel(L.latLng(finalPos));
+            
+            // Force Routing Re-Sync
+            if (routingControl) {
+                routingControl.setWaypoints(markers.map(m => m.getLatLng()));
+            }
         });
-
-        return marker;
     }
 
-    function updateRouteWaypoints() {
-        if (routingControl) {
-            const points = markers.map(m => m.getLatLng());
-            routingControl.setWaypoints(points);
-        }
-    }
-
-    function setupRouteEngine() {
-        // Build GFW and Gander pins as start/end [cite: 2025-12-26]
-        markers.push(createLockedMarker([48.9351, -55.6562]));
-        markers.push(createLockedMarker([48.9566, -54.6089]));
-
-        // Initialize Routing Machine with Marker Suppression
+    function initRouting() {
         routingControl = L.Routing.control({
             waypoints: markers.map(m => m.getLatLng()),
-            createMarker: () => null, // Prevents LRM from creating its own floating pins [cite: 2025-12-25]
+            createMarker: () => null, // CRITICAL: Stop LRM from making "Ghost" pins [cite: 2025-12-25]
             addWaypoints: false,
-            routeWhileDragging: false,
             lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
         }).addTo(map);
     }
