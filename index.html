@@ -2,54 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEONG-Route | Gold Standard Anchor</title>
+    <title>RESET: Gold Standard Anchor</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #000c18; overflow: hidden; }
-        #map { height: 100vh; width: 100%; background: #000c18; }
+        body, html { margin: 0; padding: 0; height: 100%; background: #000c18; }
+        #map { height: 100vh; width: 100%; }
     </style>
 </head>
 <body>
-
 <div id="map"></div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    /**
-     * WEONG-ROUTE ANCHOR POINT
-     * Locked: 2025-12-27
-     */
+    // CLEAN SLATE MAP
+    const map = L.map('map').setView([49.0, -56.0], 6);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    const map = L.map('map').setView([49.0, -56.0], 6.5);
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    async function loadData() {
-        try {
-            const response = await fetch('communities.json');
-            const communities = await response.json();
-            
-            communities.forEach(loc => {
-                const isLevel3 = loc.level === 3;
+    fetch('communities.json')
+        .then(res => res.json())
+        .then(data => {
+            data.forEach(loc => {
                 L.circleMarker([loc.lat, loc.lng], {
-                    radius: isLevel3 ? 8 : 4,
-                    fillColor: isLevel3 ? "#ff4d4f" : "#1890ff",
-                    color: "#fff",
-                    weight: 1,
-                    fillOpacity: 0.8
-                }).addTo(map).bindPopup(`<b>${loc.name}</b><br>Level: ${loc.level}`);
+                    radius: loc.level === 3 ? 8 : 4,
+                    fillColor: loc.level === 3 ? "#ff4d4f" : "#1890ff",
+                    color: "#fff", weight: 1, fillOpacity: 0.8
+                }).addTo(map).bindPopup(loc.name);
             });
-        } catch (error) {
-            console.error("Data Load Error:", error);
-        }
-    }
-
-    loadData();
+        });
 </script>
-
 </body>
 </html>
