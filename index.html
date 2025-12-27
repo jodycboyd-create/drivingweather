@@ -2,90 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Hard-Locked Reset</title>
+    <title>WEonG - Simple Baseline</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
-        .anchor-label {
-            font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: none;
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; }
+        .simple-label {
+            font-weight: bold; padding: 4px 8px; background: white;
+            border: 2px solid #0047AB; border-radius: 4px;
         }
-        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
     /**
-     * [weong-route] - Zero-Float Engine
-     * Logic: Click-to-Anchor (Total rejection of mouse coordinates) [cite: 2025-12-25]
+     * [weong-route] - Simple Baseline Reset
+     * Purpose: Place two markers and stop [cite: 2025-12-25]
      */
-    let map, communities = [], selectedWaypoints = [], routeLayer;
+    const map = L.map('map').setView([48.9, -55.5], 7);
 
-    async function init() {
-        map = L.map('map').setView([48.9, -55.5], 7);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
 
-        try {
-            const response = await fetch('data/nl/communities.json');
-            const data = await response.json();
-            communities = data.features;
-            
-            // Create invisible magnetic zones for every community in the database [cite: 2025-12-26]
-            renderTownAnchors();
-        } catch (e) {
-            console.error("Dataset not found. Check GitHub /data/nl/ structure.");
-        }
-    }
+    // Marker 1: Grand Falls-Windsor [cite: 2025-12-26]
+    L.marker([48.9351, -55.6562]).addTo(map)
+        .bindTooltip("Grand Falls-Windsor", { permanent: true, className: 'simple-label' });
 
-    function renderTownAnchors() {
-        communities.forEach(town => {
-            const coords = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
-            
-            // Draw a subtle circle for every town in the locked dataset [cite: 2025-12-26]
-            const anchor = L.circleMarker(coords, {
-                radius: 8, color: '#0047AB', weight: 1, fillOpacity: 0.2
-            }).addTo(map);
+    // Marker 2: Gander [cite: 2025-12-26]
+    L.marker([48.9566, -54.6089]).addTo(map)
+        .bindTooltip("Gander", { permanent: true, className: 'simple-label' });
 
-            anchor.on('click', () => handleTownSelection(coords, town.properties.name));
-        });
-    }
-
-    function handleTownSelection(coords, name) {
-        // If two points are already selected, clear and start over [cite: 2025-12-25]
-        if (selectedWaypoints.length >= 2) {
-            map.eachLayer(layer => { if(layer instanceof L.Marker || layer === routeLayer) map.removeLayer(layer); });
-            selectedWaypoints = [];
-        }
-
-        const marker = L.marker(coords).addTo(map);
-        marker.bindTooltip(name, { permanent: true, className: 'anchor-label' }).openTooltip();
-        
-        selectedWaypoints.push(L.latLng(coords));
-
-        if (selectedWaypoints.length === 2) {
-            drawLockedLine();
-        }
-    }
-
-    function drawLockedLine() {
-        if (routeLayer) map.removeLayer(routeLayer);
-
-        routeLayer = L.Routing.control({
-            waypoints: selectedWaypoints,
-            createMarker: () => null, // Suppress LRM's default "Ghost Pins" [cite: 2025-12-25]
-            addWaypoints: false,
-            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
-        }).addTo(map);
-    }
-
-    window.onload = init;
 </script>
 </body>
 </html>
