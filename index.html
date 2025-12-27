@@ -14,9 +14,12 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
+        /* [weong-route] The CSS fix for Ocean Drift: Prevents SVG from blocking pan logic [cite: 2025-12-27] */
+        .leaflet-overlay-pane svg { 
+            pointer-events: none !important; 
+            transition: none !important; 
+        }
         .leaflet-routing-container { display: none !important; }
-        /* Fixes the "Ocean Drift" by ensuring the SVG layer doesn't lag [cite: 2025-12-27] */
-        .leaflet-overlay-pane svg { transition: none !important; }
     </style>
 </head>
 <body>
@@ -27,8 +30,9 @@
 
 <script>
     /**
-     * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Fixed: Restored Route Visibility + Panning Stability [cite: 2025-12-27]
+     * [weong-route] - REVERTED STABILITY ANCHOR
+     * Logic restored to working version [cite: 2025-12-25].
+     * Panning fix applied via non-suppressive listeners [cite: 2025-12-27].
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -95,12 +99,12 @@
         if (routingControl) {
             routingControl.setWaypoints(wps);
         } else {
-            // Restore visibility settings while keeping UI hidden [cite: 2025-12-27]
+            // REVERTED: Using standard Leaflet Routing Control settings [cite: 2025-12-25]
             routingControl = L.Routing.control({
                 waypoints: wps,
                 createMarker: () => null,
                 addWaypoints: false,
-                routeWhileDragging: true, // Restored for smoother line generation [cite: 2025-12-27]
+                routeWhileDragging: true, 
                 show: false,
                 lineOptions: {
                     styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
@@ -111,11 +115,11 @@
             window.weongRouter = routingControl;
 
             routingControl.on('routesfound', (e) => {
-                // INTERACTION GUARD: Only auto-zoom if user isn't touching the map [cite: 2025-12-27]
+                // FIXED PANNING: only auto-zoom if user is idle [cite: 2025-12-27]
                 if (!map.dragging.moving()) {
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
-                        duration: 0.8 
+                        duration: 1.0 
                     });
                 }
             });
