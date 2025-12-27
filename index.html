@@ -8,83 +8,39 @@
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000c18; overflow: hidden; }
         #map { height: 100vh; width: 100%; background: #000c18; }
-        
-        .custom-popup .leaflet-popup-content-wrapper {
-            background: #001529;
-            color: #fff;
-            border: 1px solid #003366;
-            border-radius: 4px;
-        }
-        
-        .level-3-indicator {
-            color: #ff4d4f;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 0.85em;
-        }
+        .custom-popup .leaflet-popup-content-wrapper { background: #001529; color: #fff; border: 1px solid #003366; }
+        .level-3-indicator { color: #ff4d4f; font-weight: bold; text-transform: uppercase; font-size: 0.85em; }
     </style>
 </head>
 <body>
-
 <div id="map"></div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    /**
-     * WEONG-ROUTE GOLD STANDARD
-     * Locked: 2025-12-27
-     * Purpose: Primary Anchor Point for Newfoundland Deep Dive
-     */
-
-    // 1. Initialize Map
     const map = L.map('map').setView([49.0, -56.0], 6.5);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    // 2. Fetch from Permanent Communities Database
     async function initMapData() {
         try {
             const response = await fetch('communities.json');
-            if (!response.ok) throw new Error('communities.json not found');
             const data = await response.json();
             renderLevel3Logic(data);
         } catch (error) {
-            console.error("[weong-route] Critical Revert Error:", error);
+            console.error("[weong-route] Revert Error:", error);
         }
     }
 
-    // 3. Apply Locked-in [weong-route] Methodology
     function renderLevel3Logic(communities) {
         communities.forEach(loc => {
-            // Level 3 is the primary trigger for route and bulletin
             const isLevel3 = loc.level === 3;
-            
             const marker = L.circleMarker([loc.lat, loc.lng], {
                 radius: isLevel3 ? 8 : 4,
                 fillColor: isLevel3 ? "#ff4d4f" : "#1890ff",
-                color: "#fff",
-                weight: 1,
-                fillOpacity: 0.8
+                color: "#fff", weight: 1, fillOpacity: 0.8
             }).addTo(map);
-
-            marker.bindPopup(`
-                <div class="custom-popup">
-                    <b>${loc.name}</b><br>
-                    Status: <span class="level-3-indicator">Level ${loc.level}</span>
-                </div>
-            `);
-
-            if (isLevel3) {
-                console.log(`[weong-bulletin] Level 3 logic locked for: ${loc.name}`);
-            }
+            marker.bindPopup(`<b>${loc.name}</b><br><span class="level-3-indicator">Level ${loc.level}</span>`);
         });
     }
-
-    // Execute Anchor Build
     initMapData();
 </script>
-
 </body>
 </html>
