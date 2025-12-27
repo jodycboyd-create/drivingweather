@@ -14,12 +14,7 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* [weong-route] HARD-ANCHOR STRATEGY: Forces the route to move with the map pane [cite: 2025-12-27] */
-        .leaflet-overlay-pane { z-index: 400 !important; }
-        .leaflet-overlay-pane svg { 
-            will-change: transform !important;
-            pointer-events: none !important;
-        }
+        .leaflet-overlay-pane svg { transition: none !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -32,19 +27,12 @@
 <script>
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Strategy: Route Hard-Anchoring & Frame-Locking [cite: 2025-12-27]
+     * Fixed: Label Freeze & Disappearing Route [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // Disable all internal animations to prevent "ocean drift" [cite: 2025-12-27]
-        map = L.map('map', { 
-            zoomControl: false, 
-            fadeAnimation: false, 
-            zoomAnimation: true,
-            markerZoomAnimation: true 
-        }).setView([48.5, -56.0], 6); 
-        
+        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -57,7 +45,7 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Critical Data Error"); }
+        } catch (e) { console.error("Data Load Failure"); }
     }
 
     function findNearestNode(latlng) {
@@ -69,17 +57,36 @@
     }
 
     function setupRoutingPins() {
-        const anchors = [[48.9500, -57.9500], [47.5615, -52.7126]];
+        const anchors = [[48.9454, -57.9415], [47.5615, -52.7126]];
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
-            const pos = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
-            const marker = L.marker(pos, { draggable: true }).addTo(map);
-            marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
+            const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { 
+                draggable: true 
+            }).addTo(map);
+            
+            // Initial Label Bind
+            marker.bindTooltip(nearest.properties.name, { 
+                permanent: true, className: 'snapping-label' 
+            }).openTooltip();
+            
             markers[i] = marker;
             
+            marker.on('drag', (e) => {
+                const live = findNearestNode(e.latlng);
+                marker.setTooltipContent(live.properties.name); // Live feedback during drag
+            });
+
             marker.on('dragend', () => {
                 const final = findNearestNode(marker.getLatLng());
-                marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
+                const finalPos = [final.geometry.coordinates[1], final.geometry.coordinates[0]];
+                
+                // HARD-LOCK: Rebind tooltip to fix the "Corner Brook" freeze [cite: 2025-12-27]
+                marker.setLatLng(finalPos);
+                marker.unbindTooltip();
+                marker.bindTooltip(final.properties.name, { 
+                    permanent: true, className: 'snapping-label' 
+                }).openTooltip();
+                
                 syncRoute();
             });
         });
@@ -111,17 +118,15 @@
 
             routingControl.on('routesfound', (e) => {
                 if (!map.dragging.moving()) {
-                    // Optimized speed to prevent drift window [cite: 2025-12-27]
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
                         duration: 0.5 
                     });
-
-                    // FORCE RESET: Re-pins the route line to coordinates once moving stops [cite: 2025-12-27]
+                    
+                    // RE-ANCHOR: Ensure the route stays visible after the zoom finishes [cite: 2025-12-27]
                     map.once('moveend', () => {
                         requestAnimationFrame(() => {
                            routingControl.getPlan().setWaypoints(wps);
-                           routingControl.fire('routesfound', {routes: e.routes});
                         });
                     });
                 }
