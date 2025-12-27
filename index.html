@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - SVG Stability [Reverted]</title>
+    <title>WEonG - Final Anchor [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        /* Safe background fallback to prevent blackouts [cite: 2025-12-27] */
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
@@ -15,10 +14,9 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* SVG Lock: Keeps line from floating during pans [cite: 2025-12-27] */
-        .leaflet-overlay-pane svg { transition: none !important; }
         .leaflet-routing-container { display: none !important; }
-        .eta-flag-container { pointer-events: none !important; }
+        /* Critical for flag visibility [cite: 2025-12-27] */
+        .eta-flag-container { pointer-events: none !important; z-index: 1000 !important; }
     </style>
 </head>
 <body>
@@ -28,24 +26,11 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-    /**
-     * [weong-route] - REVERTED SVG ANCHOR
-     * Fixed: Removed Canvas renderer to resolve black screen. [cite: 2025-12-27]
-     */
-    let map, communities = [], markers = [null, null], routingControl;
+    let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
     async function init() {
-        // [1] Standard SVG Renderer (Reliable)
-        map = L.map('map', { 
-            zoomControl: false, 
-            fadeAnimation: true 
-        }).setView([48.8, -55.5], 7); 
-        
+        map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7); 
         window.weongMap = map; 
-
-        // [2] Dedicated ETA Pane remains for widget support [cite: 2025-12-27]
-        const etaPane = map.createPane('etaPane');
-        etaPane.style.zIndex = 650;
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -75,10 +60,8 @@
             const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { 
                 draggable: true 
             }).addTo(map);
-            
             marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
-            
             marker.on('dragend', () => {
                 const final = findNearestNode(marker.getLatLng());
                 marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
@@ -92,27 +75,49 @@
             createMarker: () => null,
             addWaypoints: false,
             routeWhileDragging: false,
-            fitSelectedRoutes: false, 
             show: false,
-            lineOptions: {
-                styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
-                extendToWaypoints: true
-            }
+            lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }] }
         }).addTo(map);
 
         window.weongRouter = routingControl;
 
         routingControl.on('routesfound', (e) => {
+            const route = e.routes[0];
+            // Update the flag immediately upon route discovery [cite: 2025-12-27]
+            updateEtaFlag(route);
+
             if (routingControl._shouldFly) {
-                map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
-                    padding: [100, 100], 
-                    duration: 0.8 
-                });
+                map.flyToBounds(L.latLngBounds(route.coordinates), { padding: [100, 100], duration: 0.8 });
                 routingControl._shouldFly = false;
             }
         });
 
         setTimeout(() => syncRoute(false), 500); 
+    }
+
+    // INTERNAL FLAG ENGINE [cite: 2025-12-27]
+    function updateEtaFlag(route) {
+        const midIdx = Math.floor(route.coordinates.length / 2);
+        const midCoord = route.coordinates[midIdx];
+        
+        // Pass the route data to the global window for the widget to calculate speed [cite: 2025-12-27]
+        window.currentRouteData = route;
+
+        if (!etaMarker) {
+            etaMarker = L.marker(midCoord, {
+                icon: L.divIcon({ 
+                    className: 'eta-flag-container', 
+                    html: '<div id="flagTime" style="background:#1A73E8; color:white; padding:8px 15px; border-radius:20px; border:2px solid white; font-weight:bold; white-space:nowrap; box-shadow:0 4px 10px rgba(0,0,0,0.4); font-family:sans-serif; font-size:14px;">--h --m</div>',
+                    iconSize: [100, 40],
+                    iconAnchor: [50, 20]
+                })
+            }).addTo(map);
+        } else {
+            etaMarker.setLatLng(midCoord);
+        }
+        
+        // Trigger widget update if it exists [cite: 2025-12-27]
+        if (window.updateVelocityDisplay) window.updateVelocityDisplay();
     }
 
     function syncRoute(shouldFly = false) {
@@ -123,7 +128,6 @@
 
     window.onload = init;
 </script>
-
 <script src="velocity-widget.js"></script>
 </body>
 </html>
