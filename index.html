@@ -3,33 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Sleek Anchor</title>
+    <title>WEonG - Reliable Anchor [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #000c18; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 4px 10px; border-radius: 20px;
-            pointer-events: none; white-space: nowrap; font-size: 12px;
+            border: 2px solid #0047AB; padding: 3px 8px; border-radius: 4px;
+            pointer-events: none; white-space: nowrap; font-size: 11px;
         }
         .leaflet-routing-container { display: none !important; }
-        /* SLEEK CAPSULE STYLE [cite: 2025-12-27] */
-        .eta-capsule {
-            background: rgba(26, 115, 232, 0.9);
-            backdrop-filter: blur(5px);
-            color: white;
-            padding: 6px 14px;
-            border-radius: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            font-family: sans-serif;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            white-space: nowrap;
-            font-size: 13px;
-            font-weight: 600;
+        
+        /* MICRO-CAPSULE STYLE */
+        .micro-flag {
+            background: #1a73e8; color: white; padding: 4px 10px; border-radius: 20px;
+            font-family: sans-serif; font-size: 12px; font-weight: bold;
+            display: flex; gap: 8px; border: 1.5px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: nowrap;
         }
     </style>
 </head>
@@ -39,7 +30,7 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-    let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
+    let map, markers = [null, null], routingControl, etaMarker = null;
 
     async function init() {
         map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
@@ -47,51 +38,44 @@
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        try {
-            const res = await fetch('data/nl/communities.json');
-            const data = await res.json();
-            communities = data.features;
-            setupApp();
-        } catch (e) { console.error("Data fail"); }
-    }
+        // Core points: Corner Brook & St. John's
+        const p1 = L.marker([48.95, -57.95], { draggable: true }).addTo(map);
+        const p2 = L.marker([47.56, -52.71], { draggable: true }).addTo(map);
+        markers = [p1, p2];
 
-    function setupApp() {
-        const starts = [[48.95, -57.95], [47.56, -52.71]];
-        starts.forEach((c, i) => {
-            const m = L.marker(c, { draggable: true }).addTo(map);
-            markers[i] = m;
-            m.on('dragend', () => syncRoute());
-        });
-
+        // SWITCH TO STABLE ROUTER
         routingControl = L.Routing.control({
-            waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
+            serviceUrl: 'https://routing.openstreetmap.de/routed-car/route/v1',
+            waypoints: [p1.getLatLng(), p2.getLatLng()],
             createMarker: () => null,
             addWaypoints: false,
             routeWhileDragging: true,
-            lineOptions: { styles: [{ color: '#00B4DB', weight: 6, opacity: 0.9 }] }
+            lineOptions: { styles: [{ color: '#00d2ff', weight: 6, opacity: 0.9 }] }
         }).addTo(map);
 
         routingControl.on('routesfound', (e) => {
             const route = e.routes[0];
             window.currentRouteData = route;
-            updateCapsule(route);
+            updateFlag(route);
         });
+
+        markers.forEach(m => m.on('dragend', () => {
+            routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
+        }));
     }
 
-    function updateCapsule(route) {
+    function updateFlag(route) {
         const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
-        const html = `<div class="eta-capsule"><span id="capTime">--</span> <span>•</span> <span id="capDist" style="opacity:0.8">--</span></div>`;
+        const html = `<div class="micro-flag"><span id="capTime">--</span><span>|</span><span id="capDist" style="opacity:0.8">--</span></div>`;
         
         if (!etaMarker) {
-            etaMarker = L.marker(mid, { icon: L.divIcon({ className: '', html: html, iconSize: [160, 30], iconAnchor: [80, 15] }) }).addTo(map);
+            etaMarker = L.marker(mid, { 
+                icon: L.divIcon({ className: '', html: html, iconSize: [120, 24], iconAnchor: [60, 12] }) 
+            }).addTo(map);
         } else {
             etaMarker.setLatLng(mid);
         }
         if (window.updateVelocityDisplay) window.updateVelocityDisplay();
-    }
-
-    function syncRoute() {
-        routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
     }
 
     window.onload = init;
