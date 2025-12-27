@@ -2,49 +2,50 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Absolute Snap Lock</title>
+    <title>WEonG - Coastline Enforcer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
         .snapping-label {
-            font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: none;
+            font-weight: bold; padding: 6px 10px; background: white;
+            border: 2px solid #0047AB; border-radius: 6px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); white-space: nowrap;
         }
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
     /**
-     * [weong-route] - FIXED SNAP & ROAD LOCK [cite: 2025-12-23]
-     * Strategy: Absolute Marker Control to prevent Atlantic Floating and Duplicates.
+     * [weong-route] - Coastline Snapping Logic
+     * Goal: Prevent markers from staying in the Atlantic [cite: 2025-12-25]
      */
-    let map, communities = [], markers = [null, null], routeLine = null;
+    let map, communities = [], marker1, marker2, routingControl;
 
     async function init() {
         map = L.map('map').setView([48.9, -55.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Load the locked Newfoundland deep-dive dataset [cite: 2025-12-26]
+            // Loading the locked-in 2025 Newfoundland community dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Hard-locked Initial Spawn at GFW and Gander [cite: 2025-12-26]
-            renderLockedMarker(0, [48.9351, -55.6562]); 
-            renderLockedMarker(1, [48.9566, -54.6089]);
-            
-            updateHighwayPath();
+            setupMarkers();
         } catch (e) {
-            console.error("Dataset load error.");
+            console.error("Critical: Newfoundland dataset not found.");
         }
     }
 
+    // THE MAGNET: Finds the nearest town node from the database [cite: 2025-12-26]
     function findNearestLandNode(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
@@ -53,57 +54,54 @@
         });
     }
 
-    function renderLockedMarker(index, coords) {
-        const town = findNearestLandNode(L.latLng(coords));
-        const townPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+    function setupMarkers() {
+        // Points initialized at GFW and Gander [cite: 2025-12-26]
+        marker1 = createEnforcedMarker([48.9351, -55.6562], "Point A");
+        marker2 = createEnforcedMarker([48.9566, -54.6089], "Point B");
 
-        // DELETE current marker before spawning new to kill duplicates [cite: 2025-12-25]
-        if (markers[index]) map.removeLayer(markers[index]);
-
-        const marker = L.marker(townPos, { draggable: true }).addTo(map);
-        marker.bindTooltip(town.properties.name, { 
-            permanent: true, direction: 'top', className: 'snapping-label' 
-        }).openTooltip();
-
-        markers[index] = marker;
-
-        // Visual feedback while dragging
-        marker.on('drag', (e) => {
-            const tempTown = findNearestLandNode(e.latlng);
-            marker.setTooltipContent(tempTown.properties.name);
-        });
-
-        // THE LOCK: Force physical snap to land-node on release [cite: 2025-12-25]
-        marker.on('dragend', (e) => {
-            renderLockedMarker(index, e.latlng);
-            updateHighwayPath();
-        });
+        routingControl = L.Routing.control({
+            waypoints: [marker1.getLatLng(), marker2.getLatLng()],
+            createMarker: () => null, // Kills "Ghost Pins" from image_e930ee.png [cite: 2025-12-25]
+            addWaypoints: false,
+            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+        }).addTo(map);
     }
 
-    async function updateHighwayPath() {
-        if (!markers[0] || !markers[1]) return;
+    function createEnforcedMarker(coords, defaultName) {
+        const marker = L.marker(coords, { draggable: true }).addTo(map);
         
-        const start = markers[0].getLatLng();
-        const end = markers[1].getLatLng();
+        const updateUI = (ll) => {
+            const town = findNearestLandNode(ll);
+            marker.bindTooltip(town.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
+            }).openTooltip();
+        };
 
-        // Direct OSRM Call to avoid Leaflet Routing Machine's marker bugs [cite: 2025-12-25]
-        const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+        updateUI(L.latLng(coords));
 
-        try {
-            const response = await fetch(url);
-            const data = await response.json();
+        // Drag event: Just update the label name while moving
+        marker.on('drag', () => {
+            updateUI(marker.getLatLng());
+            syncRoute();
+        });
+
+        // RELEASE EVENT: THE PHYSICAL SNAP [cite: 2025-12-25]
+        marker.on('dragend', () => {
+            const snappedNode = findNearestLandNode(marker.getLatLng());
+            const lockedPos = [snappedNode.geometry.coordinates[1], snappedNode.geometry.coordinates[0]];
             
-            if (routeLine) map.removeLayer(routeLine);
+            // This line physically teleports the pin out of the ocean [cite: 2025-12-25]
+            marker.setLatLng(lockedPos);
+            updateUI(L.latLng(lockedPos));
+            syncRoute();
+        });
 
-            const coordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-            
-            // Draw the road network path between the two locked pins [cite: 2025-12-25]
-            routeLine = L.polyline(coordinates, { 
-                color: '#0047AB', weight: 8, opacity: 0.8, lineJoin: 'round' 
-            }).addTo(map);
+        return marker;
+    }
 
-        } catch (e) {
-            console.error("Route calculation failed.");
+    function syncRoute() {
+        if (routingControl) {
+            routingControl.setWaypoints([marker1.getLatLng(), marker2.getLatLng()]);
         }
     }
 
