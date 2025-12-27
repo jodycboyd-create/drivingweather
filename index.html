@@ -8,59 +8,57 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
-        
         .snapping-label {
-            font-weight: bold;
-            color: #0047AB;
-            background: white;
-            border: 2px solid #0047AB;
-            padding: 6px 12px;
-            border-radius: 8px;
-            pointer-events: none;
-            white-space: nowrap;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: bold; color: #0047AB; background: white;
+            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
+            pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            font-family: sans-serif;
         }
-
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
-
 <div id="map"></div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-
 <script>
     /**
      * [weong-route] - Gold Standard Anchor Point
-     * Basemap: Google Maps Standard (Roads/Terrain) [cite: 2025-12-27]
+     * Features: Full Island-Wide Rendering + Dual-Pin Snapping [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // 1. Initialize Map with Google Maps Road Layer [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
         
+        // Google Maps Standard Basemap [cite: 2025-12-27]
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-            maxZoom: 20,
-            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             attribution: '&copy; Google Maps'
         }).addTo(map);
 
         try {
-            // 2. Fetch Newfoundland Deep-Dive Dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            if (communities.length > 0) {
-                setupRoutingPins();
-            }
-        } catch (e) { 
-            console.error("Critical: [weong-route] dataset failed to load."); 
-        }
+            // 1. Render all background nodes first to verify full dataset [cite: 2025-12-26]
+            renderAllNodes();
+            
+            // 2. Setup interactive routing pins [cite: 2025-12-27]
+            if (communities.length > 0) setupRoutingPins();
+        } catch (e) { console.error("Data Load Error"); }
+    }
+
+    function renderAllNodes() {
+        communities.forEach(f => {
+            const isL3 = f.properties.level === 3; // Level 3 Exception Trigger [cite: 2025-12-23]
+            L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
+                radius: isL3 ? 6 : 2.5,
+                fillColor: isL3 ? "#ff4d4f" : "#0047AB",
+                color: "#fff", weight: 0.5, fillOpacity: 0.7, interactive: false
+            }).addTo(map);
+        });
     }
 
     function findNearestNode(latlng) {
@@ -72,59 +70,38 @@
     }
 
     function setupRoutingPins() {
-        const defaultCoords = [[48.9500, -57.9500], [47.5615, -52.7126]];
-
-        defaultCoords.forEach((coord, i) => {
+        const anchors = [[48.9500, -57.9500], [47.5615, -52.7126]];
+        anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
             const pos = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
-            
             const marker = L.marker(pos, { draggable: true }).addTo(map);
-            marker.bindTooltip(nearest.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label' 
-            }).openTooltip();
-            
+            marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
-
-            marker.on('drag', (e) => {
-                const liveNode = findNearestNode(e.latlng);
-                marker.setTooltipContent(liveNode.properties.name);
-            });
-
+            marker.on('drag', (e) => marker.setTooltipContent(findNearestNode(e.latlng).properties.name));
             marker.on('dragend', () => {
-                const finalNode = findNearestNode(marker.getLatLng());
-                marker.setLatLng([finalNode.geometry.coordinates[1], finalNode.geometry.coordinates[0]]);
+                const final = findNearestNode(marker.getLatLng());
+                marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
                 syncRoute();
             });
         });
-
         syncRoute();
     }
 
     function syncRoute() {
         if (!markers[0] || !markers[1]) return;
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
-
         if (routingControl) {
             routingControl.setWaypoints(wps);
         } else {
             routingControl = L.Routing.control({
-                waypoints: wps,
-                createMarker: () => null,
-                addWaypoints: false,
-                lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
+                waypoints: wps, createMarker: () => null, addWaypoints: false,
+                lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
-
-            routingControl.on('routesfound', function(e) {
-                const route = e.routes[0];
-                // Fly-to-Bounds Logic [cite: 2025-12-27]
-                map.flyToBounds(L.latLngBounds(route.coordinates), {
-                    padding: [100, 100],
-                    duration: 1.5
-                });
+            routingControl.on('routesfound', (e) => {
+                map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { padding: [100, 100], duration: 1.5 });
             });
         }
     }
-
     window.onload = init;
 </script>
 </body>
