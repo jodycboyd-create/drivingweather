@@ -19,35 +19,42 @@
 </head>
 <body>
 <div id="map"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
 <script>
     /**
-     * [weong-route] - Gold Standard Anchor Point
-     * Updated: Hidden Dataset (Visual Clean) + Dual-Pin Snapping [cite: 2025-12-27]
+     * [weong-route] - PERMANENT STABILITY ANCHOR
+     * Methodology: Dual-Pin Snapping, Full NL Dataset (Hidden), Google Basemap
+     * Locked-in: 2025-12-27
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
+        // Initialize Map and expose to window for modules
         map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
+        window.map = map; 
         
-        // Google Maps Standard Basemap [cite: 2025-12-27]
+        // Google Maps Standard Basemap
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             attribution: '&copy; Google Maps'
         }).addTo(map);
 
         try {
-            // Await full Newfoundland dataset for the background engine [cite: 2025-12-26]
+            // Load Locked Newfoundland Dataset
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // setupRoutingPins still uses the 'communities' list for snapping [cite: 2025-12-27]
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Data Load Error"); }
+        } catch (e) { 
+            console.error("Critical Error: Core dataset failed to load."); 
+        }
     }
 
+    // Snapping Logic to nearest NL community node
     function findNearestNode(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
@@ -57,13 +64,17 @@
     }
 
     function setupRoutingPins() {
-        // Core Anchors: Corner Brook and St. John's [cite: 2025-12-26]
         const anchors = [[48.9500, -57.9500], [47.5615, -52.7126]];
+        
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
             const pos = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
+            
             const marker = L.marker(pos, { draggable: true }).addTo(map);
-            marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
+            marker.bindTooltip(nearest.properties.name, { 
+                permanent: true, className: 'snapping-label' 
+            }).openTooltip();
+            
             markers[i] = marker;
             
             marker.on('drag', (e) => {
@@ -83,21 +94,32 @@
     function syncRoute() {
         if (!markers[0] || !markers[1]) return;
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
+
         if (routingControl) {
             routingControl.setWaypoints(wps);
         } else {
             routingControl = L.Routing.control({
-                waypoints: wps, createMarker: () => null, addWaypoints: false,
+                waypoints: wps, 
+                createMarker: () => null, 
+                addWaypoints: false,
                 lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
+
+            // Expose routingControl to window for modules
+            window.routingControl = routingControl;
+
             routingControl.on('routesfound', (e) => {
-                // Dynamic Zoom Fly-to-Bounds [cite: 2025-12-27]
-                map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { padding: [100, 100], duration: 1.5 });
+                map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
+                    padding: [100, 100], 
+                    duration: 1.5 
+                });
             });
         }
     }
     window.onload = init;
 </script>
+
 <script src="velocity-widget.js"></script>
+
 </body>
 </html>
