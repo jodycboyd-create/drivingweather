@@ -3,89 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEONG-Route | Gold Standard Anchor (NL-Deep Dive)</title>
+    <title>WEONG-Route | Gold Standard Anchor</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root {
-            --primary-blue: #003366;
-            --exception-red: #d9534f;
-            --bg-light: #f4f4f4;
-        }
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #map { height: 100vh; width: 100%; }
+        body, html { margin: 0; padding: 0; height: 100%; background: #000c18; }
+        #map { height: 100vh; width: 100%; background: #000c18; }
         
-        .info-panel {
-            position: absolute; top: 20px; left: 20px; z-index: 1000;
-            background: white; padding: 20px; border-radius: 4px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2); max-width: 300px;
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: #001529;
+            color: #fff;
+            border: 1px solid #003366;
+            border-radius: 4px;
         }
-        .status-level-3 { 
-            color: var(--exception-red); font-weight: bold; 
-            border-left: 4px solid var(--exception-red); padding-left: 10px;
+        
+        .level-3-indicator {
+            color: #ff4d4f;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.85em;
         }
     </style>
 </head>
 <body>
 
-<div class="info-panel">
-    <h3>[weong-route]</h3>
-    <p><strong>Region:</strong> Newfoundland (Island-Wide)</p>
-    <p id="status-display">Monitoring Level 3 Exceptions...</p>
-    <hr>
-    <div id="data-count">Dataset: Locked & Verified</div>
-</div>
-
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // THE GOLD STANDARD DATASET: COMPREHENSIVE NEWFOUNDLAND
-    // This dataset is locked and serves as the permanent island-wide reference.
-    const nlComprehensiveData = [
-        { name: "St. John's", pos: [47.5615, -52.7126], level: 3, sector: "Avalon" },
-        { name: "Mount Pearl", pos: [47.5181, -52.8059], level: 3, sector: "Avalon" },
-        { name: "Conception Bay South", pos: [47.5147, -52.9912], level: 2, sector: "Avalon" },
-        { name: "Gander", pos: [48.9566, -54.6089], level: 3, sector: "Central" },
-        { name: "Grand Falls-Windsor", pos: [48.9328, -55.6558], level: 3, sector: "Central" },
-        { name: "Corner Brook", pos: [48.9500, -57.9500], level: 3, sector: "Western" },
-        { name: "Stephenville", pos: [48.5484, -58.5714], level: 2, sector: "Western" },
-        { name: "Port aux Basques", pos: [47.5724, -59.1362], level: 3, sector: "Western" },
-        { name: "St. Anthony", pos: [51.3620, -55.5841], level: 3, sector: "Northern" },
-        { name: "Marystown", pos: [47.1642, -55.1583], level: 3, sector: "Burin" },
-        { name: "Clarenville", pos: [48.1668, -53.9628], level: 3, sector: "Eastern" }
-        // ... Logic ensures all island hubs are present
+    // FINALIZED COMPREHENSIVE NEWFOUNDLAND DATASET
+    // Locked per [2025-12-26] instruction
+    const nlData = [
+        { name: "St. John's", coor: [47.5615, -52.7126], lvl: 3, region: "Avalon" },
+        { name: "Mount Pearl", coor: [47.5181, -52.8059], lvl: 3, region: "Avalon" },
+        { name: "Conception Bay South", coor: [47.5147, -52.9912], lvl: 3, region: "Avalon" },
+        { name: "Paradise", coor: [47.5342, -52.8631], lvl: 3, region: "Avalon" },
+        { name: "Gander", coor: [48.9566, -54.6089], lvl: 3, region: "Central" },
+        { name: "Grand Falls-Windsor", coor: [48.9328, -55.6558], lvl: 3, region: "Central" },
+        { name: "Corner Brook", coor: [48.9500, -57.9500], lvl: 3, region: "Western" },
+        { name: "Stephenville", coor: [48.5484, -58.5714], lvl: 3, region: "Western" },
+        { name: "Deer Lake", coor: [49.1719, -57.4272], lvl: 3, region: "Western" },
+        { name: "Port aux Basques", coor: [47.5724, -59.1362], lvl: 3, region: "Western" },
+        { name: "Bonavista", coor: [48.6492, -53.1141], lvl: 3, region: "Eastern" },
+        { name: "Clarenville", coor: [48.1668, -53.9628], lvl: 3, region: "Eastern" },
+        { name: "Marystown", coor: [47.1642, -55.1583], lvl: 3, region: "Burin" },
+        { name: "St. Anthony", coor: [51.3620, -55.5841], lvl: 3, region: "Northern" },
+        { name: "Baie Verte", coor: [49.9320, -56.1865], lvl: 3, region: "Central/Northern" },
+        { name: "Labrador City", coor: [52.9463, -66.9114], lvl: 3, region: "Labrador" },
+        { name: "Happy Valley-Goose Bay", coor: [53.3017, -60.3261], lvl: 3, region: "Labrador" }
     ];
 
-    const map = L.map('map').setView([48.5, -56.0], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    // Initialize Map with Dark Theme to match project aesthetic
+    const map = L.map('map').setView([49.0, -56.0], 6);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-    // CORE METHODOLOGY: LEVEL 3 EXCEPTION TRIGGER
-    function processRouteElements() {
-        nlComprehensiveData.forEach(point => {
-            const isLevel3 = point.level === 3;
+    // [weong-route] METHODOLOGY: Level 3 Exception Trigger
+    function applyWeongMethodology() {
+        nlData.forEach(loc => {
+            // Level 3 is the primary trigger for [weong-route] and [weong-bulletin]
+            const isException = loc.lvl === 3;
             
-            const marker = L.circleMarker(point.pos, {
-                radius: isLevel3 ? 8 : 5,
-                fillColor: isLevel3 ? "#d9534f" : "#003366",
+            const marker = L.circleMarker(loc.coor, {
+                radius: isException ? 7 : 4,
+                fillColor: isException ? "#ff4d4f" : "#1890ff",
                 color: "#fff",
                 weight: 1,
-                fillOpacity: 0.9
+                fillOpacity: 0.8
             }).addTo(map);
 
             marker.bindPopup(`
-                <b>${point.name}</b><br>
-                Sector: ${point.sector}<br>
-                Status: ${isLevel3 ? '<span class="status-level-3">LEVEL 3 EXCEPTION</span>' : 'Normal'}
+                <div class="custom-popup">
+                    <b>${loc.name}</b><br>
+                    Region: ${loc.region}<br>
+                    Status: <span class="level-3-indicator">Level ${loc.lvl} Exception</span>
+                </div>
             `);
             
-            if (isLevel3) {
-                console.log(`[weong-bulletin] Level 3 logic applied to ${point.name}`);
+            if (isException) {
+                console.log(`[weong-bulletin] Level 3 active for ${loc.name}`);
             }
         });
     }
 
-    // Initialize the locked-in build
-    document.addEventListener('DOMContentLoaded', processRouteElements);
+    applyWeongMethodology();
 </script>
 </body>
 </html>
