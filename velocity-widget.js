@@ -1,20 +1,25 @@
 /**
- * [weong-route] Module: Velocity Widget (Universal Listener)
- * Fix: Uses Map-level event bubbling to ensure ETA updates even after router resets.
+ * [weong-route] Module: Velocity Widget (Self-Healing Flag)
+ * Fix: Re-creates High-Z pane and marker if the main script wipes the map.
  */
 (function() {
     let speedOffset = 0;
     let etaMarker = null;
 
-    function initWidget() {
-        if (document.getElementById('velocity-panel')) return;
-
-        // Create High-Z Pane for the flag
-        if (window.weongMap && !window.weongMap.getPane('etaPane')) {
+    function ensurePane() {
+        if (!window.weongMap) return false;
+        // If the map was reset, the pane might be gone. Re-create it.
+        if (!window.weongMap.getPane('etaPane')) {
             const pane = window.weongMap.createPane('etaPane');
             pane.style.zIndex = 650;
             pane.style.pointerEvents = 'none';
         }
+        return true;
+    }
+
+    function initWidget() {
+        if (document.getElementById('velocity-panel')) return;
+        ensurePane();
 
         const ui = document.createElement('div');
         ui.id = 'velocity-panel';
@@ -34,8 +39,6 @@
         document.getElementById('minusBtn').onclick = () => { speedOffset -= 5; updateUI(); };
         document.getElementById('plusBtn').onclick = () => { speedOffset += 5; updateUI(); };
 
-        // [1] THE FIX: Listen to the MAP, not the Router
-        // Leaflet Routing Machine bubbles events up to the map object.
         window.weongMap.on('routing:routesfound', (e) => {
             calculatePrecisionETA(e.routes[0]);
         });
@@ -49,6 +52,8 @@
 
     function calculatePrecisionETA(route) {
         window.lastRouteData = route;
+        ensurePane(); // Double check pane exists before drawing
+        
         const totalDist = route.summary.totalDistance / 1000;
         let weightedSpeedSum = 0;
 
@@ -74,9 +79,8 @@
         const midIdx = Math.floor(route.coordinates.length / 2);
         const midPoint = route.coordinates[midIdx];
 
-        // [2] Ensure flag visibility
+        // Ensure the flag is re-added if it was wiped from the map
         if (!etaMarker || !window.weongMap.hasLayer(etaMarker)) {
-            if (etaMarker) window.weongMap.removeLayer(etaMarker);
             etaMarker = L.marker(midPoint, {
                 pane: 'etaPane',
                 icon: L.divIcon({
@@ -93,11 +97,13 @@
         }
     }
 
-    // Initialize once map is ready
-    const checkMap = setInterval(() => {
+    // Heartbeat to ensure widget survives map reloads
+    setInterval(() => {
         if (window.weongMap) {
             initWidget();
-            clearInterval(checkMap);
+            // If the route exists but flag is gone, force a redraw
+            if (window.lastRouteData && (!etaMarker || !window.weongMap.hasLayer(etaMarker))) {
+                calculatePrecisionETA(window.lastRouteData);
+            }
         }
-    }, 500);
-})();
+    }, 1
