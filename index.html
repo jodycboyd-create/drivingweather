@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Foundational Reversion [Locked]</title>
+    <title>WEonG - Global Island View</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -25,13 +25,15 @@
 
 <script>
     /**
-     * [weong-route] - REVERTED FOUNDATION
-     * This is the stable version where Label-Sync Snap was verified working.
+     * [weong-route] - STABLE FOUNDATION
+     * Update: Zoom Level 5 for full Island capture.
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        map = L.map('map').setView([48.8, -55.8], 6);
+        // TWEAK: Zoom 5 and slightly adjusted center to capture the full province [cite: 2025-12-26]
+        map = L.map('map').setView([49.5, -56.0], 5);
+        
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
@@ -53,6 +55,7 @@
     }
 
     function setupMarkers() {
+        // Initial locked positions: Corner Brook and St. John's
         const anchors = [[48.9515, -57.9485], [47.5615, -52.7126]];
         
         anchors.forEach((coord, i) => {
@@ -94,6 +97,7 @@
 
             routingControl.on('routesfound', function(e) {
                 const bounds = L.latLngBounds(e.routes[0].coordinates);
+                // Keeps the smooth fly-to transition once the route is picked
                 map.flyToBounds(bounds, { padding: [80, 80], duration: 1.5 });
             });
         }
