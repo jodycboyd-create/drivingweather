@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Industrial Magnet [Locked]</title>
+    <title>WEonG - Hard Magnet [weong-route]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -23,8 +23,8 @@
 
 <script>
     /**
-     * [weong-route] - Industrial Strength Magnet
-     * Strategy: Absolute Marker Destruction/Reconstruction on dragend [cite: 2025-12-23]
+     * [weong-route] - Hard Magnet Methodology
+     * LOCKED: Forced snap to dataset coordinates on release [cite: 2025-12-23]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -33,18 +33,18 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Load the locked 2025 Newfoundland dataset [cite: 2025-12-26]
+            // Loading the locked-in 2025 Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Force initial snap to GFW and Gander [cite: 2025-12-26]
-            renderMagnetMarker(0, [48.9351, -55.6562]); 
-            renderMagnetMarker(1, [48.9566, -54.6089]);
+            // Hard-locked Initial Spawn [cite: 2025-12-26]
+            spawnLockedMarker(0, [48.9351, -55.6562]); // GFW
+            spawnLockedMarker(1, [48.9566, -54.6089]); // Gander
             
             updateRoute();
         } catch (e) {
-            console.error("Critical: Dataset missing. Magnet offline.");
+            console.error("Dataset load error.");
         }
     }
 
@@ -56,14 +56,14 @@
         });
     }
 
-    function renderMagnetMarker(index, coords) {
+    function spawnLockedMarker(index, coords) {
         const town = findNearestLandNode(L.latLng(coords));
         const townPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
 
-        // THE DUPLICATE KILLER: Physically remove marker from map [cite: 2025-12-25]
+        // DELETE old marker to prevent "Bishop's Falls" ghosting [cite: 2025-12-25]
         if (markers[index]) map.removeLayer(markers[index]);
 
-        // THE MAGNET: Spawn brand new marker at dataset coordinate [cite: 2025-12-25]
+        // SPAWN NEW marker at exact dataset coordinate [cite: 2025-12-25]
         const marker = L.marker(townPos, { draggable: true }).addTo(map);
         marker.bindTooltip(town.properties.name, { 
             permanent: true, direction: 'top', className: 'snapping-label' 
@@ -71,15 +71,15 @@
 
         markers[index] = marker;
 
-        // Feedback during drag - only updates name, not location
+        // Visual name feedback while dragging
         marker.on('drag', (e) => {
             const tempTown = findNearestLandNode(e.latlng);
             marker.setTooltipContent(tempTown.properties.name);
         });
 
-        // THE SNAP LOCK: On release, destroy current pin and spawn at town center [cite: 2025-12-25]
+        // THE MAGNET: On release, kill the "loose" marker and re-spawn at town center
         marker.on('dragend', (e) => {
-            renderMagnetMarker(index, e.latlng);
+            spawnLockedMarker(index, e.latlng);
             updateRoute();
         });
     }
@@ -93,8 +93,7 @@
         } else {
             routingControl = L.Routing.control({
                 waypoints: pts,
-                router: L.Routing.osrmv1({ serviceUrl: `https://router.project-osrm.org/route/v1` }),
-                createMarker: () => null, // Prevents "Ghost Pins" from image_ea7f67.png [cite: 2025-12-25]
+                createMarker: () => null, // Kills LRM's buggy markers [cite: 2025-12-25]
                 addWaypoints: false,
                 lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
