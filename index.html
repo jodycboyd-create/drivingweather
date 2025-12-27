@@ -14,8 +14,12 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* HARD-LOCK: Prevents the browser from trying to animate the SVG line separately */
-        .leaflet-overlay-pane svg { transition: none !important; }
+        /* [weong-route] HARD-ANCHOR STRATEGY: Forces the route to move with the map pane [cite: 2025-12-27] */
+        .leaflet-overlay-pane { z-index: 400 !important; }
+        .leaflet-overlay-pane svg { 
+            will-change: transform !important;
+            pointer-events: none !important;
+        }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -28,13 +32,19 @@
 <script>
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Fixed: Ocean drift via Frame-Locking and Reset-on-Move
+     * Strategy: Route Hard-Anchoring & Frame-Locking [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // fadeAnimation is disabled to prevent "ghost" lines during zoom
-        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
+        // Disable all internal animations to prevent "ocean drift" [cite: 2025-12-27]
+        map = L.map('map', { 
+            zoomControl: false, 
+            fadeAnimation: false, 
+            zoomAnimation: true,
+            markerZoomAnimation: true 
+        }).setView([48.5, -56.0], 6); 
+        
         window.weongMap = map; 
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -47,7 +57,7 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Critical Error: Core dataset failed to load."); }
+        } catch (e) { console.error("Critical Data Error"); }
     }
 
     function findNearestNode(latlng) {
@@ -89,11 +99,10 @@
                 addWaypoints: false,
                 routeWhileDragging: false, 
                 autoRoute: true,
-                fitSelectedRoutes: false, // Prevents internal engine conflicts
+                fitSelectedRoutes: false,
                 show: false,
                 lineOptions: { 
                     styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
-                    addWaypoints: false,
                     extendToWaypoints: true 
                 }
             }).addTo(map);
@@ -101,18 +110,17 @@
             window.weongRouter = routingControl;
 
             routingControl.on('routesfound', (e) => {
-                // LOCK: Only auto-zoom if the user is not manually panning
                 if (!map.dragging.moving()) {
+                    // Optimized speed to prevent drift window [cite: 2025-12-27]
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
-                        duration: 0.4 // Faster duration to reduce the "unstable" window
+                        duration: 0.5 
                     });
 
-                    // FRAME-LOCK: Forces a total redraw the millisecond movement stops
+                    // FORCE RESET: Re-pins the route line to coordinates once moving stops [cite: 2025-12-27]
                     map.once('moveend', () => {
                         requestAnimationFrame(() => {
                            routingControl.getPlan().setWaypoints(wps);
-                           // Manually trigger widget refresh to keep ETA flag in sync
                            routingControl.fire('routesfound', {routes: e.routes});
                         });
                     });
