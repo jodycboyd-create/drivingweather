@@ -24,7 +24,7 @@
 <script>
     /**
      * [weong-route] - Gold Standard Anchor Point
-     * Features: Full Island-Wide Rendering + Dual-Pin Snapping [cite: 2025-12-27]
+     * Updated: Hidden Dataset (Visual Clean) + Dual-Pin Snapping [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -38,27 +38,14 @@
         }).addTo(map);
 
         try {
+            // Await full Newfoundland dataset for the background engine [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // 1. Render all background nodes first to verify full dataset [cite: 2025-12-26]
-            renderAllNodes();
-            
-            // 2. Setup interactive routing pins [cite: 2025-12-27]
+            // setupRoutingPins still uses the 'communities' list for snapping [cite: 2025-12-27]
             if (communities.length > 0) setupRoutingPins();
         } catch (e) { console.error("Data Load Error"); }
-    }
-
-    function renderAllNodes() {
-        communities.forEach(f => {
-            const isL3 = f.properties.level === 3; // Level 3 Exception Trigger [cite: 2025-12-23]
-            L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
-                radius: isL3 ? 6 : 2.5,
-                fillColor: isL3 ? "#ff4d4f" : "#0047AB",
-                color: "#fff", weight: 0.5, fillOpacity: 0.7, interactive: false
-            }).addTo(map);
-        });
     }
 
     function findNearestNode(latlng) {
@@ -70,6 +57,7 @@
     }
 
     function setupRoutingPins() {
+        // Core Anchors: Corner Brook and St. John's [cite: 2025-12-26]
         const anchors = [[48.9500, -57.9500], [47.5615, -52.7126]];
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
@@ -77,7 +65,12 @@
             const marker = L.marker(pos, { draggable: true }).addTo(map);
             marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
-            marker.on('drag', (e) => marker.setTooltipContent(findNearestNode(e.latlng).properties.name));
+            
+            marker.on('drag', (e) => {
+                const live = findNearestNode(e.latlng);
+                marker.setTooltipContent(live.properties.name);
+            });
+
             marker.on('dragend', () => {
                 const final = findNearestNode(marker.getLatLng());
                 marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
@@ -98,6 +91,7 @@
                 lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
             routingControl.on('routesfound', (e) => {
+                // Dynamic Zoom Fly-to-Bounds [cite: 2025-12-27]
                 map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { padding: [100, 100], duration: 1.5 });
             });
         }
