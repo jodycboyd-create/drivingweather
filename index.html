@@ -14,7 +14,7 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* [weong-route] PERFORMANCE FIX: Forces hardware acceleration for SVG layer */
+        /* PERFORMANCE LOCK: Forces hardware acceleration for SVG layer [cite: 2025-12-27] */
         .leaflet-overlay-pane svg { transition: none !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -28,11 +28,12 @@
 <script>
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Fixed: Total decoupling via Frame-Locking [cite: 2025-12-27]
+     * Fixed: Total decoupling via Frame-Locking and SVG reset [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
+        // Disable fadeAnimation to prevent coordinate lag during zooms [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
@@ -66,6 +67,11 @@
             marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
             
+            marker.on('drag', (e) => {
+                const live = findNearestNode(e.latlng);
+                marker.setTooltipContent(live.properties.name);
+            });
+
             marker.on('dragend', () => {
                 const final = findNearestNode(marker.getLatLng());
                 marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
@@ -101,16 +107,18 @@
 
             routingControl.on('routesfound', (e) => {
                 if (!map.dragging.moving()) {
-                    // Fast fly and hard-refresh on end [cite: 2025-12-27]
+                    // Optimized speed: Fast fly and hard-refresh on end [cite: 2025-12-27]
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
                         duration: 0.4 
                     });
 
                     map.once('moveend', () => {
-                        // The 'Nuclear Option' to fix drift: Force projection reset [cite: 2025-12-27]
+                        // FORCE SYNC: Re-verifies positions relative to new center [cite: 2025-12-27]
                         requestAnimationFrame(() => {
                            routingControl.getPlan().setWaypoints(wps);
+                           // Manually trigger module updates to keep widget flags in sync [cite: 2025-12-27]
+                           routingControl.fire('routesfound', {routes: e.routes});
                         });
                     });
                 }
@@ -121,5 +129,6 @@
 </script>
 
 <script src="velocity-widget.js"></script>
+
 </body>
 </html>
