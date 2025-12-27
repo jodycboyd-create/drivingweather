@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEONG-Route | Gold Standard Anchor</title>
+    <title>WEONG-Route | Gold Standard Anchor (NL-Deep Dive)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000c18; }
@@ -30,41 +30,30 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // FINALIZED COMPREHENSIVE NEWFOUNDLAND DATASET
-    // Locked per [2025-12-26] instruction
-    const nlData = [
-        { name: "St. John's", coor: [47.5615, -52.7126], lvl: 3, region: "Avalon" },
-        { name: "Mount Pearl", coor: [47.5181, -52.8059], lvl: 3, region: "Avalon" },
-        { name: "Conception Bay South", coor: [47.5147, -52.9912], lvl: 3, region: "Avalon" },
-        { name: "Paradise", coor: [47.5342, -52.8631], lvl: 3, region: "Avalon" },
-        { name: "Gander", coor: [48.9566, -54.6089], lvl: 3, region: "Central" },
-        { name: "Grand Falls-Windsor", coor: [48.9328, -55.6558], lvl: 3, region: "Central" },
-        { name: "Corner Brook", coor: [48.9500, -57.9500], lvl: 3, region: "Western" },
-        { name: "Stephenville", coor: [48.5484, -58.5714], lvl: 3, region: "Western" },
-        { name: "Deer Lake", coor: [49.1719, -57.4272], lvl: 3, region: "Western" },
-        { name: "Port aux Basques", coor: [47.5724, -59.1362], lvl: 3, region: "Western" },
-        { name: "Bonavista", coor: [48.6492, -53.1141], lvl: 3, region: "Eastern" },
-        { name: "Clarenville", coor: [48.1668, -53.9628], lvl: 3, region: "Eastern" },
-        { name: "Marystown", coor: [47.1642, -55.1583], lvl: 3, region: "Burin" },
-        { name: "St. Anthony", coor: [51.3620, -55.5841], lvl: 3, region: "Northern" },
-        { name: "Baie Verte", coor: [49.9320, -56.1865], lvl: 3, region: "Central/Northern" },
-        { name: "Labrador City", coor: [52.9463, -66.9114], lvl: 3, region: "Labrador" },
-        { name: "Happy Valley-Goose Bay", coor: [53.3017, -60.3261], lvl: 3, region: "Labrador" }
-    ];
-
-    // Initialize Map with Dark Theme to match project aesthetic
+    // INITIALIZE MAP
     const map = L.map('map').setView([49.0, -56.0], 6);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // [weong-route] METHODOLOGY: Level 3 Exception Trigger
-    function applyWeongMethodology() {
-        nlData.forEach(loc => {
+    // FETCH FROM PERMANENT DATABASE
+    async function loadGoldStandardData() {
+        try {
+            const response = await fetch('communities.json');
+            const communities = await response.json();
+            processRouteElements(communities);
+        } catch (error) {
+            console.error("[weong-route] Critical Error: communities.json not found.", error);
+        }
+    }
+
+    // CORE METHODOLOGY: LEVEL 3 EXCEPTION TRIGGER
+    function processRouteElements(data) {
+        data.forEach(loc => {
             // Level 3 is the primary trigger for [weong-route] and [weong-bulletin]
-            const isException = loc.lvl === 3;
+            const isException = loc.level === 3;
             
-            const marker = L.circleMarker(loc.coor, {
+            const marker = L.circleMarker([loc.lat, loc.lng], {
                 radius: isException ? 7 : 4,
                 fillColor: isException ? "#ff4d4f" : "#1890ff",
                 color: "#fff",
@@ -75,8 +64,7 @@
             marker.bindPopup(`
                 <div class="custom-popup">
                     <b>${loc.name}</b><br>
-                    Region: ${loc.region}<br>
-                    Status: <span class="level-3-indicator">Level ${loc.lvl} Exception</span>
+                    Status: <span class="level-3-indicator">Level ${loc.level} Exception</span>
                 </div>
             `);
             
@@ -86,7 +74,8 @@
         });
     }
 
-    applyWeongMethodology();
+    // Initialize on load
+    loadGoldStandardData();
 </script>
 </body>
 </html>
