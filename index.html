@@ -14,8 +14,8 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* Forces the SVG to stay strictly relative to the map container [cite: 2025-12-27] */
-        .leaflet-zoom-animated { will-change: transform !important; }
+        /* HARD-LOCK: Prevents the browser from trying to animate the SVG line separately */
+        .leaflet-overlay-pane svg { transition: none !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -28,12 +28,13 @@
 <script>
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Logic: Hard-Reset on Zoom to prevent Ocean Drift [cite: 2025-12-27]
+     * Fixed: Ocean drift via Frame-Locking and Reset-on-Move
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        map = L.map('map', { zoomControl: false, markerZoomAnimation: false }).setView([48.5, -56.0], 6); 
+        // fadeAnimation is disabled to prevent "ghost" lines during zoom
+        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -46,7 +47,7 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Data Load Failure"); }
+        } catch (e) { console.error("Critical Error: Core dataset failed to load."); }
     }
 
     function findNearestNode(latlng) {
@@ -88,10 +89,11 @@
                 addWaypoints: false,
                 routeWhileDragging: false, 
                 autoRoute: true,
-                fitSelectedRoutes: false,
+                fitSelectedRoutes: false, // Prevents internal engine conflicts
                 show: false,
                 lineOptions: { 
                     styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
+                    addWaypoints: false,
                     extendToWaypoints: true 
                 }
             }).addTo(map);
@@ -99,19 +101,21 @@
             window.weongRouter = routingControl;
 
             routingControl.on('routesfound', (e) => {
+                // LOCK: Only auto-zoom if the user is not manually panning
                 if (!map.dragging.moving()) {
-                    // 1. Hide the route line before moving [cite: 2025-12-27]
-                    map.removeControl(routingControl);
+                    map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
+                        padding: [100, 100], 
+                        duration: 0.4 // Faster duration to reduce the "unstable" window
+                    });
 
-                    // 2. Perform a fast, non-animated jump to bounds to prevent projection lag [cite: 2025-12-27]
-                    map.fitBounds(L.latLngBounds(e.routes[0].coordinates), { padding: [100, 100] });
-
-                    // 3. Re-add the route once the map is stationary [cite: 2025-12-27]
-                    setTimeout(() => {
-                        routingControl.addTo(map);
-                        // Refresh the widget [cite: 2025-12-27]
-                        routingControl.fire('routesfound', {routes: e.routes});
-                    }, 50);
+                    // FRAME-LOCK: Forces a total redraw the millisecond movement stops
+                    map.once('moveend', () => {
+                        requestAnimationFrame(() => {
+                           routingControl.getPlan().setWaypoints(wps);
+                           // Manually trigger widget refresh to keep ETA flag in sync
+                           routingControl.fire('routesfound', {routes: e.routes});
+                        });
+                    });
                 }
             });
         }
