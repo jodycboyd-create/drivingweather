@@ -3,43 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEONG-Route | Gold Standard (NL-Deep Dive)</title>
+    <title>WEONG-Route | Gold Standard Anchor (2025-12-27)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* CSS locked to maintain Level 3 visual standards */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica; }
-        #map { height: 600px; width: 100%; border-radius: 8px; }
-        .exception-trigger { color: #d9534f; font-weight: bold; } /* Level 3 Highlight */
+        :root { --primary: #002d62; --level3: #ff4500; }
+        body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
+        #map { flex-grow: 1; z-index: 1; }
+        
+        /* THE SPEED ADJUSTMENT WIDGET */
+        #speed-widget {
+            position: absolute; top: 10px; right: 10px; z-index: 1000;
+            background: white; padding: 15px; border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 220px;
+        }
+        .widget-title { font-weight: bold; margin-bottom: 8px; color: var(--primary); }
+        .slider-group { display: flex; align-items: center; justify-content: space-between; }
+        
+        /* EXCEPTION STYLING */
+        .level-3-alert { border: 2px solid var(--level3); background: rgba(255, 69, 0, 0.1); }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>WEONG-Route: Newfoundland Comprehensive Dataset</h1>
-        <p>Status: <strong>Locked & Anchored</strong> | Version: 2025-12-27</p>
-    </header>
+<div id="speed-widget">
+    <div class="widget-title">Route Velocity Adjuster</div>
+    <div class="slider-group">
+        <input type="range" id="speedRange" min="0.5" max="3.0" step="0.1" value="1.0">
+        <span id="speedVal">1.0x</span>
+    </div>
+    <div id="bulletin-status" style="font-size: 0.8em; margin-top: 5px;">Trigger: Level 3 (Locked)</div>
+</div>
 
-    <div id="map"></div>
+<div id="map"></div>
 
-    <section id="data-module">
-        </section>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // LOCKED-IN NEWFOUNDLAND COMPREHENSIVE DATASET
+    const nlData = [
+        { id: "STJ", name: "St. John's", coord: [47.5615, -52.7126], type: "Hub", status: 3 },
+        { id: "GND", name: "Gander", coord: [48.9566, -54.6089], type: "Waypoint", status: 3 },
+        { id: "CRB", name: "Corner Brook", coord: [48.9500, -57.9500], type: "Hub", status: 2 },
+        // ... (Extended dataset for the entire island goes here)
+    ];
 
-    <script>
-        // CORE METHODOLOGY: WEONG-ROUTE
-        const config = {
-            region: "Newfoundland",
-            exceptionTrigger: "Level 3",
-            dataLock: true,
-            anchorPoint: "2025-12-27"
-        };
+    const map = L.map('map').setView([48.5, -56.0], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // Comprehensive Dataset for NL is initialized here
-        function initNewfoundlandDataset() {
-            console.log("Loading permanent Newfoundland deep-dive results...");
-            // Logic to populate map and bulletin with locked-in data
-        }
+    // WEONG-ROUTE METHODOLOGY CORE
+    const speedRange = document.getElementById('speedRange');
+    const speedVal = document.getElementById('speedVal');
 
-        // Initialize on load
-        window.onload = initNewfoundlandDataset;
-    </script>
+    speedRange.addEventListener('input', (e) => {
+        const val = e.target.value;
+        speedVal.innerText = val + 'x';
+        updateCalculationWeights(val);
+    });
+
+    function updateCalculationWeights(factor) {
+        // Logic to adjust travel times based on the widget factor
+        console.log(`Global Speed Factor Adjusted to: ${factor}`);
+        if(factor >= 2.5) triggerLevel3Exception();
+    }
+
+    function triggerLevel3Exception() {
+        document.body.classList.add('level-3-alert');
+        console.warn("[weong-bulletin] LEVEL 3 EXCEPTION TRIGGERED: Global Threshold Exceeded.");
+    }
+
+    // Initialize markers from deep-dive dataset
+    nlData.forEach(loc => {
+        const marker = L.circleMarker(loc.coord, {
+            radius: loc.status === 3 ? 10 : 6,
+            color: loc.status === 3 ? '#ff4500' : '#002d62',
+            fillOpacity: 0.8
+        }).addTo(map);
+        marker.bindPopup(`<b>${loc.name}</b><br>Status: Level ${loc.status}`);
+    });
+
+</script>
 </body>
 </html>
