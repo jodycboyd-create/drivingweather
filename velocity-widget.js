@@ -1,85 +1,77 @@
 /**
- * [weong-route] Module: Velocity Widget (Resilient Sync)
- * Fixes: Re-activates widget for the "Zero-Ghost" routing logic. [cite: 2025-12-27]
+ * [weong-route] Module: Velocity Widget (Segment-Aware)
+ * Logic: Calculates ETA based on road type instead of a flat 100km/h. [cite: 2025-12-27]
  */
 (function() {
-    let driveSpeed = 100;
+    let speedOffset = 0; // User can still +/- to adjust for weather/traffic
     let etaMarker = null;
     let currentRouter = null;
 
     function initWidget() {
         if (document.getElementById('velocity-panel')) return;
-
         const ui = document.createElement('div');
         ui.id = 'velocity-panel';
-        ui.style.cssText = `position:absolute; bottom:30px; left:30px; z-index:1000; background:rgba(0,18,32,0.9); padding:20px; border-radius:12px; color:white; font-family:sans-serif; width:200px; border:1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: auto;`;
+        ui.style.cssText = `position:absolute; bottom:30px; left:30px; z-index:1000; background:rgba(0,18,32,0.9); padding:20px; border-radius:12px; color:white; font-family:sans-serif; width:220px; border:1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.5);`;
         ui.innerHTML = `
-            <div style="font-size:10px; color:#00B4DB; font-weight:bold; letter-spacing:1px;">DRIVE VELOCITY</div>
-            <div style="font-size:24px; margin:10px 0;"><span id="speedVal">100</span> <small style="font-size:12px; color:#888;">km/h</small></div>
+            <div style="font-size:10px; color:#00B4DB; font-weight:bold; letter-spacing:1px;">VELOCITY OVERRIDE</div>
+            <div style="font-size:20px; margin:10px 0;"><span id="speedVal">±0</span> <small style="font-size:12px; color:#888;">km/h offset</small></div>
             <div style="display:flex; gap:5px;">
                 <button id="minusBtn" style="cursor:pointer; padding:5px 10px; background:#333; color:white; border:none; border-radius:4px;">−</button> 
                 <button id="plusBtn" style="cursor:pointer; padding:5px 10px; background:#333; color:white; border:none; border-radius:4px;">+</button>
             </div>
+            <div style="margin-top:10px; font-size:11px; color:#aaa; line-height:1.4;">
+                TCH: 100 | Routes: 80 | Local: 50
+            </div>
             <div style="margin-top:10px; font-size:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
-                Dist: <span id="totalDist">0</span> km
+                Total: <span id="totalDist">0</span> km
             </div>
         `;
         document.body.appendChild(ui);
-
-        document.getElementById('minusBtn').onclick = () => adjustSpeed(-5);
-        document.getElementById('plusBtn').onclick = () => adjustSpeed(5);
+        document.getElementById('minusBtn').onclick = () => { speedOffset -= 5; updateUI(); };
+        document.getElementById('plusBtn').onclick = () => { speedOffset += 5; updateUI(); };
     }
 
-    function adjustSpeed(delta) {
-        driveSpeed = Math.max(30, Math.min(130, driveSpeed + delta));
-        document.getElementById('speedVal').innerText = driveSpeed;
-        updateETA();
+    function updateUI() {
+        document.getElementById('speedVal').innerText = (speedOffset >= 0 ? "+" : "") + speedOffset;
+        // Trigger a re-calculation based on the current last-known route
+        if (window.lastRouteData) calculateSegmentETA(window.lastRouteData);
     }
 
-    function updateETA(dist) {
-        const d = dist || parseFloat(document.getElementById('totalDist').innerText);
-        if (isNaN(d) || d === 0) return;
-        const hours = d / driveSpeed;
-        const h = Math.floor(hours);
-        const m = Math.round((hours - h) * 60);
+    function calculateSegmentETA(route) {
+        window.lastRouteData = route;
+        let totalTimeHours = 0;
+        const totalDistKm = route.summary.totalDistance / 1000;
+
+        // Iterate through segments to detect road types [cite: 2025-12-27]
+        route.instructions.forEach(instr => {
+            const dist = instr.distance / 1000;
+            const text = instr.road || "";
+            let speed = 50; // Default local speed [cite: 2025-12-27]
+
+            if (text.includes("Trans-Canada") || text.includes("TCH") || text.includes("NL-1")) {
+                speed = 100;
+            } else if (text.match(/Route\s\d+/) || text.match(/Hwy\s\d+/)) {
+                speed = 80;
+            }
+
+            // Apply the user's manual offset (e.g., -20 for snow)
+            const effectiveSpeed = Math.max(10, speed + speedOffset);
+            totalTimeHours += (dist / effectiveSpeed);
+        });
+
+        const h = Math.floor(totalTimeHours);
+        const m = Math.round((totalTimeHours - h) * 60);
+
+        document.getElementById('totalDist').innerText = totalDistKm.toFixed(1);
         const flag = document.getElementById('flagTime');
         if (flag) flag.innerText = `${h}h ${m}m`;
     }
 
-    /**
-     * The Heartbeat: Ensures we are always listening to the ACTIVE router [cite: 2025-12-27]
-     */
     setInterval(() => {
-        if (window.weongMap && !document.getElementById('velocity-panel')) {
-            initWidget();
-        }
-
-        // If the router instance has changed or was just created [cite: 2025-12-27]
+        if (window.weongMap && !document.getElementById('velocity-panel')) initWidget();
         if (window.weongRouter && window.weongRouter !== currentRouter) {
             currentRouter = window.weongRouter;
-            
-            currentRouter.on('routesfound', function(e) {
-                const route = e.routes[0];
-                const dist = route.summary.totalDistance / 1000;
-                const distEl = document.getElementById('totalDist');
-                if (distEl) distEl.innerText = dist.toFixed(1);
-                
-                const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
-                
-                if (!etaMarker) {
-                    etaMarker = L.marker(mid, {
-                        icon: L.divIcon({ 
-                            className: 'eta-flag', 
-                            html: '<div id="flagTime" style="background:#1A73E8; color:white; padding:5px 10px; border-radius:15px; border:2px solid white; font-weight:bold; white-space:nowrap; box-shadow:0 2px 5px rgba(0,0,0,0.3);">--</div>',
-                            iconSize: [80, 30],
-                            iconAnchor: [40, 15]
-                        })
-                    }).addTo(window.weongMap);
-                } else {
-                    etaMarker.setLatLng(mid);
-                }
-                updateETA(dist);
-            });
+            currentRouter.on('routesfound', (e) => calculateSegmentETA(e.routes[0]));
         }
     }, 500);
 })();
