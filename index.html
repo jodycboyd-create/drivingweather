@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Coastline Enforcer</title>
+    <title>WEonG - Absolute Snap Fix</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -24,28 +24,31 @@
 
 <script>
     /**
-     * [weong-route] - Coastline Snapping Logic
-     * Goal: Prevent markers from staying in the Atlantic [cite: 2025-12-25]
+     * [weong-route] - FIXED SNAP Logic
+     * Strategy: Destroy and Rebuild markers on dragend to force physical land-locking.
      */
-    let map, communities = [], marker1, marker2, routingControl;
+    let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
         map = L.map('map').setView([48.9, -55.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Loading the locked-in 2025 Newfoundland community dataset [cite: 2025-12-26]
+            // Loading the locked-in 2025 Newfoundland dataset
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            setupMarkers();
+            // Spawn initial pins at GFW and Gander
+            spawnOrUpdateMarker(0, [48.9351, -55.6562]); 
+            spawnOrUpdateMarker(1, [48.9566, -54.6089]);
+            
+            updateRoute();
         } catch (e) {
-            console.error("Critical: Newfoundland dataset not found.");
+            console.error("Critical: Dataset missing.");
         }
     }
 
-    // THE MAGNET: Finds the nearest town node from the database [cite: 2025-12-26]
     function findNearestLandNode(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
@@ -54,54 +57,46 @@
         });
     }
 
-    function setupMarkers() {
-        // Points initialized at GFW and Gander [cite: 2025-12-26]
-        marker1 = createEnforcedMarker([48.9351, -55.6562], "Point A");
-        marker2 = createEnforcedMarker([48.9566, -54.6089], "Point B");
+    function spawnOrUpdateMarker(index, coords) {
+        const town = findNearestLandNode(L.latLng(coords));
+        const snappedPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
 
-        routingControl = L.Routing.control({
-            waypoints: [marker1.getLatLng(), marker2.getLatLng()],
-            createMarker: () => null, // Kills "Ghost Pins" from image_e930ee.png [cite: 2025-12-25]
-            addWaypoints: false,
-            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
-        }).addTo(map);
-    }
+        // PHYSICAL DESTROY: Prevents "Bishop's Falls" duplicates
+        if (markers[index]) map.removeLayer(markers[index]);
 
-    function createEnforcedMarker(coords, defaultName) {
-        const marker = L.marker(coords, { draggable: true }).addTo(map);
-        
-        const updateUI = (ll) => {
-            const town = findNearestLandNode(ll);
-            marker.bindTooltip(town.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label' 
-            }).openTooltip();
-        };
+        const marker = L.marker(snappedPos, { draggable: true }).addTo(map);
+        marker.bindTooltip(town.properties.name, { 
+            permanent: true, direction: 'top', className: 'snapping-label' 
+        }).openTooltip();
 
-        updateUI(L.latLng(coords));
+        markers[index] = marker;
 
-        // Drag event: Just update the label name while moving
+        // Visual name update while moving
         marker.on('drag', () => {
-            updateUI(marker.getLatLng());
-            syncRoute();
+            const currentTown = findNearestLandNode(marker.getLatLng());
+            marker.setTooltipContent(currentTown.properties.name);
         });
 
-        // RELEASE EVENT: THE PHYSICAL SNAP [cite: 2025-12-25]
-        marker.on('dragend', () => {
-            const snappedNode = findNearestLandNode(marker.getLatLng());
-            const lockedPos = [snappedNode.geometry.coordinates[1], snappedNode.geometry.coordinates[0]];
-            
-            // This line physically teleports the pin out of the ocean [cite: 2025-12-25]
-            marker.setLatLng(lockedPos);
-            updateUI(L.latLng(lockedPos));
-            syncRoute();
+        // THE PHYSICAL LOCK: Force snap to land on release
+        marker.on('dragend', (e) => {
+            spawnOrUpdateMarker(index, e.latlng);
+            updateRoute();
         });
-
-        return marker;
     }
 
-    function syncRoute() {
+    function updateRoute() {
+        if (!markers[0] || !markers[1]) return;
+        const pts = [markers[0].getLatLng(), markers[1].getLatLng()];
+
         if (routingControl) {
-            routingControl.setWaypoints([marker1.getLatLng(), marker2.getLatLng()]);
+            routingControl.setWaypoints(pts);
+        } else {
+            routingControl = L.Routing.control({
+                waypoints: pts,
+                createMarker: () => null, // NEVER let the engine create markers
+                addWaypoints: false,
+                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+            }).addTo(map);
         }
     }
 
