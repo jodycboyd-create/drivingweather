@@ -14,8 +14,8 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        .leaflet-overlay-pane svg { transition: none !important; }
         .leaflet-routing-container { display: none !important; }
+        .leaflet-overlay-pane svg { transition: none !important; }
     </style>
 </head>
 <body>
@@ -27,7 +27,7 @@
 <script>
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
-     * Fixed: Label Freeze & Disappearing Route [cite: 2025-12-27]
+     * Fixed: Route Visibility & Handshake [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -60,33 +60,19 @@
         const anchors = [[48.9454, -57.9415], [47.5615, -52.7126]];
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
-            const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { 
-                draggable: true 
-            }).addTo(map);
-            
-            // Initial Label Bind
-            marker.bindTooltip(nearest.properties.name, { 
-                permanent: true, className: 'snapping-label' 
-            }).openTooltip();
-            
+            const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { draggable: true }).addTo(map);
+            marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
             
             marker.on('drag', (e) => {
                 const live = findNearestNode(e.latlng);
-                marker.setTooltipContent(live.properties.name); // Live feedback during drag
+                marker.setTooltipContent(live.properties.name);
             });
 
             marker.on('dragend', () => {
                 const final = findNearestNode(marker.getLatLng());
-                const finalPos = [final.geometry.coordinates[1], final.geometry.coordinates[0]];
-                
-                // HARD-LOCK: Rebind tooltip to fix the "Corner Brook" freeze [cite: 2025-12-27]
-                marker.setLatLng(finalPos);
-                marker.unbindTooltip();
-                marker.bindTooltip(final.properties.name, { 
-                    permanent: true, className: 'snapping-label' 
-                }).openTooltip();
-                
+                marker.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
+                marker.unbindTooltip().bindTooltip(final.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
                 syncRoute();
             });
         });
@@ -113,29 +99,17 @@
                     extendToWaypoints: true 
                 }
             }).addTo(map);
-
             window.weongRouter = routingControl;
 
             routingControl.on('routesfound', (e) => {
                 if (!map.dragging.moving()) {
-                    map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
-                        padding: [100, 100], 
-                        duration: 0.5 
-                    });
-                    
-                    // RE-ANCHOR: Ensure the route stays visible after the zoom finishes [cite: 2025-12-27]
-                    map.once('moveend', () => {
-                        requestAnimationFrame(() => {
-                           routingControl.getPlan().setWaypoints(wps);
-                        });
-                    });
+                    map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { padding: [100, 100], duration: 0.5 });
                 }
             });
         }
     }
     window.onload = init;
 </script>
-
 <script src="velocity-widget.js"></script>
 </body>
 </html>
