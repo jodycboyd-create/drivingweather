@@ -1,109 +1,63 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Gravity Lock</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
-        /* High-visibility labels for NL communities [cite: 2025-12-26] */
-        .snapping-label {
-            font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); white-space: nowrap;
-            pointer-events: none; font-size: 14px;
-        }
-    </style>
-</head>
-<body>
-<div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+/**
+ * [weong-route] - Absolute Gravity Restoration
+ * Goal: Fix the "Floating Pin" issue seen in image_e90f5f.png
+ * Logic: Force-Teleport on DragEnd [cite: 2025-12-25]
+ */
 
-<script>
-    /**
-     * Build: [weong-route] Robust Gravity & Boundary Build
-     * Strategy: Absolute Coordinate Rejection (ACR) [cite: 2025-12-25]
-     * Dataset: Locked Newfoundland Comprehensive [cite: 2025-12-26]
-     */
-    let map, communities = [];
+function createLockedMarker(initialCoords, index) {
+    // 1. Find nearest locked community node for initial placement [cite: 2025-12-26]
+    const startNode = findNearestCommunity(L.latLng(initialCoords));
+    const startPos = [startNode.geometry.coordinates[1], startNode.geometry.coordinates[0]];
 
-    async function init() {
-        // Initialize map centered on the Newfoundland landmass [cite: 2025-12-26]
-        map = L.map('map', {
-            minZoom: 6,
-            maxZoom: 12
-        }).setView([48.5, -55.8], 7);
+    const marker = L.marker(startPos, { 
+        draggable: true,
+        autoPan: true 
+    }).addTo(map);
+
+    // Update the visual label [cite: 2025-12-26]
+    const updateLabel = (latlng) => {
+        const node = findNearestCommunity(latlng);
+        marker.bindTooltip(node.properties.name, { 
+            permanent: true, 
+            direction: 'top', 
+            className: 'snapping-label' 
+        }).openTooltip();
+    };
+
+    updateLabel(L.latLng(startPos));
+
+    // Real-time name changes while dragging
+    marker.on('drag', (e) => updateLabel(e.latlng));
+
+    // THE RESTORED SNAP: This is what was lost [cite: 2025-12-25]
+    marker.on('dragend', function(e) {
+        // A. Identify the nearest physical community from the deep-dive dataset
+        const finalNode = findNearestCommunity(e.latlng);
+        const snappedCoords = [finalNode.geometry.coordinates[1], finalNode.geometry.coordinates[0]];
         
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        // B. FORCE TELEPORT: This kills the "floating in water" bug
+        // We override the mouse drop position entirely [cite: 2025-12-25].
+        marker.setLatLng(snappedCoords);
+        
+        // C. RE-SYNC: Ensure label and internal state are locked [cite: 2025-12-26]
+        updateLabel(L.latLng(snappedCoords));
+        
+        console.log(`[weong-route] Locked to: ${finalNode.properties.name}`);
+        
+        // Trigger route update if engine is active
+        if(window.routingControl) updateRoute();
+    });
 
-        try {
-            // Updated Path: Reflecting the new GitHub directory structure [cite: 2025-12-26]
-            const response = await fetch('data/nl/communities.json');
-            const data = await response.json();
-            communities = data.features;
-            
-            // Spawn initial "Locked" pins for Central Newfoundland [cite: 2025-12-26]
-            spawnGravityMarker([48.9351, -55.6562]); // Grand Falls-Windsor
-            spawnGravityMarker([48.9566, -54.6089]); // Gander
-            
-        } catch (e) {
-            console.error("CRITICAL: Newfoundland Dataset failed to load from GitHub structure.");
-        }
-    }
+    return marker;
+}
 
-    function spawnGravityMarker(initialCoords) {
-        // 1. Force the first placement onto the community grid [cite: 2025-12-26]
-        const startNode = findNearestCommunity(L.latLng(initialCoords));
-        const startPos = [startNode.geometry.coordinates[1], startNode.geometry.coordinates[0]];
-
-        const marker = L.marker(startPos, { 
-            draggable: true,
-            zIndexOffset: 1000 
-        }).addTo(map);
-
-        const syncUI = (latlng) => {
-            const node = findNearestCommunity(latlng);
-            marker.bindTooltip(node.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label', offset: [0, -10]
-            }).openTooltip();
-        };
-
-        syncUI(L.latLng(startPos));
-
-        // 2. Real-time name updates while dragging across the coast
-        marker.on('drag', (e) => syncUI(e.latlng));
-
-        // 3. THE REJECTION LOGIC: Prevents "Atlantic Floating" [cite: 2025-12-25]
-        marker.on('dragend', function(e) {
-            // A. Search the locked dataset for the closest valid community
-            const lockedNode = findNearestCommunity(e.latlng);
-            const finalPos = [lockedNode.geometry.coordinates[1], lockedNode.geometry.coordinates[0]];
-            
-            // B. PHYSICAL TELEPORT: 
-            // Reject the user's drop location if it is in the water or wilderness.
-            // This forces the pin to "snap" back to a valid town [cite: 2025-12-25].
-            marker.setLatLng(finalPos);
-            
-            // C. LOCK-IN: Ensure the label matches the teleported position [cite: 2025-12-26]
-            syncUI(L.latLng(finalPos));
-            
-            console.log(`[weong-route] Gravity Lock: ${lockedNode.properties.name}`);
-        });
-    }
-
-    /**
-     * Core Algorithm: Spatial Nearest-Neighbor Search
-     * Constraints: Strict adherence to the locked NL dataset [cite: 2025-12-26]
-     */
-    function findNearestCommunity(mouseLatLng) {
-        return communities.reduce((prev, curr) => {
-            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return mouseLatLng.distanceTo(c) < mouseLatLng.distanceTo(p) ? curr : prev;
-        });
-    }
-
-    window.onload = init;
-</script>
-</body>
-</html>
+/**
+ * Dataset Search: Only recognizes communities in the locked NL file [cite: 2025-12-26]
+ */
+function findNearestCommunity(latlng) {
+    return communities.reduce((prev, curr) => {
+        const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+        const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+        return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
+    });
+}
