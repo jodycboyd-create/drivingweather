@@ -3,17 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Newfoundland Road Engine [v1.1 Diagnostic]</title>
+    <title>WEonG - Newfoundland Road Engine [v1.5 All-Seeing Magnet]</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        
+        /* [weong-route] Foundation Styling */
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: none;
             white-space: nowrap;
         }
+
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -26,28 +31,32 @@
 
 <script>
     /**
-     * [weong-route] - Diagnostic Foundation
-     * GOAL: Verify if Moreton's Harbour is reachable in the dataset.
+     * [weong-route] - Foundation: All-Seeing Magnet Build
+     * Methodology: Multi-Source Snap (JSON + Manual Overrides)
+     * LOCKED: Corner Brook to St. John's Default
      */
     let map, communities = [], markers = [null, null], routingControl;
 
+    // PRECISION ANCHORS: Ensuring small communities are never skipped
+    const PRECISION_NODES = [
+        { name: "Bridgeport", lat: 49.5520, lng: -54.8750 },
+        { name: "Moreton's Harbour", lat: 49.5667, lng: -54.8667 },
+        { name: "Valley Pond", lat: 49.5390, lng: -54.8480 },
+        { name: "Tizzard's Harbour", lat: 49.5960, lng: -54.8140 }
+    ];
+
     async function init() {
-        map = L.map('map').setView([48.8, -55.8], 6); // Whole Island View
+        // Starts showing the entire island
+        map = L.map('map').setView([48.8, -55.8], 6);
         
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
         try {
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
-            
-            // QUICK CHECK: Is Moreton's Harbour in the file?
-            const mh = communities.find(c => c.properties.name.includes("Moreton"));
-            if (mh) {
-                console.log("FOUND Moreton's Harbour in JSON:", mh.geometry.coordinates);
-            } else {
-                console.warn("Moreton's Harbour NOT found in communities.json!");
-            }
             
             setupFoundationMarkers();
         } catch (e) {
@@ -55,16 +64,40 @@
         }
     }
 
+    /**
+     * The Magnet: Checks JSON first, then applies Precision Anchors.
+     */
     function findNearestLandNode(latlng) {
-        return communities.reduce((prev, curr) => {
-            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
-        });
+        // 1. Create a master list of all searchable points
+        const allPoints = [
+            ...communities.map(c => ({
+                name: c.properties.name,
+                lat: c.geometry.coordinates[1],
+                lng: c.geometry.coordinates[0]
+            })),
+            ...PRECISION_NODES
+        ];
+
+        // 2. Find the absolute closest point to the mouse/marker
+        let nearest = allPoints[0];
+        let minDistance = latlng.distanceTo(L.latLng(nearest.lat, nearest.lng));
+
+        for (let i = 1; i < allPoints.length; i++) {
+            const d = latlng.distanceTo(L.latLng(allPoints[i].lat, allPoints[i].lng));
+            if (d < minDistance) {
+                minDistance = d;
+                nearest = allPoints[i];
+            }
+        }
+
+        return {
+            properties: { name: nearest.name },
+            geometry: { coordinates: [nearest.lng, nearest.lat] }
+        };
     }
 
     function setupFoundationMarkers() {
-        // Defaults: Corner Brook and St. John's
+        // Anchors: Corner Brook to St. John's
         const anchors = [
             { lat: 48.9515, lng: -57.9485 },
             { lat: 47.5615, lng: -52.7126 }
@@ -81,40 +114,39 @@
             
             markers[i] = marker;
 
+            // Update label name while dragging
             marker.on('drag', (e) => {
                 const liveTown = findNearestLandNode(e.latlng);
                 marker.setTooltipContent(liveTown.properties.name);
             });
 
+            // Physical Snap on release
             marker.on('dragend', () => {
                 const finalTown = findNearestLandNode(marker.getLatLng());
                 marker.setLatLng([finalTown.geometry.coordinates[1], finalTown.geometry.coordinates[0]]); 
                 syncHighway();
             });
         });
+
         syncHighway();
     }
 
     function syncHighway() {
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
+
         if (routingControl) {
             routingControl.setWaypoints(wps);
         } else {
             routingControl = L.Routing.control({
                 waypoints: wps,
-                createMarker: () => null,
+                createMarker: () => null, 
                 addWaypoints: false,
-                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+                lineOptions: { 
+                    styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] 
+                }
             }).addTo(map);
 
+            // Auto-Zoom to route after calculation
             routingControl.on('routesfound', function(e) {
                 const bounds = L.latLngBounds(e.routes[0].coordinates);
                 map.flyToBounds(bounds, { padding: [80, 80], duration: 1.5 });
-            });
-        }
-    }
-
-    window.onload = init;
-</script>
-</body>
-</html>
