@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Hard Magnet [weong-route]</title>
+    <title>WEonG - Label-Sync Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -23,8 +23,8 @@
 
 <script>
     /**
-     * [weong-route] - Hard Magnet Methodology
-     * LOCKED: Forced snap to dataset coordinates on release [cite: 2025-12-23]
+     * [weong-route] - Label-Sync Methodology
+     * Strategy: Force marker GPS to match the town name displayed in the tooltip.
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -38,13 +38,9 @@
             const data = await response.json();
             communities = data.features;
             
-            // Hard-locked Initial Spawn [cite: 2025-12-26]
-            spawnLockedMarker(0, [48.9351, -55.6562]); // GFW
-            spawnLockedMarker(1, [48.9566, -54.6089]); // Gander
-            
-            updateRoute();
+            setupHardMarkers();
         } catch (e) {
-            console.error("Dataset load error.");
+            console.error("Dataset load error. [cite: 2025-12-26]");
         }
     }
 
@@ -56,44 +52,50 @@
         });
     }
 
-    function spawnLockedMarker(index, coords) {
-        const town = findNearestLandNode(L.latLng(coords));
-        const townPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+    function setupHardMarkers() {
+        // Initial locked positions for GFW and Gander [cite: 2025-12-26]
+        const pts = [[48.9351, -55.6562], [48.9566, -54.6089]];
+        
+        pts.forEach((coords, i) => {
+            const town = findNearestLandNode(L.latLng(coords));
+            const pos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+            
+            const marker = L.marker(pos, { draggable: true }).addTo(map);
+            marker.bindTooltip(town.properties.name, { 
+                permanent: true, direction: 'top', className: 'snapping-label' 
+            }).openTooltip();
+            
+            markers[i] = marker;
 
-        // DELETE old marker to prevent "Bishop's Falls" ghosting [cite: 2025-12-25]
-        if (markers[index]) map.removeLayer(markers[index]);
+            // Continues the logic you observed: label updates as you move
+            marker.on('drag', (e) => {
+                const liveTown = findNearestLandNode(e.latlng);
+                marker.setTooltipContent(liveTown.properties.name);
+            });
 
-        // SPAWN NEW marker at exact dataset coordinate [cite: 2025-12-25]
-        const marker = L.marker(townPos, { draggable: true }).addTo(map);
-        marker.bindTooltip(town.properties.name, { 
-            permanent: true, direction: 'top', className: 'snapping-label' 
-        }).openTooltip();
-
-        markers[index] = marker;
-
-        // Visual name feedback while dragging
-        marker.on('drag', (e) => {
-            const tempTown = findNearestLandNode(e.latlng);
-            marker.setTooltipContent(tempTown.properties.name);
+            // THE TRIGGER: Force GPS to follow the Label [cite: 2025-12-25]
+            marker.on('dragend', () => {
+                const finalTown = findNearestLandNode(marker.getLatLng());
+                const lockedCoords = [finalTown.geometry.coordinates[1], finalTown.geometry.coordinates[0]];
+                
+                // Physical teleport to ensure no ocean floating [cite: 2025-12-25]
+                marker.setLatLng(lockedCoords); 
+                syncHighway();
+            });
         });
 
-        // THE MAGNET: On release, kill the "loose" marker and re-spawn at town center
-        marker.on('dragend', (e) => {
-            spawnLockedMarker(index, e.latlng);
-            updateRoute();
-        });
+        syncHighway();
     }
 
-    function updateRoute() {
-        if (!markers[0] || !markers[1]) return;
-        const pts = [markers[0].getLatLng(), markers[1].getLatLng()];
+    function syncHighway() {
+        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
         if (routingControl) {
-            routingControl.setWaypoints(pts);
+            routingControl.setWaypoints(wps);
         } else {
             routingControl = L.Routing.control({
-                waypoints: pts,
-                createMarker: () => null, // Kills LRM's buggy markers [cite: 2025-12-25]
+                waypoints: wps,
+                createMarker: () => null, // Kills the duplicate "Ghost Pins" [cite: 2025-12-25]
                 addWaypoints: false,
                 lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
