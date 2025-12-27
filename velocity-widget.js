@@ -1,9 +1,9 @@
 /**
- * [weong-route] Module: Velocity Widget (Segment-Aware)
- * Logic: Calculates ETA based on road type instead of a flat 100km/h. [cite: 2025-12-27]
+ * [weong-route] Module: Velocity Widget (Midpoint Flag Restoration)
+ * Logic: Forces the ETA flag to render on the Canvas-Locked map. [cite: 2025-12-27]
  */
 (function() {
-    let speedOffset = 0; // User can still +/- to adjust for weather/traffic
+    let speedOffset = 0;
     let etaMarker = null;
     let currentRouter = null;
 
@@ -33,7 +33,6 @@
 
     function updateUI() {
         document.getElementById('speedVal').innerText = (speedOffset >= 0 ? "+" : "") + speedOffset;
-        // Trigger a re-calculation based on the current last-known route
         if (window.lastRouteData) calculateSegmentETA(window.lastRouteData);
     }
 
@@ -42,29 +41,43 @@
         let totalTimeHours = 0;
         const totalDistKm = route.summary.totalDistance / 1000;
 
-        // Iterate through segments to detect road types [cite: 2025-12-27]
         route.instructions.forEach(instr => {
             const dist = instr.distance / 1000;
             const text = instr.road || "";
-            let speed = 50; // Default local speed [cite: 2025-12-27]
-
+            let speed = 50; 
             if (text.includes("Trans-Canada") || text.includes("TCH") || text.includes("NL-1")) {
                 speed = 100;
             } else if (text.match(/Route\s\d+/) || text.match(/Hwy\s\d+/)) {
                 speed = 80;
             }
-
-            // Apply the user's manual offset (e.g., -20 for snow)
             const effectiveSpeed = Math.max(10, speed + speedOffset);
             totalTimeHours += (dist / effectiveSpeed);
         });
 
         const h = Math.floor(totalTimeHours);
         const m = Math.round((totalTimeHours - h) * 60);
+        const timeStr = `${h}h ${m}m`;
 
         document.getElementById('totalDist').innerText = totalDistKm.toFixed(1);
-        const flag = document.getElementById('flagTime');
-        if (flag) flag.innerText = `${h}h ${m}m`;
+
+        // FLAG RESTORATION LOGIC [cite: 2025-12-27]
+        const midIdx = Math.floor(route.coordinates.length / 2);
+        const midCoord = route.coordinates[midIdx];
+
+        if (!etaMarker) {
+            etaMarker = L.marker(midCoord, {
+                icon: L.divIcon({ 
+                    className: 'eta-flag', 
+                    html: `<div id="flagTime" style="background:#1A73E8; color:white; padding:5px 10px; border-radius:15px; border:2px solid white; font-weight:bold; white-space:nowrap; box-shadow:0 2px 5px rgba(0,0,0,0.3); font-family:sans-serif;">${timeStr}</div>`,
+                    iconSize: [80, 30],
+                    iconAnchor: [40, 15]
+                })
+            }).addTo(window.weongMap);
+        } else {
+            etaMarker.setLatLng(midCoord);
+            const flag = document.getElementById('flagTime');
+            if (flag) flag.innerText = timeStr;
+        }
     }
 
     setInterval(() => {
