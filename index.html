@@ -2,17 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - [weong-route] Absolute Reset</title>
+    <title>WEonG - Newfoundland Absolute Anchor</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
-        .snapping-label {
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        .anchor-label {
             font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4); white-space: nowrap; pointer-events: none;
+            border: 2px solid #0047AB; padding: 5px 10px; border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); pointer-events: none;
         }
-        /* Completely suppress the default LRM UI to avoid "Ghost" sync issues */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -24,87 +23,67 @@
 
 <script>
     /**
-     * [weong-route] - Zero-Ghosting Engine
-     * Logic: The Marker coordinate is a slave to the Newfoundland Dataset [cite: 2025-12-26]
+     * [weong-route] - Zero-Float Reset
+     * Method: Click-to-Anchor (Eliminates Drag-Drop bugs) [cite: 2025-12-25]
+     * Data: Locked 2025 Newfoundland Dataset [cite: 2025-12-26]
      */
-    let map, communities = [], markers = [], routingControl;
+    let map, communities = [], waypoints = [], routingControl;
 
     async function init() {
         map = L.map('map').setView([48.9, -55.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Re-loading the locked 2025 Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Generate the baseline locked pins [cite: 2025-12-26]
-            spawnHardMarker([48.9351, -55.6562]); // GFW
-            spawnHardMarker([48.9566, -54.6089]); // Gander
-            
-            forceRouteSync();
+            // Render the towns as invisible "Magnetic Zones" [cite: 2025-12-26]
+            renderMagneticZones();
         } catch (e) {
-            console.error("Fatal Error: /data/nl/communities.json not found.");
+            console.error("Newfoundland dataset failed to load.");
         }
     }
 
-    // THE GRAVITY CORE: Finds the EXACT node in your database [cite: 2025-12-26]
-    function findNearestNode(latlng) {
-        return communities.reduce((prev, curr) => {
-            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
-        });
-    }
-
-    function spawnHardMarker(coords) {
-        const node = findNearestNode(L.latLng(coords));
-        const finalPos = [node.geometry.coordinates[1], node.geometry.coordinates[0]];
-
-        // Create the marker specifically on a community coordinate [cite: 2025-12-26]
-        const marker = L.marker(finalPos, { draggable: true }).addTo(map);
-        markers.push(marker);
-
-        const updateTooltip = (ll) => {
-            const currentTown = findNearestNode(ll);
-            marker.bindTooltip(currentTown.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label' 
-            }).openTooltip();
-        };
-
-        updateTooltip(L.latLng(finalPos));
-
-        // Drag Event: Visual only feedback
-        marker.on('drag', (e) => updateTooltip(e.latlng));
-
-        // THE LOCK: On drop, the mouse release point is DISCARDED [cite: 2025-12-25]
-        marker.on('dragend', function(e) {
-            const snappedNode = findNearestNode(e.latlng);
-            const snappedPos = [snappedNode.geometry.coordinates[1], snappedNode.geometry.coordinates[0]];
+    function renderMagneticZones() {
+        communities.forEach(town => {
+            const coords = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
             
-            // Hard teleport to land-locked coordinate [cite: 2025-12-25]
-            marker.setLatLng(snappedPos);
-            updateTooltip(L.latLng(snappedPos));
-            
-            // Force the route line to sync ONLY with the snapped pins
-            forceRouteSync();
-        });
-    }
-
-    function forceRouteSync() {
-        if (!routingControl) {
-            // Suppression of "Ghost Pins": createMarker returns null [cite: 2025-12-25]
-            routingControl = L.Routing.control({
-                waypoints: markers.map(m => m.getLatLng()),
-                createMarker: () => null, 
-                addWaypoints: false,
-                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+            // Create a small, invisible circle over every town node [cite: 2025-12-26]
+            const zone = L.circleMarker(coords, {
+                radius: 10, fillOpacity: 0, color: 'transparent', interactive: true
             }).addTo(map);
-        } else {
-            // Overwrite the routing array with our markers' physically snapped positions
-            routingControl.setWaypoints(markers.map(m => m.getLatLng()));
+
+            // On click, this town becomes a locked waypoint
+            zone.on('click', () => {
+                addWaypoint(coords, town.properties.name);
+            });
+        });
+    }
+
+    function addWaypoint(coords, name) {
+        // Limit to 2 points for now (Start and End)
+        if (waypoints.length >= 2) waypoints = []; 
+        
+        const marker = L.marker(coords).addTo(map);
+        marker.bindTooltip(name, { permanent: true, className: 'anchor-label' }).openTooltip();
+        
+        waypoints.push(L.latLng(coords));
+
+        if (waypoints.length === 2) {
+            drawLockedRoute();
         }
+    }
+
+    function drawLockedRoute() {
+        if (routingControl) map.removeControl(routingControl);
+
+        routingControl = L.Routing.control({
+            waypoints: waypoints,
+            createMarker: () => null, // Prevents "Ghost Pins" [cite: 2025-12-25]
+            addWaypoints: false,
+            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+        }).addTo(map);
     }
 
     window.onload = init;
