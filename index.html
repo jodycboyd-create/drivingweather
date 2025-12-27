@@ -123,6 +123,62 @@
 
     window.onload = init;
 </script>
+    <script>
+    /**
+     * [weong-route] - FAILSAFE ANCHOR 2025.12.27
+     * Logic: If Server A fails, instantly try Server B.
+     */
+    let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
+
+    const servers = [
+        'https://routing.openstreetmap.de/routed-car/route/v1',
+        'https://router.project-osrm.org/route/v1'
+    ];
+    let currentServerIdx = 0;
+
+    // ... (init and findNearest remain identical to anchor) ...
+
+    function setupApp() {
+        // ... (marker setup remains identical to anchor) ...
+
+        createRoutingControl(servers[currentServerIdx]);
+    }
+
+    function createRoutingControl(url) {
+        if (routingControl) map.removeControl(routingControl);
+
+        routingControl = L.Routing.control({
+            serviceUrl: url,
+            waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
+            createMarker: () => null,
+            addWaypoints: false,
+            routeWhileDragging: false,
+            show: false,
+            lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
+        }).addTo(map);
+
+        routingControl.on('routesfound', (e) => {
+            currentServerIdx = 0; // Reset on success
+            const route = e.routes[0];
+            window.currentRouteData = route;
+            updateCapsule(route);
+        });
+
+        routingControl.on('routingerror', () => {
+            console.warn("Switching Routing Servers...");
+            currentServerIdx = (currentServerIdx + 1) % servers.length;
+            createRoutingControl(servers[currentServerIdx]);
+        });
+    }
+
+    function syncRoute() {
+        if (routingControl) {
+            routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
+        }
+    }
+
+    window.onload = init;
+</script>
 <script src="velocity-widget.js"></script>
 </body>
 </html>
