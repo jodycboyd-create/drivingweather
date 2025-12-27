@@ -2,32 +2,93 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>RESET: Gold Standard Anchor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEonG - Stability Anchor [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #000c18; }
-        #map { height: 100vh; width: 100%; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: #001529;
+            color: #fff;
+            border: 1px solid #0047AB;
+            border-radius: 8px;
+        }
+
+        .level-3-indicator {
+            color: #ff4d4f;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            border-top: 1px solid rgba(255, 77, 79, 0.3);
+            margin-top: 5px;
+            display: block;
+        }
     </style>
 </head>
 <body>
+
 <div id="map"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // CLEAN SLATE MAP
-    const map = L.map('map').setView([49.0, -56.0], 6);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+    /**
+     * [weong-route] - Gold Standard Anchor Point
+     * Reverting to locked island-wide methodology.
+     */
+    let map;
 
-    fetch('communities.json')
-        .then(res => res.json())
-        .then(data => {
-            data.forEach(loc => {
-                L.circleMarker([loc.lat, loc.lng], {
-                    radius: loc.level === 3 ? 8 : 4,
-                    fillColor: loc.level === 3 ? "#ff4d4f" : "#1890ff",
-                    color: "#fff", weight: 1, fillOpacity: 0.8
-                }).addTo(map).bindPopup(loc.name);
-            });
+    async function init() {
+        // 1. Initialize Map centered on Newfoundland
+        map = L.map('map').setView([48.5, -56.0], 7); 
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        try {
+            // 2. Fetch locked Newfoundland dataset
+            const response = await fetch('data/nl/communities.json');
+            const data = await response.json();
+            
+            // 3. Process markers using Level 3 methodology
+            renderCommunities(data.features);
+        } catch (e) { 
+            console.error("Critical: [weong-route] dataset failed to load."); 
+        }
+    }
+
+    function renderCommunities(features) {
+        features.forEach(feature => {
+            const coords = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
+            const name = feature.properties.name;
+            const level = feature.properties.level || 1; // Default to 1 if level not present
+            
+            // LEVEL 3 EXCEPTION TRIGGER: Primary logic toggle
+            const isLevel3 = level === 3;
+
+            const marker = L.circleMarker(coords, {
+                radius: isLevel3 ? 8 : 4,
+                fillColor: isLevel3 ? "#ff4d4f" : "#0047AB",
+                color: "#fff",
+                weight: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+
+            marker.bindPopup(`
+                <div class="custom-popup">
+                    <b>${name}</b><br>
+                    Status: ${isLevel3 ? '<span class="level-3-indicator">Level 3 Exception</span>' : 'Normal'}
+                </div>
+            `);
+
+            if (isLevel3) {
+                console.log(`[weong-bulletin] Level 3 logic locked for: ${name}`);
+            }
         });
+    }
+
+    window.onload = init;
 </script>
 </body>
 </html>
