@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Persistence Lock [Locked]</title>
+    <title>WEonG - Persistence Lock [Final]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,8 +14,8 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
+        /* Prevents the route line from "floating" by keeping the SVG layer locked [cite: 2025-12-27] */
         .leaflet-overlay-pane svg { will-change: transform; transition: none !important; }
-        .map-is-moving .leaflet-overlay-pane svg { pointer-events: none; }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -27,11 +27,11 @@
 
 <script>
     /**
-     * [weong-route] - PERSISTENCE LOCK
-     * Fixed: Route resetting to default after drop [cite: 2025-12-27]
+     * [weong-route] - ATOMIC PERSISTENCE
+     * Fix: Prevents route from resetting after pin drop [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
-    let currentWaypoints = []; // Global state to prevent resets
+    let isAutoZooming = false; // Guard to separate user action from engine action
 
     async function init() {
         map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
@@ -47,7 +47,7 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Data Load Failure"); }
+        } catch (e) { console.error("Critical: Dataset failed."); }
     }
 
     function findNearestNode(latlng) {
@@ -84,6 +84,7 @@
                     permanent: true, className: 'snapping-label' 
                 }).openTooltip();
                 
+                // Set explicitly and recalculate immediately
                 syncRoute();
             });
         });
@@ -92,15 +93,14 @@
 
     function syncRoute() {
         if (!markers[0] || !markers[1]) return;
-        
-        // Update the GLOBAL state so moveend knows the new locations [cite: 2025-12-27]
-        currentWaypoints = [markers[0].getLatLng(), markers[1].getLatLng()];
+        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
         if (routingControl) {
-            routingControl.setWaypoints(currentWaypoints);
+            // [weong-route] The "Atomic Push": Force engine waypoints directly [cite: 2025-12-27]
+            routingControl.getPlan().setWaypoints(wps);
         } else {
             routingControl = L.Routing.control({
-                waypoints: currentWaypoints,
+                waypoints: wps,
                 createMarker: () => null,
                 addWaypoints: false,
                 routeWhileDragging: false, 
@@ -113,21 +113,17 @@
 
             window.weongRouter = routingControl;
 
-            map.on('movestart', () => map.getContainer().classList.add('map-is-moving'));
-            map.on('moveend', () => {
-                map.getContainer().classList.remove('map-is-moving');
-                // Use global state to prevent resetting to Corner Brook [cite: 2025-12-27]
-                if (routingControl && currentWaypoints.length > 0) {
-                    routingControl.getPlan().setWaypoints(currentWaypoints);
-                }
-            });
-
             routingControl.on('routesfound', (e) => {
+                // Ensure the map only zooms if the user isn't currently dragging it [cite: 2025-12-27]
                 if (!map.dragging.moving()) {
+                    isAutoZooming = true;
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
-                        duration: 0.5 
+                        duration: 0.6 
                     });
+                    
+                    // Unlock the guard once the map stops moving
+                    map.once('moveend', () => { isAutoZooming = false; });
                 }
             });
         }
