@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Frame-Locked Stability [Locked]</title>
+    <title>WEonG - Coordinate Lock [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,11 +14,14 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* Lock the SVG to the map tiles to prevent "Ocean Drift" [cite: 2025-12-27] */
-        .leaflet-overlay-pane svg { 
-            transition: none !important; 
-            pointer-events: none !important; 
+        /* [1] FORCE COORDINATE SYNC: Disable the independent SVG transform [cite: 2025-12-27] */
+        .leaflet-zoom-animated {
             will-change: transform;
+        }
+        .leaflet-overlay-pane svg {
+            transition: none !important;
+            /* Prevents the SVG from lagging behind the marker layer during pans */
+            transform-origin: 0 0; 
         }
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -31,16 +34,18 @@
 
 <script>
     /**
-     * [weong-route] - FRAME-LOCKED STABILITY ANCHOR
-     * Logic: High-frequency re-projection during map animations [cite: 2025-12-27]
+     * [weong-route] - COORDINATE LOCK STRATEGY
+     * Fixes decoupling by bypassing the SVG interpolation layer. [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
+        // [2] Disable zoomAnimation to force the route to redraw every frame [cite: 2025-12-27]
         map = L.map('map', { 
             zoomControl: false, 
             fadeAnimation: false,
-            zoomAnimation: true 
+            zoomAnimation: false, // Forces instant redraw of all layers on zoom
+            markerZoomAnimation: false
         }).setView([48.8, -55.5], 7); 
         
         window.weongMap = map; 
@@ -55,20 +60,16 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Dataset Load Error"); }
+        } catch (e) { console.error("Data Load Error"); }
 
-        // [1] THE FRAME LOCK: Constantly re-sync the SVG layer during map changes [cite: 2025-12-27]
-        function syncLoop() {
-            if (routingControl && (map.dragging.moving() || map._animatingZoom)) {
-                // Accessing internal renderer to force pixel realignment
-                if (routingControl._line) {
-                    routingControl._line.pxBounds = null; 
-                    routingControl._line.draw(); 
-                }
+        // [3] THE "GLUE" LOOP: Hard-sync the routing line to the current map state [cite: 2025-12-27]
+        map.on('zoom animanim zoomend move drag', () => {
+            if (routingControl && routingControl._line) {
+                // This manually triggers the SVG internal update mid-animation
+                routingControl._line.reordered = false;
+                routingControl._line._update(); 
             }
-            requestAnimationFrame(syncLoop);
-        }
-        syncLoop();
+        });
     }
 
     function findNearestNode(latlng) {
@@ -115,9 +116,8 @@
 
         routingControl.on('routesfound', (e) => {
             if (routingControl._shouldFly) {
-                // [2] INTERRUPT: Kill zoom instantly if user touches the map [cite: 2025-12-27]
-                map.once('mousedown touchstart dragstart', () => { map.stop(); });
-
+                // Kill any conflicting animations immediately
+                map.stop(); 
                 map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                     padding: [100, 100], 
                     duration: 0.8 
@@ -126,7 +126,7 @@
             }
         });
 
-        // [3] MOVEEND FAILSAVE: Hard alignment of pixels when movement stops [cite: 2025-12-27]
+        // Ensure alignment after any camera movement finishes [cite: 2025-12-27]
         map.on('moveend', () => {
             if (routingControl && markers[0] && markers[1]) {
                 routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
