@@ -88,7 +88,40 @@
         });
         syncRoute();
     }
+function syncRoute() {
+        if (!markers[0] || !markers[1]) return;
+        const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
 
+        if (routingControl) {
+            routingControl.setWaypoints(wps);
+        } else {
+            routingControl = L.Routing.control({
+                waypoints: wps, 
+                createMarker: () => null, 
+                addWaypoints: false,
+                // [weong-route] GLUE FIX: Prevents the line from detaching on pan
+                routeWhileDragging: false, 
+                autoRoute: true,
+                show: false,
+                lineOptions: { 
+                    styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
+                    addWaypoints: false 
+                }
+            }).addTo(map);
+
+            window.weongRouter = routingControl;
+
+            routingControl.on('routesfound', (e) => {
+                // Only fly to bounds if the map isn't currently being panned by the user
+                if (!map.dragging.moving()) {
+                    map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
+                        padding: [100, 100], 
+                        duration: 1.5 
+                    });
+                }
+            });
+        }
+    }
     function syncRoute() {
         if (!markers[0] || !markers[1]) return;
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
