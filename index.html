@@ -3,22 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Precision Anchor [Locked]</title>
+    <title>WEonG - SVG Stability [Reverted]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        /* Safe background fallback to prevent blackouts [cite: 2025-12-27] */
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* Prevents the route line from "floating" during pans */
-        .leaflet-overlay-pane svg { transition: none !important; pointer-events: none !important; }
+        /* SVG Lock: Keeps line from floating during pans [cite: 2025-12-27] */
+        .leaflet-overlay-pane svg { transition: none !important; }
         .leaflet-routing-container { display: none !important; }
-        
-        /* Ensure the ETA flag container doesn't block map interaction */
         .eta-flag-container { pointer-events: none !important; }
     </style>
 </head>
@@ -30,25 +29,23 @@
 
 <script>
     /**
-     * [weong-route] - STABILITY ANCHOR 2025.12.27
-     * Features: Canvas Lock, Zero-Ghost Init, High-Z ETA Pane.
+     * [weong-route] - REVERTED SVG ANCHOR
+     * Fixed: Removed Canvas renderer to resolve black screen. [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // [1] Initialize map with Canvas Renderer for hardware-locked alignment
+        // [1] Standard SVG Renderer (Reliable)
         map = L.map('map', { 
             zoomControl: false, 
-            fadeAnimation: false,
-            renderer: L.canvas() 
+            fadeAnimation: true 
         }).setView([48.8, -55.5], 7); 
         
         window.weongMap = map; 
 
-        // [2] Dedicated ETA Pane: This is the "Hard-Wire" for the travel flag
+        // [2] Dedicated ETA Pane remains for widget support [cite: 2025-12-27]
         const etaPane = map.createPane('etaPane');
         etaPane.style.zIndex = 650;
-        etaPane.style.pointerEvents = 'none';
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -60,7 +57,7 @@
             const data = await response.json();
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
-        } catch (e) { console.error("Dataset Missing."); }
+        } catch (e) { console.error("Data Load Error"); }
     }
 
     function findNearestNode(latlng) {
@@ -73,17 +70,13 @@
 
     function setupRoutingPins() {
         const anchors = [[48.9454, -57.9415], [47.5615, -52.7126]];
-        
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
             const marker = L.marker([nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]], { 
                 draggable: true 
             }).addTo(map);
             
-            marker.bindTooltip(nearest.properties.name, { 
-                permanent: true, className: 'snapping-label' 
-            }).openTooltip();
-            
+            marker.bindTooltip(nearest.properties.name, { permanent: true, className: 'snapping-label' }).openTooltip();
             markers[i] = marker;
             
             marker.on('dragend', () => {
@@ -94,7 +87,6 @@
             });
         });
 
-        // [3] Initialize Engine Empty: Prevents the "Ghost" route artifacts
         routingControl = L.Routing.control({
             waypoints: [], 
             createMarker: () => null,
@@ -112,7 +104,6 @@
 
         routingControl.on('routesfound', (e) => {
             if (routingControl._shouldFly) {
-                map.once('mousedown touchstart dragstart', () => { map.stop(); });
                 map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                     padding: [100, 100], 
                     duration: 0.8 
@@ -121,16 +112,18 @@
             }
         });
 
-        // [4] HARD RESET SYNC: Redraws the line on every move to prevent decoupling
-        map.on('move zoom viewreset', () => {
-            if (routingControl && routingControl._line) {
-                routingControl._line.redraw(); 
-            }
-        });
-
-        // Initial route sync
         setTimeout(() => syncRoute(false), 500); 
     }
 
     function syncRoute(shouldFly = false) {
-        if (!
+        if (!markers[0] || !markers[1] || !routingControl) return;
+        routingControl._shouldFly = shouldFly;
+        routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
+    }
+
+    window.onload = init;
+</script>
+
+<script src="velocity-widget.js"></script>
+</body>
+</html>
