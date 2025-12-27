@@ -2,16 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Robust State-Locked Engine</title>
+    <title>WEonG - Phase 1: Magnet Snapping</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
-        .leaflet-routing-container { display: none !important; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #eef2f5; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 6px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3); white-space: nowrap;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); white-space: nowrap;
         }
     </style>
 </head>
@@ -19,85 +17,74 @@
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
     /**
-     * Build: [weong-route] - Robust State-Locked Engine
-     * Logic: Master Array Synchronization [cite: 2025-12-25]
-     * Data: Locked Newfoundland Dataset [cite: 2025-12-26]
+     * Build: [weong-route] Phase 1 - Magnet Focus
+     * Goal: Solve the "Floating Pin" issue before introducing road logic.
+     * Dataset: Locked Newfoundland Comprehensive [cite: 2025-12-26]
      */
-    let map, communities = [], routingControl;
-    let masterMarkers = []; 
+    let map, communities = [];
 
     async function init() {
-        map = L.map('map').setView([48.9, -55.2], 9);
+        // Set view to Central Newfoundland [cite: 2025-12-26]
+        map = L.map('map').setView([48.9, -55.3], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // Load locked Newfoundland dataset [cite: 2025-12-26]
-        const response = await fetch('data/nl/communities.json');
-        const data = await response.json();
-        communities = data.features;
-        
-        // Define hard baseline: GFW and Gander [cite: 2025-12-26]
-        const gfw = L.latLng(48.9351, -55.6562);
-        const gander = L.latLng(48.9566, -54.6089);
-
-        // 1. Initialize custom markers as the ONLY source of truth
-        createMasterMarker(gfw, 0);
-        createMasterMarker(gander, 1);
-
-        // 2. Initialize Routing as a PURE RENDERER [cite: 2025-12-25]
-        routingControl = L.Routing.control({
-            waypoints: masterMarkers.map(m => m.getLatLng()),
-            router: L.Routing.osrmv1({ 
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                useHints: false // Prevents OSRM from "remembering" bad coordinates
-            }),
-            createMarker: () => null, // Kills the internal markers causing desync
-            addWaypoints: false,
-            routeWhileDragging: false,
-            show: false,
-            lineOptions: { styles: [{ color: '#0047AB', weight: 9, opacity: 0.9 }] }
-        }).addTo(map);
+        try {
+            // Load the locked dataset [cite: 2025-12-26]
+            const response = await fetch('data/nl/communities.json');
+            const data = await response.json();
+            communities = data.features;
+            
+            // Initialize two points: Grand Falls-Windsor and Gander [cite: 2025-12-26]
+            createMagnetMarker([48.9351, -55.6562]);
+            createMagnetMarker([48.9566, -54.6089]);
+            
+        } catch (e) {
+            console.error("Dataset load error. Check community.json path.");
+        }
     }
 
-    function createMasterMarker(latlng, index) {
-        // Initial snap for data integrity [cite: 2025-12-26]
-        const node = findNearest(latlng);
-        const pos = L.latLng(node.geometry.coordinates[1], node.geometry.coordinates[0]);
+    function createMagnetMarker(coords) {
+        // 1. Initial Snap: Find the town for the starting coordinate
+        const initialNode = findNearest(L.latLng(coords));
+        const initialPos = [initialNode.geometry.coordinates[1], initialNode.geometry.coordinates[0]];
 
-        const marker = L.marker(pos, { draggable: true }).addTo(map);
-        masterMarkers[index] = marker;
+        const marker = L.marker(initialPos, { draggable: true }).addTo(map);
 
-        const syncUI = (ll) => {
-            const nearest = findNearest(ll);
-            marker.bindTooltip(nearest.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label' 
+        const updateUI = (ll) => {
+            const nearestNode = findNearest(ll);
+            // Persistent labels as requested [cite: 2025-12-26]
+            marker.bindTooltip(nearestNode.properties.name, { 
+                permanent: true, 
+                direction: 'top', 
+                className: 'snapping-label' 
             }).openTooltip();
         };
 
-        syncUI(pos);
+        updateUI(L.latLng(initialPos));
 
-        marker.on('drag', (e) => syncUI(e.latlng));
+        // 2. Real-time feedback while dragging
+        marker.on('drag', (e) => {
+            updateUI(e.latlng);
+        });
 
-        // THE MASTER SYNC [cite: 2025-12-25]
-        marker.on('dragend', function(e) {
-            const nearest = findNearest(e.latlng);
-            const finalPos = L.latLng(nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]);
+        // 3. THE MAGNET LOCK: Physically teleport the pin to the town node [cite: 2025-12-26]
+        marker.on('dragend', (e) => {
+            const nearestNode = findNearest(e.latlng);
+            const snappedPos = [nearestNode.geometry.coordinates[1], nearestNode.geometry.coordinates[0]];
             
-            // Step 1: Physical Snap [cite: 2025-12-26]
-            marker.setLatLng(finalPos);
-            syncUI(finalPos);
+            // Hard set the marker position to the community coordinate
+            marker.setLatLng(snappedPos);
+            updateUI(L.latLng(snappedPos));
             
-            // Step 2: Full Waypoint Reconstruction
-            // We do not update one index; we rewrite the whole plan to force OSRM to restart
-            const newWaypoints = masterMarkers.map(m => m.getLatLng());
-            routingControl.setWaypoints(newWaypoints);
+            console.log("Snapped to:", nearestNode.properties.name, snappedPos);
         });
     }
 
     function findNearest(latlng) {
+        // Spatial search against the locked NL dataset [cite: 2025-12-26]
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
