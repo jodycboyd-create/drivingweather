@@ -2,11 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Magnetic Draggable</title>
-    <link <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
     <title>WEonG - [weong-route] Absolute Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -28,8 +23,8 @@
 
 <script>
     /**
-     * [weong-route] - Absolute Gravity Build
-     * Rule: Physical Destroy/Rebuild on DragEnd to force land-locking [cite: 2025-12-25]
+     * [weong-route] - Absolute Gravity Reset
+     * Method: State-Locked Re-rendering [cite: 2025-12-25]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
@@ -38,22 +33,22 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Loading the locked Newfoundland deep-dive dataset [cite: 2025-12-26]
+            // Loading the final, locked-in Newfoundland dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Initial render [cite: 2025-12-26]
-            renderLockedMarker(0, [48.9351, -55.6562]); // Point A
-            renderLockedMarker(1, [48.9566, -54.6089]); // Point B
+            // Spawn initial hard-locked pins [cite: 2025-12-26]
+            spawnOrUpdateMarker(0, [48.9351, -55.6562]); // GFW
+            spawnOrUpdateMarker(1, [48.9566, -54.6089]); // Gander
             
-            updateRoutingLine();
+            syncRoutingLine();
         } catch (e) {
-            console.error("Dataset load failed. Snapping engine offline.");
+            console.error("Critical: Dataset load failed.");
         }
     }
 
-    function findNearestNode(latlng) {
+    function findNearestTown(latlng) {
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
@@ -61,153 +56,50 @@
         });
     }
 
-    function renderLockedMarker(index, coords) {
-        // Step 1: Find the target town from the dataset [cite: 2025-12-26]
-        const town = findNearestNode(L.latLng(coords));
-        const townPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+    function spawnOrUpdateMarker(index, coords) {
+        // Find the town in the dataset [cite: 2025-12-26]
+        const town = findNearestTown(L.latLng(coords));
+        const snappedPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
 
-        // Step 2: Remove existing marker if it exists to prevent "Double Pins" like image_e930ee.png [cite: 2025-12-25]
-        if (markers[index]) map.removeLayer(markers[index]);
+        // DELETE current marker to prevent duplicates seen in image_e9fbc0.png [cite: 2025-12-25]
+        if (markers[index]) {
+            map.removeLayer(markers[index]);
+        }
 
-        // Step 3: Create the new marker strictly at the dataset coordinate [cite: 2025-12-25]
-        const marker = L.marker(townPos, { draggable: true }).addTo(map);
+        // SPAWN new marker at the precise dataset coordinate [cite: 2025-12-25]
+        const marker = L.marker(snappedPos, { draggable: true }).addTo(map);
         marker.bindTooltip(town.properties.name, { 
             permanent: true, direction: 'top', className: 'snapping-label' 
         }).openTooltip();
 
         markers[index] = marker;
 
-        // Visual Drag only (The "Rubber Band")
+        // Visual feedback while dragging
         marker.on('drag', (e) => {
-            const tempTown = findNearestNode(e.latlng);
+            const tempTown = findNearestTown(e.latlng);
             marker.setTooltipContent(tempTown.properties.name);
         });
 
-        // THE LOCK: On drop, kill the ghost and rebuild at the town node [cite: 2025-12-25]
+        // THE LOCK: On release, we destroy the ghost and rebuild at the town node [cite: 2025-12-25]
         marker.on('dragend', (e) => {
-            renderLockedMarker(index, e.latlng);
-            updateRoutingLine();
+            spawnOrUpdateMarker(index, e.latlng);
+            syncRoutingLine();
         });
     }
 
-    function updateRoutingLine() {
+    function syncRoutingLine() {
         if (!markers[0] || !markers[1]) return;
-        
-        const waypoints = [markers[0].getLatLng(), markers[1].getLatLng()];
+        const pts = [markers[0].getLatLng(), markers[1].getLatLng()];
 
         if (routingControl) {
-            routingControl.setWaypoints(waypoints);
+            routingControl.setWaypoints(pts);
         } else {
             routingControl = L.Routing.control({
-                waypoints: waypoints,
+                waypoints: pts,
                 createMarker: () => null, // Prevents Routing engine's ghost pins [cite: 2025-12-25]
                 addWaypoints: false,
                 lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
             }).addTo(map);
-        }
-    }
-
-    window.onload = init;
-</script>
-</body>
-</html>rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
-        .snapping-label {
-            font-weight: bold; padding: 6px 10px; background: white;
-            border: 2px solid #0047AB; border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3); white-space: nowrap;
-        }
-        .leaflet-routing-container { display: none !important; }
-    </style>
-</head>
-<body>
-
-<div id="map"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-
-<script>
-    /**
-     * [weong-route] - Magnetic Build
-     * Rule: Markers must snap to the Newfoundland Deep-Dive Dataset [cite: 2025-12-26]
-     */
-    let map, communities = [], marker1, marker2, control;
-
-    async function init() {
-        map = L.map('map').setView([48.9, -55.5], 7);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-        try {
-            // Load the locked Newfoundland dataset [cite: 2025-12-26]
-            const response = await fetch('data/nl/communities.json');
-            const data = await response.json();
-            communities = data.features;
-            
-            setupMarkers();
-        } catch (e) {
-            console.error("Dataset load failed. Snapping will not function.");
-        }
-    }
-
-    // THE MAGNET: Finds the nearest community node [cite: 2025-12-26]
-    function findNearest(latlng) {
-        return communities.reduce((prev, curr) => {
-            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
-        });
-    }
-
-    function setupMarkers() {
-        // Start at GFW and Gander [cite: 2025-12-26]
-        const start1 = [48.9351, -55.6562];
-        const start2 = [48.9566, -54.6089];
-
-        marker1 = L.marker(start1, { draggable: true }).addTo(map);
-        marker2 = L.marker(start2, { draggable: true }).addTo(map);
-
-        // UI Update logic [cite: 2025-12-25]
-        const refreshMarker = (marker) => {
-            const town = findNearest(marker.getLatLng());
-            marker.bindTooltip(town.properties.name, { 
-                permanent: true, direction: 'top', className: 'snapping-label' 
-            }).openTooltip();
-        };
-
-        [marker1, marker2].forEach(m => {
-            refreshMarker(m);
-            
-            // While dragging: Update name in real-time
-            m.on('drag', () => {
-                refreshMarker(m);
-                updateRoute();
-            });
-
-            // THE SNAP: Force to coordinate from dataset on release [cite: 2025-12-25]
-            m.on('dragend', () => {
-                const town = findNearest(m.getLatLng());
-                const lockedCoords = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
-                
-                m.setLatLng(lockedCoords); // Physical snap [cite: 2025-12-25]
-                refreshMarker(m);
-                updateRoute();
-            });
-        });
-
-        control = L.Routing.control({
-            waypoints: [marker1.getLatLng(), marker2.getLatLng()],
-            createMarker: () => null,
-            addWaypoints: false,
-            lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.7 }] }
-        }).addTo(map);
-    }
-
-    function updateRoute() {
-        if (control) {
-            control.setWaypoints([marker1.getLatLng(), marker2.getLatLng()]);
         }
     }
 
