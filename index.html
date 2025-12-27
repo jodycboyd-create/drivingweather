@@ -27,27 +27,23 @@
     /**
      * [weong-route] - PERMANENT STABILITY ANCHOR
      * Methodology: Dual-Pin Snapping, Full NL Dataset (Hidden), Google Basemap
-     * Added: Interaction Guard to prevent ocean drift decoupling [cite: 2025-12-27]
+     * Fixed: Ocean drift decoupling via Ironclad Glue settings
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // Initialize Map and expose as window.weongMap for modular access [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
-        // Google Maps Standard Basemap
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             attribution: '&copy; Google Maps'
         }).addTo(map);
 
         try {
-            // Loading Locked Newfoundland Dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
-            
             if (communities.length > 0) setupRoutingPins();
         } catch (e) { 
             console.error("Critical Error: Core dataset failed to load."); 
@@ -64,16 +60,13 @@
 
     function setupRoutingPins() {
         const anchors = [[48.9500, -57.9500], [47.5615, -52.7126]];
-        
         anchors.forEach((coord, i) => {
             const nearest = findNearestNode(L.latLng(coord));
             const pos = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
-            
             const marker = L.marker(pos, { draggable: true }).addTo(map);
             marker.bindTooltip(nearest.properties.name, { 
                 permanent: true, className: 'snapping-label' 
             }).openTooltip();
-            
             markers[i] = marker;
             
             marker.on('drag', (e) => {
@@ -97,25 +90,26 @@
         if (routingControl) {
             routingControl.setWaypoints(wps);
         } else {
+            // [weong-route] IRONCLAD GLUE BLOCK: Prevents ocean drift
             routingControl = L.Routing.control({
                 waypoints: wps, 
                 createMarker: () => null, 
                 addWaypoints: false,
-                // [weong-route] GLUE FIX: Prevents line detaching during movement [cite: 2025-12-27]
                 routeWhileDragging: false, 
                 autoRoute: true,
+                fitSelectedRoutes: false, // STOPS ENGINE-USER CONFLICT
                 show: false,
                 lineOptions: { 
                     styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
-                    addWaypoints: false 
+                    addWaypoints: false,
+                    extendToWaypoints: true // GLUES LINE TO PINS
                 }
             }).addTo(map);
 
-            // Expose as window.weongRouter for modular polling [cite: 2025-12-27]
             window.weongRouter = routingControl;
 
             routingControl.on('routesfound', (e) => {
-                // INTERACTION GUARD: Only auto-zoom if user is not panning [cite: 2025-12-27]
+                // INTERACTION GUARD: Only moves if user is idle
                 if (!map.dragging.moving()) {
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
