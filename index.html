@@ -3,7 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <title>WEonG - Magnetic Draggable</title>
+    <link <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WEonG - [weong-route] Absolute Snap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <style>
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        .snapping-label {
+            font-weight: bold; color: #0047AB; background: white;
+            border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); white-space: nowrap;
+        }
+        .leaflet-routing-container { display: none !important; }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+<script>
+    /**
+     * [weong-route] - Absolute Gravity Build
+     * Rule: Physical Destroy/Rebuild on DragEnd to force land-locking [cite: 2025-12-25]
+     */
+    let map, communities = [], markers = [null, null], routingControl;
+
+    async function init() {
+        map = L.map('map').setView([48.9, -55.5], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        try {
+            // Loading the locked Newfoundland deep-dive dataset [cite: 2025-12-26]
+            const response = await fetch('data/nl/communities.json');
+            const data = await response.json();
+            communities = data.features;
+            
+            // Initial render [cite: 2025-12-26]
+            renderLockedMarker(0, [48.9351, -55.6562]); // Point A
+            renderLockedMarker(1, [48.9566, -54.6089]); // Point B
+            
+            updateRoutingLine();
+        } catch (e) {
+            console.error("Dataset load failed. Snapping engine offline.");
+        }
+    }
+
+    function findNearestNode(latlng) {
+        return communities.reduce((prev, curr) => {
+            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
+        });
+    }
+
+    function renderLockedMarker(index, coords) {
+        // Step 1: Find the target town from the dataset [cite: 2025-12-26]
+        const town = findNearestNode(L.latLng(coords));
+        const townPos = [town.geometry.coordinates[1], town.geometry.coordinates[0]];
+
+        // Step 2: Remove existing marker if it exists to prevent "Double Pins" like image_e930ee.png [cite: 2025-12-25]
+        if (markers[index]) map.removeLayer(markers[index]);
+
+        // Step 3: Create the new marker strictly at the dataset coordinate [cite: 2025-12-25]
+        const marker = L.marker(townPos, { draggable: true }).addTo(map);
+        marker.bindTooltip(town.properties.name, { 
+            permanent: true, direction: 'top', className: 'snapping-label' 
+        }).openTooltip();
+
+        markers[index] = marker;
+
+        // Visual Drag only (The "Rubber Band")
+        marker.on('drag', (e) => {
+            const tempTown = findNearestNode(e.latlng);
+            marker.setTooltipContent(tempTown.properties.name);
+        });
+
+        // THE LOCK: On drop, kill the ghost and rebuild at the town node [cite: 2025-12-25]
+        marker.on('dragend', (e) => {
+            renderLockedMarker(index, e.latlng);
+            updateRoutingLine();
+        });
+    }
+
+    function updateRoutingLine() {
+        if (!markers[0] || !markers[1]) return;
+        
+        const waypoints = [markers[0].getLatLng(), markers[1].getLatLng()];
+
+        if (routingControl) {
+            routingControl.setWaypoints(waypoints);
+        } else {
+            routingControl = L.Routing.control({
+                waypoints: waypoints,
+                createMarker: () => null, // Prevents Routing engine's ghost pins [cite: 2025-12-25]
+                addWaypoints: false,
+                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+            }).addTo(map);
+        }
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #aacbff; }
