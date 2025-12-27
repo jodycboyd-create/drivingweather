@@ -1,7 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <met<!DOCTYPE html>
+<html lang="en">
+<head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEONG-ROUTE | Newfoundland Anchor</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="info-panel">
+    <h3>[weong-route] Project</h3>
+    <p><strong>Status:</strong> Newfoundland Comprehensive Locked</p>
+    <p><strong>Trigger:</strong> Level 3 All Elements</p>
+    <small>Anchor Point: 2025-12-27</small>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Initialize map focused on Newfoundland
+    const map = L.map('map').setView([49.0, -56.0], 7);
+
+    // Standard Map Tiles (Pre-Black Map version)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Placeholder for the comprehensive Newfoundland Dataset
+    // This maintains the structure for the "Deep Dive" results
+    const locations = [
+        { name: "St. John's", coords: [47.5615, -52.7126], level: 3 },
+        { name: "Gander", coords: [48.9578, -54.6084], level: 3 },
+        { name: "Corner Brook", coords: [48.9500, -57.9500], level: 3 }
+        // Remaining island data points are persistent in the project database
+    ];
+
+    locations.forEach(loc => {
+        L.marker(loc.coords)
+            .addTo(map)
+            .bindPopup(`<b>${loc.name}</b><br>Exception Trigger: Level ${loc.level}`);
+    });
+
+</script>
+</body>
+</html>a charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WEonG - Velocity Engine [Locked Anchor]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
