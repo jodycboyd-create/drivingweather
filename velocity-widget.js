@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Ironclad Persistence [Locked]</title>
+    <title>WEonG - Stability Anchor [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,7 +14,7 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* Prevents "Ocean Drift" by locking the SVG to the map's zoom level [cite: 2025-12-27] */
+        /* Prevents the route line from "floating" during pans */
         .leaflet-overlay-pane svg { transition: none !important; pointer-events: none !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -27,13 +27,13 @@
 
 <script>
     /**
-     * [weong-route] - MANUAL ENGINE INJECTION
-     * Prevents default route ghosts by starting the engine empty. [cite: 2025-12-27]
+     * [weong-route] - STABILITY ANCHOR
+     * Fix: Decoupling prevented via Interruptible Animation & Zero-Ghost Init.
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // [1] Set the Newfoundland anchor point immediately
+        // [1] Initialize map view immediately to Newfoundland
         map = L.map('map', { 
             zoomControl: false, 
             fadeAnimation: false 
@@ -85,9 +85,9 @@
             });
         });
 
-        // [2] INITIALIZE ENGINE EMPTY: No waypoints = No ghosts [cite: 2025-12-27]
+        // [2] INITIALIZE ENGINE EMPTY: Prevents the Corner Brook "Ghost" route
         routingControl = L.Routing.control({
-            waypoints: [], // CRITICAL: Start with nothing
+            waypoints: [], 
             createMarker: () => null,
             addWaypoints: false,
             routeWhileDragging: false,
@@ -102,35 +102,42 @@
         window.weongRouter = routingControl;
 
         routingControl.on('routesfound', (e) => {
-            // Check a custom property to see if we should move the camera
-            if (routingControl._shouldFly && !map.dragging.moving()) {
+            if (routingControl._shouldFly) {
+                // [3] INTERRUPT: Kill auto-zoom if user touches the map
+                map.once('mousedown touchstart dragstart', () => {
+                    map.stop(); 
+                    routingControl._shouldFly = false;
+                });
+
                 map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                     padding: [100, 100], 
                     duration: 0.8 
                 });
-                routingControl._shouldFly = false; // Reset after flying
+                
+                routingControl._shouldFly = false;
             }
         });
 
-        // [3] INJECT DATA: Push the western/eastern hubs into the empty engine [cite: 2025-12-27]
+        // [4] RE-PROJECTION LOCK: Force SVG alignment after every move
+        map.on('moveend', () => {
+            if (routingControl && markers[0] && markers[1]) {
+                const currentWps = [markers[0].getLatLng(), markers[1].getLatLng()];
+                routingControl.getPlan().setWaypoints(currentWps);
+            }
+        });
+
+        // First-time sync (No zoom)
         setTimeout(() => syncRoute(false), 500); 
     }
 
     function syncRoute(shouldFly = false) {
         if (!markers[0] || !markers[1] || !routingControl) return;
-        
         const wps = [markers[0].getLatLng(), markers[1].getLatLng()];
-        
-        // Flag the router to tell it whether to move the camera [cite: 2025-12-27]
         routingControl._shouldFly = shouldFly;
-        
-        // Use the Internal Plan to set waypoints—this is the most stable method
         routingControl.setWaypoints(wps);
     }
 
     window.onload = init;
 </script>
 
-<script src="velocity-widget.js"></script>
-</body>
-</html>
+<script src="velocity-widget
