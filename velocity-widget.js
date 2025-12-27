@@ -3,43 +3,35 @@
 
     window.updateVelocityDisplay = function() {
         const route = window.currentRouteData;
-        if (!route) return;
+        if (!route || !document.getElementById('capTime')) return;
 
         const totalDist = route.summary.totalDistance / 1000;
-        let weightedSpeedSum = 0;
-
-        route.instructions.forEach(instr => {
-            const segDist = instr.distance / 1000;
-            const roadName = (instr.road || "").toLowerCase();
-            let segSpeed = (roadName.match(/trans-canada|nl-1|tch/)) ? 100 : 80;
-            if (segDist < 1) segSpeed = 50; 
-            weightedSpeedSum += (segSpeed * (segDist / totalDist));
-        });
-
-        const avgSpeed = Math.max(15, weightedSpeedSum + speedOffset);
+        const avgSpeed = 85 + speedOffset; // Baseline speed for NL highways
         const hours = totalDist / avgSpeed;
-        const timeStr = `${Math.floor(hours)}h ${Math.round((hours % 1) * 60)}m`;
+        
+        const h = Math.floor(hours);
+        const m = Math.round((hours - h) * 60);
 
-        if (document.getElementById('capTime')) document.getElementById('capTime').innerText = timeStr;
-        if (document.getElementById('capDist')) document.getElementById('capDist').innerText = `${totalDist.toFixed(0)} km`;
-        if (document.getElementById('speedVal')) document.getElementById('speedVal').innerText = (speedOffset >= 0 ? "+" : "") + speedOffset;
+        document.getElementById('capTime').innerText = `${h}h ${m}m`;
+        document.getElementById('capDist').innerText = `${totalDist.toFixed(0)}km`;
+        
+        if (document.getElementById('speedVal')) {
+            document.getElementById('speedVal').innerText = (speedOffset >= 0 ? "+" : "") + speedOffset;
+        }
     };
 
     function initWidget() {
-        if (document.getElementById('velocity-panel')) return;
-        const ui = document.createElement('div');
-        ui.id = 'velocity-panel';
-        ui.style.cssText = `position:absolute; top:20px; right:20px; z-index:2000; background:rgba(0,0,0,0.8); padding:15px; border-radius:12px; color:white; font-family:sans-serif; border:1px solid #333;`;
-        ui.innerHTML = `
-            <div style="font-size:10px; opacity:0.6; margin-bottom:5px;">VELOCITY</div>
-            <div style="font-size:18px; font-weight:bold; margin-bottom:10px;"><span id="speedVal">0</span> km/h</div>
-            <button onclick="window.adjustSpeed(-5)" style="padding:5px 10px;">-</button>
-            <button onclick="window.adjustSpeed(5)" style="padding:5px 10px;">+</button>
+        if (document.getElementById('v-box')) return;
+        const box = document.createElement('div');
+        box.id = 'v-box';
+        box.style.cssText = `position:absolute; bottom:20px; left:20px; z-index:2000; background:rgba(0,0,0,0.8); padding:10px; border-radius:8px; color:white; font-family:sans-serif; border:1px solid #444;`;
+        box.innerHTML = `
+            <div style="font-size:10px; margin-bottom:5px;">SPD ADJ: <span id="speedVal">0</span></div>
+            <button onclick="window.adj(-5)">-</button> <button onclick="window.adj(5)">+</button>
         `;
-        document.body.appendChild(ui);
+        document.body.appendChild(box);
     }
 
-    window.adjustSpeed = (val) => { speedOffset += val; window.updateVelocityDisplay(); };
-
+    window.adj = (v) => { speedOffset += v; window.updateVelocityDisplay(); };
     setInterval(() => { if (window.weongMap) initWidget(); }, 1000);
 })();
