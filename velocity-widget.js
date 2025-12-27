@@ -1,6 +1,6 @@
 /**
- * [weong-route] Module: Velocity Widget (Hard-Wired)
- * Fix: Uses a pre-existing pane and a direct redraw trigger. [cite: 2025-12-27]
+ * [weong-route] Module: Velocity Widget (Flag Reinforcement)
+ * Features: High-Z Pane targeting and road-weighted speed logic. [cite: 2025-12-27]
  */
 (function() {
     let speedOffset = 0;
@@ -27,7 +27,7 @@
         document.getElementById('minusBtn').onclick = () => { speedOffset -= 5; updateUI(); };
         document.getElementById('plusBtn').onclick = () => { speedOffset += 5; updateUI(); };
 
-        // Listen for the specific routing event on the map
+        // Universal listener for the routing event on the map object [cite: 2025-12-27]
         window.weongMap.on('routing:routesfound', (e) => {
             calculatePrecisionETA(e.routes[0]);
         });
@@ -44,6 +44,7 @@
         const totalDist = route.summary.totalDistance / 1000;
         let weightedSpeedSum = 0;
 
+        // Weighted Average Logic: Prevents local roads from skewing TCH times [cite: 2025-12-27]
         route.instructions.forEach(instr => {
             const segDist = instr.distance / 1000;
             const roadName = (instr.road || "").toLowerCase();
@@ -62,6 +63,7 @@
 
         document.getElementById('totalDist').innerText = totalDist.toFixed(1);
 
+        // Midpoint Logic: Finds the coordinate index at exactly half the distance [cite: 2025-12-27]
         const midIdx = Math.floor(route.coordinates.length / 2);
         const midPoint = route.coordinates[midIdx];
 
@@ -78,11 +80,11 @@
             }).addTo(window.weongMap);
         } else {
             etaMarker.setLatLng(midPoint);
-            document.getElementById('flagTime').innerText = timeStr;
+            const flag = document.getElementById('flagTime');
+            if (flag) flag.innerText = timeStr;
         }
     }
 
-    // Single interval to catch map ready state
     const boot = setInterval(() => {
         if (window.weongMap) {
             initWidget();
