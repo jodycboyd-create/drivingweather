@@ -6,23 +6,8 @@
     <title>WEONG-Route | Gold Standard Anchor</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* Base styling for a clean, full-screen deep dive */
         body, html { margin: 0; padding: 0; height: 100%; background: #000c18; overflow: hidden; }
         #map { height: 100vh; width: 100%; background: #000c18; }
-        
-        .custom-popup .leaflet-popup-content-wrapper {
-            background: #001529;
-            color: #fff;
-            border: 1px solid #003366;
-            border-radius: 4px;
-        }
-        
-        .level-3-indicator {
-            color: #ff4d4f;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 0.85em;
-        }
     </style>
 </head>
 <body>
@@ -33,60 +18,37 @@
 
 <script>
     /**
-     * WEONG-ROUTE METHODOLOGY
-     * Status: Gold Standard Anchor Point [2025-12-27]
+     * WEONG-ROUTE ANCHOR POINT
+     * Locked: 2025-12-27
      */
 
-    // 1. Initialize Map centered on Newfoundland
     const map = L.map('map').setView([49.0, -56.0], 6.5);
 
-    // 2. Add Dark Theme Layer (CartoDB Dark Matter)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // 3. Dynamic Data Fetch from communities.json
-    async function loadNewfoundlandData() {
+    async function loadData() {
         try {
             const response = await fetch('communities.json');
-            if (!response.ok) throw new Error('Could not find communities.json database.');
             const communities = await response.json();
             
-            applyLevel3Logic(communities);
+            communities.forEach(loc => {
+                const isLevel3 = loc.level === 3;
+                L.circleMarker([loc.lat, loc.lng], {
+                    radius: isLevel3 ? 8 : 4,
+                    fillColor: isLevel3 ? "#ff4d4f" : "#1890ff",
+                    color: "#fff",
+                    weight: 1,
+                    fillOpacity: 0.8
+                }).addTo(map).bindPopup(`<b>${loc.name}</b><br>Level: ${loc.level}`);
+            });
         } catch (error) {
-            console.error("[weong-route] FATAL ERROR:", error);
+            console.error("Data Load Error:", error);
         }
     }
 
-    // 4. Locked-in Render Methodology
-    function applyLevel3Logic(data) {
-        data.forEach(loc => {
-            // Level 3 exception trigger is the primary project requirement
-            const isLevel3 = loc.level === 3;
-            
-            const marker = L.circleMarker([loc.lat, loc.lng], {
-                radius: isLevel3 ? 8 : 4,
-                fillColor: isLevel3 ? "#ff4d4f" : "#1890ff",
-                color: "#fff",
-                weight: 1,
-                fillOpacity: 0.8
-            }).addTo(map);
-
-            marker.bindPopup(`
-                <div class="custom-popup">
-                    <b>${loc.name}</b><br>
-                    Status: <span class="level-3-indicator">Level ${loc.level}</span>
-                </div>
-            `);
-
-            if (isLevel3) {
-                console.log(`[weong-bulletin] Level 3 active: ${loc.name}`);
-            }
-        });
-    }
-
-    // Execute Anchor Build
-    loadNewfoundlandData();
+    loadData();
 </script>
 
 </body>
