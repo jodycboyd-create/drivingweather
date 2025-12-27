@@ -8,18 +8,24 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
+        
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 6px 12px; border-radius: 8px;
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* [weong-route] The CSS fix for Ocean Drift: Prevents SVG from blocking pan logic [cite: 2025-12-27] */
-        .leaflet-overlay-pane svg { 
-            pointer-events: none !important; 
-            transition: none !important; 
+
+        /* [weong-route] THE DRIFT KILLER 
+           Forces the SVG route line to move in 1:1 sync with map tiles during pans. 
+        */
+        .map-is-moving .leaflet-overlay-pane svg {
+            will-change: transform;
+            pointer-events: none !important;
         }
+
         .leaflet-routing-container { display: none !important; }
+        .leaflet-overlay-pane svg { transition: none !important; }
     </style>
 </head>
 <body>
@@ -30,14 +36,13 @@
 
 <script>
     /**
-     * [weong-route] - REVERTED STABILITY ANCHOR
-     * Logic restored to working version [cite: 2025-12-25].
-     * Panning fix applied via non-suppressive listeners [cite: 2025-12-27].
+     * [weong-route] - PERMANENT STABILITY ANCHOR
+     * Logic: Projection-Locking on Move [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
+        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([48.5, -56.0], 6); 
         window.weongMap = map; 
         
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -99,7 +104,6 @@
         if (routingControl) {
             routingControl.setWaypoints(wps);
         } else {
-            // REVERTED: Using standard Leaflet Routing Control settings [cite: 2025-12-25]
             routingControl = L.Routing.control({
                 waypoints: wps,
                 createMarker: () => null,
@@ -114,12 +118,22 @@
 
             window.weongRouter = routingControl;
 
+            // [weong-route] DRIFT LOCK HANDLERS [cite: 2025-12-27]
+            map.on('movestart', () => map.getContainer().classList.add('map-is-moving'));
+            map.on('moveend', () => {
+                map.getContainer().classList.remove('map-is-moving');
+                // Hard-sync on end to ensure perfect alignment
+                if (routingControl) {
+                    routingControl.getPlan().setWaypoints(wps);
+                }
+            });
+
             routingControl.on('routesfound', (e) => {
-                // FIXED PANNING: only auto-zoom if user is idle [cite: 2025-12-27]
+                // INTERACTION GUARD: No auto-zoom if user is panning
                 if (!map.dragging.moving()) {
                     map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                         padding: [100, 100], 
-                        duration: 1.0 
+                        duration: 0.8 
                     });
                 }
             });
@@ -127,6 +141,7 @@
     }
     window.onload = init;
 </script>
+
 <script src="velocity-widget.js"></script>
 </body>
 </html>
