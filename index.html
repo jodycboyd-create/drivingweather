@@ -3,59 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEONG-ROUTE | Newfoundland Anchor</title>
+    <title>WEONG-ROUTE | Project Recovery</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; }
+        body { margin: 0; padding: 0; background: #01121e; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #map { height: 100vh; width: 100%; }
-        .info-panel {
+
+        /* UI Panel Styling based on provided image */
+        .drive-panel {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            bottom: 20px;
+            left: 20px;
             z-index: 1000;
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            max-width: 300px;
+            background: rgba(1, 18, 30, 0.9);
+            border: 1px solid #1a2b38;
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+            width: 260px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
+
+        .label { color: #00bcd4; font-size: 0.7rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
+        .velocity-display { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 15px; }
+        .speed { font-size: 2rem; font-weight: 500; }
+        .unit { font-size: 0.9rem; color: #888; margin-left: 5px; }
+        
+        .controls { display: flex; gap: 8px; }
+        .btn { 
+            background: #1a2b38; border: none; color: white; 
+            width: 32px; height: 32px; border-radius: 4px; 
+            cursor: pointer; font-size: 1.2rem; display: flex; 
+            align-items: center; justify-content: center;
+        }
+        .btn:hover { background: #2a3b48; }
+
+        .stats { border-top: 1px solid #1a2b38; pt: 10px; margin-top: 10px; font-size: 0.85rem; color: #ccc; }
+        .stats div { margin-top: 5px; }
+        .stats strong { color: white; }
     </style>
 </head>
 <body>
 
-<div class="info-panel">
-    <h3>[weong-route] Project</h3>
-    <p><strong>Status:</strong> Newfoundland Comprehensive Locked</p>
-    <p><strong>Trigger:</strong> Level 3 All Elements</p>
-    <small>Anchor Point: 2025-12-27</small>
-</div>
-
 <div id="map"></div>
+
+<div class="drive-panel">
+    <div class="label">Drive Velocity</div>
+    <div class="velocity-display">
+        <div>
+            <span class="speed" id="speed-val">100</span><span class="unit">km/h</span>
+        </div>
+        <div class="controls">
+            <button class="btn" onclick="updateSpeed(-5)">−</button>
+            <button class="btn" onclick="updateSpeed(5)">+</button>
+        </div>
+    </div>
+    <div class="stats">
+        <div>Distance: <strong id="dist-val">0</strong> km</div>
+        <div>Travel Time: <strong id="time-val">0</strong></div>
+    </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // Initialize map focused on Newfoundland
-    const map = L.map('map').setView([49.0, -56.0], 7);
+    // Initialize map on Newfoundland
+    const map = L.map('map', {
+        zoomControl: false
+    }).setView([49.0, -56.0], 7);
 
-    // Standard Map Tiles (Pre-Black Map version)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors'
+    // RESTORED TILE LAYER: CartoDB Voyager (Light, clear alternative to the black map)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '©OpenStreetMap, ©CartoDB'
     }).addTo(map);
 
-    // Placeholder for the comprehensive Newfoundland Dataset
-    // This maintains the structure for the "Deep Dive" results
-    const locations = [
-        { name: "St. John's", coords: [47.5615, -52.7126], level: 3 },
-        { name: "Gander", coords: [48.9578, -54.6084], level: 3 },
-        { name: "Corner Brook", coords: [48.9500, -57.9500], level: 3 }
-        // Remaining island data points are persistent in the project database
+    // Logic for the UI Panel
+    let currentSpeed = 100;
+    function updateSpeed(delta) {
+        currentSpeed = Math.max(0, currentSpeed + delta);
+        document.getElementById('speed-val').innerText = currentSpeed;
+    }
+
+    // Key Newfoundland Locations
+    const points = [
+        { name: "St. John's", coords: [47.5615, -52.7126] },
+        { name: "Gander", coords: [48.9578, -54.6084] },
+        { name: "Corner Brook", coords: [48.9500, -57.9500] }
     ];
 
-    locations.forEach(loc => {
-        L.marker(loc.coords)
-            .addTo(map)
-            .bindPopup(`<b>${loc.name}</b><br>Exception Trigger: Level ${loc.level}`);
+    points.forEach(p => {
+        L.circleMarker(p.coords, {
+            radius: 6,
+            fillColor: "#00bcd4",
+            color: "#fff",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        }).addTo(map).bindPopup(`<b>${p.name}</b>`);
     });
 
 </script>
