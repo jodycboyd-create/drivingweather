@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WEonG - Newfoundland Boundary Lock</title>
+    <title>WEonG - Phase 1: Absolute Magnet Lock</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001f3f; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4); white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4); white-space: nowrap; pointer-events: none;
         }
     </style>
 </head>
@@ -19,65 +19,70 @@
 
 <script>
     /**
-     * Build: [weong-route] Boundary & Coastal Lock
-     * Logic: Absolute Snap-to-Dataset [cite: 2025-12-26]
-     * Constraint: No floating pins in water [cite: 2025-12-25]
+     * [weong-route] - Phase 1: Gravity & Boundary Enforcement
+     * Logic: Absolute Coordinate Rejection [cite: 2025-12-25]
+     * Data: Locked Newfoundland Dataset [cite: 2025-12-26]
      */
     let map, communities = [];
 
     async function init() {
-        // Center on NL landmass [cite: 2025-12-26]
-        map = L.map('map').setView([48.5, -55.8], 7);
+        // Initial view of Newfoundland [cite: 2025-12-26]
+        map = L.map('map').setView([48.8, -55.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         try {
-            // Load the deep-dive locked dataset [cite: 2025-12-26]
+            // Load the locked deep-dive dataset [cite: 2025-12-26]
             const response = await fetch('data/nl/communities.json');
             const data = await response.json();
             communities = data.features;
             
-            // Baseline starting points [cite: 2025-12-26]
-            spawnLockedMarker([48.9351, -55.6562]); // GFW
-            spawnLockedMarker([48.9566, -54.6089]); // Gander
+            // Baseline points: Grand Falls-Windsor and Gander [cite: 2025-12-26]
+            spawnGravityMarker([48.9351, -55.6562]); 
+            spawnGravityMarker([48.9566, -54.6089]);
         } catch (e) {
-            console.error("Critical: Newfoundland community data missing.");
+            console.error("Critical: Dataset failed to load. Coastal lock inactive.");
         }
     }
 
-    function spawnLockedMarker(coords) {
-        // 1. Initial Force-Snap to land-based community node [cite: 2025-12-26]
-        const firstNode = findNearest(L.latLng(coords));
-        const startPos = [firstNode.geometry.coordinates[1], firstNode.geometry.coordinates[0]];
+    function spawnGravityMarker(coords) {
+        // Step 1: Force start at a locked node [cite: 2025-12-26]
+        const firstNode = findNearestNode(L.latLng(coords));
+        const firstPos = [firstNode.geometry.coordinates[1], firstNode.geometry.coordinates[0]];
 
-        const marker = L.marker(startPos, { draggable: true }).addTo(map);
+        const marker = L.marker(firstPos, { draggable: true }).addTo(map);
 
-        const updateUI = (ll) => {
-            const nearest = findNearest(ll);
-            marker.bindTooltip(nearest.properties.name, { 
+        const refreshLabel = (ll) => {
+            const node = findNearestNode(ll);
+            // Persistent labels as required [cite: 2025-12-26]
+            marker.bindTooltip(node.properties.name, { 
                 permanent: true, direction: 'top', className: 'snapping-label' 
             }).openTooltip();
         };
 
-        updateUI(L.latLng(startPos));
+        refreshLabel(L.latLng(firstPos));
 
-        // 2. Real-time name change while dragging
-        marker.on('drag', (e) => updateUI(e.latlng));
+        // Feedback: Show town name changes while hovering over the coast
+        marker.on('drag', (e) => refreshLabel(e.latlng));
 
-        // 3. THE BOUNDARY LOCK: Rejects "Atlantic Ocean" drops [cite: 2025-12-25]
+        // Step 2: THE MAGNET LOCK [cite: 2025-12-25]
+        // This fires when the user releases the mouse.
         marker.on('dragend', function(e) {
-            const nearest = findNearest(e.latlng);
-            const snappedPos = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
+            // A. Find the absolute nearest land-based community node
+            const finalNode = findNearestNode(e.latlng);
+            const snappedPos = [finalNode.geometry.coordinates[1], finalNode.geometry.coordinates[0]];
             
-            // This physically prevents the pin from staying in the water [cite: 2025-12-25]
+            // B. TELEPORT: Reject the user's drop location (no floating in water)
             marker.setLatLng(snappedPos);
-            updateUI(L.latLng(snappedPos));
             
-            console.log("Boundary Lock active. Snapped to:", nearest.properties.name);
+            // C. SYNC: Force label to match the locked community [cite: 2025-12-26]
+            refreshLabel(L.latLng(snappedPos));
+            
+            console.log("Gravity Lock: Snapped to", finalNode.properties.name);
         });
     }
 
-    function findNearest(latlng) {
-        // Strict search against only our locked NL communities [cite: 2025-12-26]
+    function findNearestNode(latlng) {
+        // Strictly search against the locked NL community grid [cite: 2025-12-26]
         return communities.reduce((prev, curr) => {
             const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
             const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
