@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Coordinate Lock [Locked]</title>
+    <title>WEonG - Canvas Lock [Locked]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -14,15 +14,7 @@
             pointer-events: none; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif;
         }
-        /* [1] FORCE COORDINATE SYNC: Disable the independent SVG transform [cite: 2025-12-27] */
-        .leaflet-zoom-animated {
-            will-change: transform;
-        }
-        .leaflet-overlay-pane svg {
-            transition: none !important;
-            /* Prevents the SVG from lagging behind the marker layer during pans */
-            transform-origin: 0 0; 
-        }
+        /* Hidden routing container */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -34,18 +26,19 @@
 
 <script>
     /**
-     * [weong-route] - COORDINATE LOCK STRATEGY
-     * Fixes decoupling by bypassing the SVG interpolation layer. [cite: 2025-12-27]
+     * [weong-route] - CANVAS ENGINE LOCK
+     * Prevents decoupling by drawing the route line directly onto the Map Canvas. [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // [2] Disable zoomAnimation to force the route to redraw every frame [cite: 2025-12-27]
+        // [1] FORCE CANVAS RENDERER: This binds the route line to the tile-grid pixels [cite: 2025-12-27]
         map = L.map('map', { 
             zoomControl: false, 
+            renderer: L.canvas(), // CRITICAL: Use Canvas instead of SVG [cite: 2025-12-27]
             fadeAnimation: false,
-            zoomAnimation: false, // Forces instant redraw of all layers on zoom
-            markerZoomAnimation: false
+            zoomAnimation: true,
+            inertia: false 
         }).setView([48.8, -55.5], 7); 
         
         window.weongMap = map; 
@@ -61,15 +54,6 @@
             communities = data.features;
             if (communities.length > 0) setupRoutingPins();
         } catch (e) { console.error("Data Load Error"); }
-
-        // [3] THE "GLUE" LOOP: Hard-sync the routing line to the current map state [cite: 2025-12-27]
-        map.on('zoom animanim zoomend move drag', () => {
-            if (routingControl && routingControl._line) {
-                // This manually triggers the SVG internal update mid-animation
-                routingControl._line.reordered = false;
-                routingControl._line._update(); 
-            }
-        });
     }
 
     function findNearestNode(latlng) {
@@ -108,7 +92,9 @@
             show: false,
             lineOptions: {
                 styles: [{ color: '#1A73E8', weight: 8, opacity: 0.8 }],
-                extendToWaypoints: true
+                extendToWaypoints: true,
+                // [2] Ensure the path specifically uses the map's canvas renderer [cite: 2025-12-27]
+                renderer: L.canvas() 
             }
         }).addTo(map);
 
@@ -116,7 +102,6 @@
 
         routingControl.on('routesfound', (e) => {
             if (routingControl._shouldFly) {
-                // Kill any conflicting animations immediately
                 map.stop(); 
                 map.flyToBounds(L.latLngBounds(e.routes[0].coordinates), { 
                     padding: [100, 100], 
@@ -126,10 +111,10 @@
             }
         });
 
-        // Ensure alignment after any camera movement finishes [cite: 2025-12-27]
-        map.on('moveend', () => {
-            if (routingControl && markers[0] && markers[1]) {
-                routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
+        // [3] PIXEL SYNC: Refresh the canvas on every move [cite: 2025-12-27]
+        map.on('move zoom viewreset', () => {
+            if (routingControl && routingControl._line) {
+                routingControl._line.redraw(); 
             }
         });
 
