@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #001220; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
         
         .snapping-label {
             font-weight: bold;
@@ -18,8 +18,8 @@
             border-radius: 8px;
             pointer-events: none;
             white-space: nowrap;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            font-family: sans-serif;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         .leaflet-routing-container { display: none !important; }
@@ -35,23 +35,18 @@
 <script>
     /**
      * [weong-route] - Gold Standard Anchor Point
-     * Restored: Esri High-Contrast Basemap & Fly-to-Bounds Zoom [cite: 2025-12-27]
+     * Basemap: Google Maps Standard (Roads/Terrain) [cite: 2025-12-27]
      */
     let map, communities = [], markers = [null, null], routingControl;
 
     async function init() {
-        // 1. Initialize Map with Esri World Dark Gray Base [cite: 2025-12-27]
+        // 1. Initialize Map with Google Maps Road Layer [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false }).setView([48.5, -56.0], 6); 
         
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
-            maxZoom: 16
-        }).addTo(map);
-
-        // Add Reference Layer (Roads/Labels) for better navigation [cite: 2025-12-27]
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Esri, HERE, Garmin',
-            maxZoom: 16
+        L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
         }).addTo(map);
 
         try {
@@ -77,7 +72,6 @@
     }
 
     function setupRoutingPins() {
-        // Default Anchors: Corner Brook and St. John's [cite: 2025-12-26]
         const defaultCoords = [[48.9500, -57.9500], [47.5615, -52.7126]];
 
         defaultCoords.forEach((coord, i) => {
@@ -117,7 +111,7 @@
                 waypoints: wps,
                 createMarker: () => null,
                 addWaypoints: false,
-                lineOptions: { styles: [{ color: '#0047AB', weight: 8, opacity: 0.8 }] }
+                lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
             }).addTo(map);
 
             routingControl.on('routesfound', function(e) {
