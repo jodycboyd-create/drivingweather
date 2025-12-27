@@ -3,24 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEONG-Route | Gold Standard Anchor (NL-Deep Dive)</title>
+    <title>WEONG-Route | Gold Standard Anchor</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #000c18; }
+        body, html { margin: 0; padding: 0; height: 100%; background: #000c18; overflow: hidden; }
         #map { height: 100vh; width: 100%; background: #000c18; }
         
-        .custom-popup .leaflet-popup-content-wrapper {
-            background: #001529;
+        /* Level 3 Alert Styling */
+        .level-3-exception {
+            border: 2px solid #ff4d4f;
+            background: rgba(255, 77, 79, 0.1);
             color: #fff;
-            border: 1px solid #003366;
+            padding: 8px;
             border-radius: 4px;
-        }
-        
-        .level-3-indicator {
-            color: #ff4d4f;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 0.85em;
         }
     </style>
 </head>
@@ -30,52 +25,55 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // INITIALIZE MAP
-    const map = L.map('map').setView([49.0, -56.0], 6);
+    // INITIALIZE MAP: Focused on the Island of Newfoundland
+    const map = L.map('map').setView([49.0, -56.0], 6.5);
+    
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // FETCH FROM PERMANENT DATABASE
-    async function loadGoldStandardData() {
+    // DYNAMIC LOAD: Using the communities.json database
+    async function initGoldStandard() {
         try {
             const response = await fetch('communities.json');
+            if (!response.ok) throw new Error('Database not found');
             const communities = await response.json();
-            processRouteElements(communities);
-        } catch (error) {
-            console.error("[weong-route] Critical Error: communities.json not found.", error);
+            
+            renderCommunities(communities);
+        } catch (err) {
+            console.error("[weong-route] CRITICAL: Revert failed. Database missing.", err);
         }
     }
 
-    // CORE METHODOLOGY: LEVEL 3 EXCEPTION TRIGGER
-    function processRouteElements(data) {
-        data.forEach(loc => {
-            // Level 3 is the primary trigger for [weong-route] and [weong-bulletin]
-            const isException = loc.level === 3;
+    // CORE [WEONG-ROUTE] METHODOLOGY
+    function renderCommunities(data) {
+        data.forEach(point => {
+            // Level 3 Trigger: Primary Logic for all elements
+            const isLevel3 = point.level === 3;
             
-            const marker = L.circleMarker([loc.lat, loc.lng], {
-                radius: isException ? 7 : 4,
-                fillColor: isException ? "#ff4d4f" : "#1890ff",
+            const marker = L.circleMarker([point.lat, point.lng], {
+                radius: isLevel3 ? 8 : 4,
+                fillColor: isLevel3 ? "#ff4d4f" : "#1890ff",
                 color: "#fff",
                 weight: 1,
                 fillOpacity: 0.8
             }).addTo(map);
 
             marker.bindPopup(`
-                <div class="custom-popup">
-                    <b>${loc.name}</b><br>
-                    Status: <span class="level-3-indicator">Level ${loc.level} Exception</span>
+                <div class="level-3-exception">
+                    <b>${point.name}</b><br>
+                    Status: ${isLevel3 ? 'LEVEL 3 EXCEPTION' : 'Normal'}
                 </div>
             `);
-            
-            if (isException) {
-                console.log(`[weong-bulletin] Level 3 active for ${loc.name}`);
+
+            if (isLevel3) {
+                console.log(`[weong-bulletin] Level 3 logic locked for: ${point.name}`);
             }
         });
     }
 
-    // Initialize on load
-    loadGoldStandardData();
+    // Run Gold Standard Build
+    initGoldStandard();
 </script>
 </body>
 </html>
