@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>NL Navigator | Baseline Build 2025-12-27</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
     </head>
 <body>
@@ -50,27 +51,21 @@
                             <span class="status-label">DATABASE</span>
                             <span class="status-indicator locked">LOCKED</span>
                         </div>
-                        <p class="status-detail">External: communities.json</p>
+                        <p class="status-detail">Source: communities.json</p>
                     </div>
                 </section>
             </aside>
 
             <main class="data-viewport">
-                <div class="viewport-header">
-                    <div class="breadcrumb-trail">
-                        <span class="root">Root</span> / <span class="current-loc">Newfoundland Deep-Dive</span>
+                <div id="map-container">
+                    <div id="map"></div>
+                    <div id="map-overlay" class="hidden">
+                        <div id="location-details">
+                            <h3>Select a Community</h3>
+                            <p>Spatial data pending selection...</p>
+                        </div>
                     </div>
                 </div>
-
-                <section id="main-content-area">
-                    <div id="data-loader" class="loader-overlay">
-                        <div class="spinner"></div>
-                        <p>Accessing Locked Dataset...</p>
-                    </div>
-                    
-                    <div id="results-grid-container" class="grid-display">
-                        </div>
-                </section>
             </main>
         </div>
 
@@ -81,12 +76,13 @@
                     <span class="text">Newfoundland Comprehensive Data Permanently Stored</span>
                 </div>
                 <div class="session-stamp">
-                    Session Anchor: 2025-12-27 | External Data Mode
+                    Session Anchor: 2025-12-27 | Map UI Active
                 </div>
             </div>
         </footer>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
