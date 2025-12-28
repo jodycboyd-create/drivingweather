@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Branch-Aware Build [LOCKED]</title>
+    <title>WEonG - Hierarchical Speed [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -45,7 +45,7 @@
     <script>
         /**
          * [weong-route] - ANCHOR RESTORATION 2025.12.27
-         * Branch Intelligence: TCH=100km/h | Secondary=80km/h
+         * Restoration: Hierarchical Speed Tiering (100/90/80/50).
          */
         let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
@@ -103,22 +103,30 @@
 
         function calculateVelocity(route) {
             const distKm = route.summary.totalDistance / 1000;
-            const center = route.coordinates[Math.floor(route.coordinates.length / 2)];
+            const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
             
-            // Branch Intelligence Logic [cite: 2025-12-27]
-            // We identify the TCH Artery vs. Branches based on latitudinal corridors
-            // TCH mostly stays above 48.9°N in the central-east. 
-            // Routes heading deep south (like Conne River at 47.9°N) are branches.
-            let velocity = 80; // Default Branch Speed
-            
-            if (distKm > 200) { 
-                velocity = 100; // Major Long-Haul Artery
-            } else if (center.lat > 48.8 && distKm > 40) {
-                velocity = 100; // TCH Corridor east-west
+            // SPEED HIERARCHY LOGIC [cite: 2025-12-27]
+            let speed = 80; // Base: Branch Road
+
+            // 1. TCH Artery Check (Main Latitudinal Corridor) [cite: 2025-12-27]
+            if (distKm > 40 && mid.lat > 48.8) {
+                speed = 100;
             }
             
-            document.getElementById('speed-val').innerText = velocity;
-            return velocity;
+            // 2. National Park Check (Gros Morne / Terra Nova) [cite: 2025-12-27]
+            const inGrosMorne = (mid.lat > 49.3 && mid.lng < -57.5);
+            const inTerraNova = (mid.lat > 48.3 && mid.lat < 48.7 && mid.lng > -54.3);
+            if (inGrosMorne || inTerraNova) {
+                speed = 90;
+            }
+
+            // 3. Local/Town Check (Very short trips) [cite: 2025-12-27]
+            if (distKm < 8) {
+                speed = 50;
+            }
+
+            document.getElementById('speed-val').innerText = speed;
+            return speed;
         }
 
         function updateCapsule(route) {
