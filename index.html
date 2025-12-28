@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Reassembled Anchor [LOCKED]</title>
+    <title>WEonG - Stabilized Anchor [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -37,13 +37,12 @@
 
 <script>
     /**
-     * [weong-route] - PROJECT REASSEMBLY 2025.12.27
-     * Logic: Re-sequenced initialization to force the route layer to render.
+     * [weong-route] - ANCHOR REASSEMBLY 2025.12.27
+     * Fix: Eliminated jitter by decoupling snapping from routing updates.
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
     async function init() {
-        // Foundation: Map initialization [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
         window.weongMap = map;
 
@@ -51,7 +50,6 @@
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
         }).addTo(map);
 
-        // Utility: Fetch community data [cite: 2025-12-26]
         try {
             const res = await fetch('data/nl/communities.json');
             const data = await res.json();
@@ -71,7 +69,6 @@
     function setupApp() {
         const starts = [[48.95, -57.95], [47.56, -52.71]];
         
-        // Framing: Setup Markers & Snapping [cite: 2025-12-27]
         starts.forEach((c, i) => {
             const node = findNearest(L.latLng(c));
             const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { 
@@ -85,18 +82,19 @@
             markers[i] = m;
             
             m.on('drag', () => {
-                m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name);
+                const near = findNearest(m.getLatLng());
+                m.getTooltip().setContent(near.properties.name);
             });
 
             m.on('dragend', () => {
                 const final = findNearest(m.getLatLng());
+                // HARD SNAP: Set position before calling route [cite: 2025-12-27]
                 m.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
                 m.getTooltip().setContent(final.properties.name);
                 syncRoute();
             });
         });
 
-        // Addition: Use the global OSRM server for high-reliability route geometry [cite: 2025-12-27]
         routingControl = L.Routing.control({
             serviceUrl: 'https://router.project-osrm.org/route/v1',
             waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
@@ -112,13 +110,12 @@
             window.currentRouteData = route;
             updateCapsule(route);
         });
-
-        // Force an initial draw after the house is framed
-        setTimeout(syncRoute, 100);
     }
 
     function updateCapsule(route) {
-        const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
+        const midIdx = Math.floor(route.coordinates.length / 2);
+        const mid = route.coordinates[midIdx];
+        
         const html = `<div class="eta-capsule"><span id="capTime">--h --m</span> <span style="opacity:0.4">|</span> <span id="capDist">-- km</span></div>`;
         
         if (!etaMarker) {
@@ -126,6 +123,7 @@
                 icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) 
             }).addTo(map);
         } else {
+            // Use setLatLng to move the capsule smoothly without recreating it [cite: 2025-12-27]
             etaMarker.setLatLng(mid);
         }
         if (window.updateVelocityDisplay) window.updateVelocityDisplay();
