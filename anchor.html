@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Color Validated Anchor [LOCKED]</title>
+    <title>WEonG - Green Pin Anchor [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
         
-        /* Forest Green Pin Style [cite: 2025-12-27] */
-        .green-pin {
-            filter: hue-rotate(90deg) brightness(0.8) saturate(1.5);
-        }
+        /* THE GREEN PIN VALIDATOR [cite: 2025-12-27] */
+        .green-pin { filter: hue-rotate(90deg) brightness(0.8) saturate(1.5); }
 
         .snapping-label {
             font-weight: bold; color: #1B5E20; background: white;
@@ -40,8 +38,8 @@
 
 <script>
     /**
-     * [weong-route] - METHODOLOGY VALIDATION 2025.12.27
-     * Addition: Changed marker colors to Green to verify the code is updating.
+     * [weong-route] - ANCHOR RESTORATION 2025.12.27
+     * Validation Addition: Forest Green pins.
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
@@ -78,8 +76,8 @@
                 draggable: true 
             }).addTo(map);
 
-            // Adding the CSS class to change pin color [cite: 2025-12-27]
-            L.DomUtil.addClass(m._icon, 'green-pin');
+            // Addition: Force Green Pin Class
+            if(m._icon) L.DomUtil.addClass(m._icon, 'green-pin');
 
             m.bindTooltip(node.properties.name, { 
                 permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10]
@@ -96,15 +94,14 @@
             });
         });
 
-        // Using a highly redundant endpoint to try and force the route line [cite: 2025-12-27]
         routingControl = L.Routing.control({
-            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            serviceUrl: 'https://routing.openstreetmap.de/routed-car/route/v1',
             waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
             createMarker: () => null,
             addWaypoints: false,
             routeWhileDragging: false,
             show: false,
-            lineOptions: { styles: [{ color: '#1B5E20', weight: 10, opacity: 0.9 }] }
+            lineOptions: { styles: [{ color: '#1B5E20', weight: 8, opacity: 0.9 }] }
         }).addTo(map);
 
         routingControl.on('routesfound', (e) => {
@@ -112,6 +109,8 @@
             window.currentRouteData = route;
             updateCapsule(route);
         });
+        
+        syncRoute();
     }
 
     function updateCapsule(route) {
