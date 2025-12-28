@@ -8,8 +8,7 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <link rel="stylesheet" href="style.css">
-    
-    </head>
+</head>
 <body>
     <div id="app-wrapper">
         <header class="system-header">
@@ -29,7 +28,7 @@
                 <section class="nav-module">
                     <h2>Primary Regions</h2>
                     <nav id="sidebar-nav">
-                        <ul class="region-links">
+                        <ul>
                             <li><a href="#" class="region-trigger" data-region="Avalon">Avalon Peninsula</a></li>
                             <li><a href="#" class="region-trigger" data-region="Central">Central Newfoundland</a></li>
                             <li><a href="#" class="region-trigger" data-region="Western">Western Newfoundland</a></li>
@@ -53,7 +52,7 @@
                             <span class="status-label">DATABASE</span>
                             <span class="status-indicator locked">LOCKED</span>
                         </div>
-                        <p class="status-detail">Source: communities.json</p>
+                        <p class="status-detail">Comprehensive Newfoundland Dataset</p>
                     </div>
                 </section>
             </aside>
@@ -66,14 +65,10 @@
                 </div>
 
                 <div id="map-interface">
-                    <div id="map" style="height: 500px; background: #aad3df;"></div>
+                    <div id="map"></div>
                 </div>
 
-                <section id="data-results-panel">
-                    <div id="loader" class="loader-overlay hidden">
-                        <div class="spinner"></div>
-                        <p>Syncing with communities.json...</p>
-                    </div>
+                <section id="content-display-area">
                     <div id="results-grid-container" class="grid-display">
                         </div>
                 </section>
@@ -87,7 +82,7 @@
                     <span class="text">Newfoundland Comprehensive Data Permanently Stored</span>
                 </div>
                 <div class="session-stamp">
-                    Session Anchor: 2025-12-27 | Map UI & JSON Active
+                    Session Anchor: 2025-12-27
                 </div>
             </div>
         </footer>
@@ -95,47 +90,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
-    <script>
-        // Restoring core logic for Map and Data rendering
-        const map = L.map('map').setView([49.0, -56.0], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-
-        async function initDashboard() {
-            try {
-                const response = await fetch('communities.json');
-                const data = await response.json();
-                renderMarkers(data);
-                renderGrid(data);
-            } catch (err) {
-                console.error("Data Load Error:", err);
-            }
-        }
-
-        function renderMarkers(communities) {
-            communities.forEach(c => {
-                const marker = L.marker([c.lat, c.lng]).addTo(map);
-                marker.bindPopup(`<b>${c.name}</b><br>Level: ${c.level}`);
-                // [weong-route] Level 3 Exception Color Logic
-                if(c.level === 3) {
-                    marker._icon.style.filter = "hue-rotate(120deg)";
-                }
-            });
-        }
-
-        function renderGrid(communities) {
-            const container = document.getElementById('results-grid-container');
-            container.innerHTML = communities.map(c => `
-                <div class="data-card ${c.level === 3 ? 'exception-lvl3' : ''}">
-                    <h3>${c.name}</h3>
-                    <p>Region: ${c.region}</p>
-                    <span class="level-tag">Level ${c.level}</span>
-                </div>
-            `).join('');
-        }
-
-        window.onload = initDashboard;
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
