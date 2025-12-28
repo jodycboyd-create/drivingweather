@@ -1,4 +1,7 @@
 /** [weong-route] Community-Based Weather Bulletin **/
+// At the top of weather-engine.js
+const container = document.getElementById('weather-anchor');
+container.innerHTML = `<div id="weather-panel"></div>`;
 (function() {
     let lastRoute = null;
 
