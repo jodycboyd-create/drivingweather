@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Clean Anchor [LOCKED]</title>
+    <title>WEonG - Velocity Anchor [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -21,7 +21,6 @@
             display: flex; gap: 10px; align-items: center; white-space: nowrap; 
             font-size: 14px; font-weight: 700;
         }
-        /* Landing Pad for External Widget */
         #velocity-anchor { position: absolute; bottom: 30px; right: 20px; z-index: 1000; }
     </style>
 </head>
@@ -66,6 +65,7 @@
                 const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
                 m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', offset: [0, -10] }).openTooltip();
                 markers[i] = m;
+                
                 m.on('drag', () => m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name));
                 m.on('dragend', () => {
                     const final = findNearest(m.getLatLng());
@@ -85,13 +85,13 @@
             }).addTo(map);
 
             routingControl.on('routesfound', (e) => {
-                // Bridge to external widget [cite: 2025-12-27]
+                // Signal the widget that a route exists [cite: 2025-12-27]
                 window.dispatchEvent(new CustomEvent('weong:routeUpdated', { detail: e.routes[0] }));
             });
             syncRoute();
         }
 
-        // Bridge listener for velocity updates from widget [cite: 2025-12-27]
+        // Listen for the calculated ETA from the widget [cite: 2025-12-27]
         window.addEventListener('weong:speedCalculated', (e) => {
             const { h, m, dist, mid } = e.detail;
             const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
