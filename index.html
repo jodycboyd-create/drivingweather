@@ -3,18 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Solidified Anchor [LOCKED]</title>
+    <title>WEonG - Velocity Restoration [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
+        
+        /* SNAPPING LABELS [cite: 2025-12-27] */
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 8px;
             pointer-events: none; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             font-family: sans-serif; font-size: 12px;
         }
+
         .leaflet-routing-container { display: none !important; }
+
+        /* ETA CAPSULE [cite: 2025-12-27] */
         .eta-capsule {
             background: rgba(26, 115, 232, 0.95); backdrop-filter: blur(4px);
             color: white; padding: 6px 16px; border-radius: 20px;
@@ -22,110 +27,120 @@
             font-family: sans-serif; display: flex; gap: 10px;
             align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700;
         }
+
+        /* VELOCITY WIDGET CONTAINER [cite: 2025-12-23] */
+        #velocity-container {
+            position: absolute; bottom: 20px; right: 20px; z-index: 1000;
+            background: white; padding: 10px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
-<div id="map"></div>
+    <div id="map"></div>
+    
+    <div id="velocity-container"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
-<script>
-    /**
-     * [weong-route] - ANCHOR RESTORATION 2025.12.27
-     * Fix: Sequence-locked widget loading.
-     */
-    let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
+    <script>
+        /**
+         * [weong-route] - ANCHOR RESTORATION 2025.12.27
+         * Addition: Velocity Widget container and delayed execution.
+         */
+        let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
-    async function init() {
-        map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
-        L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-            maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-        }).addTo(map);
+        async function init() {
+            map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
+            L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+            }).addTo(map);
 
-        try {
-            const res = await fetch('data/nl/communities.json');
-            const data = await res.json();
-            communities = data.features;
-            if (communities.length > 0) setupApp();
-        } catch (e) { console.error("Data Load Error"); }
-    }
+            try {
+                const res = await fetch('data/nl/communities.json');
+                const data = await res.json();
+                communities = data.features;
+                if (communities.length > 0) setupApp();
+            } catch (e) { console.error("Data Load Error"); }
+        }
 
-    function findNearest(latlng) {
-        return communities.reduce((prev, curr) => {
-            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
-        });
-    }
+        function findNearest(latlng) {
+            return communities.reduce((prev, curr) => {
+                const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
+                const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
+                return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
+            });
+        }
 
-    function setupApp() {
-        const starts = [[48.95, -57.95], [47.56, -52.71]];
-        starts.forEach((c, i) => {
-            const node = findNearest(L.latLng(c));
-            const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
-            m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10] }).openTooltip();
-            markers[i] = m;
+        function setupApp() {
+            const starts = [[48.95, -57.95], [47.56, -52.71]];
+            starts.forEach((c, i) => {
+                const node = findNearest(L.latLng(c));
+                const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
+                m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10] }).openTooltip();
+                markers[i] = m;
+                
+                m.on('drag', () => {
+                    m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name);
+                });
+
+                m.on('dragend', () => {
+                    const final = findNearest(m.getLatLng());
+                    m.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
+                    m.getTooltip().setContent(final.properties.name);
+                    syncRoute();
+                });
+            });
+
+            routingControl = L.Routing.control({
+                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+                waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
+                createMarker: () => null,
+                addWaypoints: false,
+                routeWhileDragging: false,
+                show: false,
+                lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
+            }).addTo(map);
+
+            routingControl.on('routesfound', (e) => {
+                const route = e.routes[0];
+                window.currentRouteData = route;
+                updateCapsule(route);
+            });
+
+            syncRoute();
+
+            // Sequence-lock widget script loading [cite: 2025-12-27]
+            const widgetScript = document.createElement('script');
+            widgetScript.src = 'velocity-widget.js';
+            document.body.appendChild(widgetScript);
+        }
+
+        function updateCapsule(route) {
+            const midIdx = Math.floor(route.coordinates.length / 2);
+            const mid = route.coordinates[midIdx];
+            const duration = Math.round(route.summary.totalTime / 60);
+            const h = Math.floor(duration / 60);
+            const m = duration % 60;
+            const dist = (route.summary.totalDistance / 1000).toFixed(1);
             
-            m.on('drag', () => {
-                m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name);
-            });
+            const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
+            if (!etaMarker) {
+                etaMarker = L.marker(mid, { icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) }).addTo(map);
+            } else {
+                etaMarker.setLatLng(mid).setIcon(L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }));
+            }
 
-            m.on('dragend', () => {
-                const final = findNearest(m.getLatLng());
-                m.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
-                m.getTooltip().setContent(final.properties.name);
-                syncRoute();
-            });
-        });
-
-        routingControl = L.Routing.control({
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
-            createMarker: () => null,
-            addWaypoints: false,
-            routeWhileDragging: false,
-            show: false,
-            lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
-        }).addTo(map);
-
-        routingControl.on('routesfound', (e) => {
-            const route = e.routes[0];
-            window.currentRouteData = route;
-            updateCapsule(route);
-        });
-
-        syncRoute();
-
-        // ADDITION: Safely load widget only after app setup is complete [cite: 2025-12-27]
-        const widgetScript = document.createElement('script');
-        widgetScript.src = 'velocity-widget.js';
-        document.body.appendChild(widgetScript);
-    }
-
-    function updateCapsule(route) {
-        const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
-        const duration = Math.round(route.summary.totalTime / 60);
-        const h = Math.floor(duration / 60);
-        const m = duration % 60;
-        const dist = (route.summary.totalDistance / 1000).toFixed(1);
-        
-        const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
-        if (!etaMarker) {
-            etaMarker = L.marker(mid, { icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) }).addTo(map);
-        } else {
-            etaMarker.setLatLng(mid).setIcon(L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }));
+            if (window.updateVelocityDisplay) {
+                window.updateVelocityDisplay();
+            }
         }
 
-        if (window.updateVelocityDisplay) {
-            window.updateVelocityDisplay();
+        function syncRoute() {
+            if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
         }
-    }
-
-    function syncRoute() {
-        if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
-    }
-    window.onload = init;
-</script>
+        window.onload = init;
+    </script>
 </body>
 </html>
