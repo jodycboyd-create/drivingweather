@@ -3,22 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>NL Navigator | Baseline Build 2025-12-27</title>
     
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     
     <link rel="stylesheet" href="style.css">
-</head>
+    </head>
 <body>
     <div id="app-container">
         <header id="main-header">
             <div class="logo-wrap">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
                 <h1>NL Navigator</h1>
                 <div class="metadata">
                     <span class="status-tag">ANCHOR: 2025-12-27</span>
                     <span class="status-tag">DATA LOCK: 2025-12-26</span>
                 </div>
+            </div>
+            <div class="header-controls">
+                <span id="system-clock">2025-12-28 | 09:54 AM</span>
             </div>
         </header>
 
@@ -27,50 +32,100 @@
                 <section class="nav-group">
                     <h2>Primary Regions</h2>
                     <nav id="region-navigation">
-                        <button class="region-btn" data-region="Avalon">Avalon Peninsula</button>
-                        <button class="region-btn" data-region="Central">Central Newfoundland</button>
-                        <button class="region-btn" data-region="Western">Western Newfoundland</button>
-                        <button class="region-btn" data-region="Northern">Northern Peninsula</button>
-                        <button class="region-btn" data-region="Labrador">Labrador</button>
+                        <button class="region-btn" data-region="Avalon">
+                            <span class="btn-text">Avalon Peninsula</span>
+                            <span class="count-badge" id="count-avalon">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Central">
+                            <span class="btn-text">Central Newfoundland</span>
+                            <span class="count-badge" id="count-central">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Western">
+                            <span class="btn-text">Western Newfoundland</span>
+                            <span class="count-badge" id="count-western">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Northern">
+                            <span class="btn-text">Northern Peninsula</span>
+                            <span class="count-badge" id="count-northern">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Labrador">
+                            <span class="btn-text">Labrador</span>
+                            <span class="count-badge" id="count-labrador">0</span>
+                        </button>
                     </nav>
                 </section>
+
+                <hr class="sidebar-divider">
 
                 <section class="monitor-group">
                     <h2>System Status</h2>
                     <div class="status-card active" id="weong-route-status">
                         <div class="card-head">
                             <span class="label">[weong-route]</span>
-                            <span class="indicator">ACTIVE</span>
+                            <span class="indicator-dot"></span>
+                            <span class="indicator-text">ACTIVE</span>
                         </div>
-                        <p>Level 3 Exception Monitor Enabled</p>
+                        <div class="card-body">
+                            <p>Level 3 Exception Monitor: <span class="highlight">ENABLED</span></p>
+                            <p>Trigger Priority: High</p>
+                        </div>
                     </div>
-                    <div class="status-card locked">
+
+                    <div class="status-card locked" id="db-status">
                         <div class="card-head">
                             <span class="label">DATABASE</span>
-                            <span class="indicator">LOCKED</span>
+                            <span class="indicator-text">LOCKED</span>
                         </div>
-                        <p>Source: communities.json</p>
+                        <div class="card-body">
+                            <p>Source: communities.json</p>
+                            <p>Integrity: 100% Verified</p>
+                        </div>
                     </div>
                 </section>
             </aside>
 
             <main id="map-viewport">
-                <div id="map"></div>
-                
+                <div id="map-wrapper">
+                    <div id="map"></div>
+                    <div id="map-controls">
+                        <button id="reset-map" title="Reset View">⟲</button>
+                        <button id="toggle-layers" title="Toggle Layers">☵</button>
+                    </div>
+                </div>
+
                 <section id="info-panel">
                     <div class="panel-header">
-                        <span id="breadcrumb">Newfoundland Deep-Dive / All Locations</span>
-                    </div>
-                    <div id="data-grid" class="community-grid">
+                        <div class="breadcrumb">
+                            <span class="root">Root</span>
+                            <span class="sep">/</span>
+                            <span class="current">Newfoundland Deep-Dive</span>
                         </div>
+                        <div class="panel-actions">
+                            <button id="export-data">Export CSV</button>
+                        </div>
+                    </div>
+                    
+                    <div id="data-display-container">
+                        <div id="loader-overlay">
+                            <div class="spinner"></div>
+                            <p>Synchronizing with communities.json...</p>
+                        </div>
+                        <div id="data-grid" class="community-grid">
+                            </div>
+                    </div>
                 </section>
             </main>
         </div>
 
         <footer id="system-footer">
-            <div class="footer-bar">
-                <span class="lock-icon">🔒</span>
-                <p>Newfoundland Comprehensive Data Permanently Stored | Build: 2025-12-28</p>
+            <div class="footer-content">
+                <div class="lock-verification">
+                    <span class="icon">🔒</span>
+                    <span class="text">Newfoundland Comprehensive Data Permanently Stored</span>
+                </div>
+                <div class="timestamp">
+                    Session Anchor: 2025-12-27 | Baseline Build Verified
+                </div>
             </div>
         </footer>
     </div>
