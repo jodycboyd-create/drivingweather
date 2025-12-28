@@ -1,11 +1,38 @@
-/** [weong-route] Weather Engine - Live API Fixed **/
+/** [weong-route] Weather Engine - Final Layout & Live API **/
 (function() {
     let lastRoute = null;
 
+    // 1. Setup the Panel Anchor
     const anchor = document.getElementById('weather-anchor');
     if (!anchor) return;
     anchor.innerHTML = `<div id="weather-panel"></div>`;
     const panel = document.getElementById('weather-panel');
+
+    // 2. Tactical CSS - Fixed Icon Scaling [cite: 2025-12-27]
+    const style = document.createElement('style');
+    style.innerHTML = `
+        #weather-panel {
+            background: rgba(10, 10, 10, 0.9); backdrop-filter: blur(12px);
+            color: white; border-radius: 16px; border: 1px solid #333;
+            font-family: 'Courier New', monospace; overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        .w-header { 
+            background: rgba(255, 255, 255, 0.05); padding: 12px; 
+            font-size: 10px; letter-spacing: 2px; color: #888; border-bottom: 1px solid #222;
+        }
+        .w-item { 
+            display: flex; align-items: center; padding: 15px; 
+            border-bottom: 1px solid #222; gap: 15px;
+        }
+        .w-icon-box { width: 40px; height: 40px; flex-shrink: 0; } /* RESTRAINS THE SUN */
+        .w-info { flex-grow: 1; }
+        .w-time { font-size: 12px; color: #00ff00; font-weight: bold; }
+        .w-loc { font-size: 14px; font-weight: bold; color: #fff; margin-top: 2px; }
+        .w-meta { font-size: 10px; color: #666; margin-top: 4px; }
+        .hazard { color: #ff4757; font-weight: bold; }
+    `;
+    document.head.appendChild(style);
 
     const icons = {
         clear: () => `<svg viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" style="width:100%; height:100%;"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M17.66 6.34l1.42-1.42"/></svg>`,
@@ -24,8 +51,6 @@
     window.addEventListener('weong:speedCalculated', async (e) => {
         if (!lastRoute || !window.communities) return;
         const { departureTime, speed } = e.detail;
-        
-        panel.innerHTML = `<div class="w-header">UPDATING LIVE DATA...</div>`;
 
         const path = lastRoute.coordinates;
         const totalDist = lastRoute.summary.totalDistance / 1000;
@@ -47,38 +72,30 @@
         try {
             const res = await fetch(url);
             const rawData = await res.json();
-            // Open-Meteo returns a single object if 1 location, but an ARRAY of objects for multiple.
             const weatherResults = Array.isArray(rawData) ? rawData : [rawData];
 
             let html = `<div class="w-header">LIVE ROUTE BULLETIN</div>`;
             stops.forEach((stop, i) => {
                 const travelHours = stop.dist / speed;
                 const arrival = new Date(departureTime.getTime() + travelHours * 3600000);
-                
-                // Find matching hour index in API results
                 const arrivalISO = arrival.toISOString().split(':')[0] + ':00';
-                const hourIdx = weatherResults[i].hourly.time.findIndex(t => t.startsWith(arrivalISO.substring(0, 13)));
-                const idx = hourIdx !== -1 ? hourIdx : 0;
-
+                
                 const w = weatherResults[i].hourly;
-                const temp = w.temperature_2m[idx];
-                const code = w.weathercode[idx];
-                const wind = w.windspeed_10m[idx];
+                const hourIdx = w.time.findIndex(t => t.startsWith(arrivalISO.substring(0, 13)));
+                const idx = hourIdx !== -1 ? hourIdx : 0;
 
                 html += `
                     <div class="w-item">
-                        <div class="w-icon-box">${mapCodeToIcon(code)}</div>
+                        <div class="w-icon-box">${mapCodeToIcon(w.weathercode[idx])}</div>
                         <div class="w-info">
                             <div class="w-time">${arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                             <div class="w-loc">${stop.name.toUpperCase()}</div>
-                            <div class="w-meta">${temp}°C | ${wind}km/h Wind | ${stop.dist.toFixed(0)}km</div>
+                            <div class="w-meta">${w.temperature_2m[idx]}°C | ${w.windspeed_10m[idx]} km/h Wind</div>
                         </div>
                     </div>`;
             });
             panel.innerHTML = html;
-        } catch (err) {
-            panel.innerHTML = `<div class="w-header" style="color:red">API CONNECTION ERROR</div>`;
-        }
+        } catch (err) { console.error("Weather API Fail"); }
     });
 
     window.addEventListener('weong:routeUpdated', (e) => { lastRoute = e.detail; });
