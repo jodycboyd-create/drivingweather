@@ -1,131 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!DOCTYPE html>
-<html lang="en">
-<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Final Reassembly [LOCKED]</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
-        .snapping-label {
-            font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 4px 10px; border-radius: 8px;
-            pointer-events: none; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            font-family: sans-serif; font-size: 12px;
-        }
-        .leaflet-routing-container { display: none !important; }
-        .eta-capsule {
-            background: rgba(26, 115, 232, 0.95); backdrop-filter: blur(4px);
-            color: white; padding: 6px 16px; border-radius: 20px;
-            border: 1px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            font-family: sans-serif; display: flex; gap: 10px;
-            align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700;
-        }
-    </style>
-</head>
-<body>
-<div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-
-<script>
-    /**
-     * [weong-route] - FINAL ANCHOR RESTORATION 2025.12.27
-     * Addition: Real-time 'drag' listener to update snapping labels live.
-     */
-    let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
-
-    async function init() {
-        map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
-        L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-            maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-        }).addTo(map);
-
-        try {
-            const res = await fetch('data/nl/communities.json');
-            const data = await res.json();
-            communities = data.features;
-            if (communities.length > 0) setupApp();
-        } catch (e) { console.error("Data Load Error"); }
-    }
-
-    function findNearest(latlng) {
-        return communities.reduce((prev, curr) => {
-            const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-            const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-            return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
-        });
-    }
-
-    function setupApp() {
-        const starts = [[48.95, -57.95], [47.56, -52.71]];
-        starts.forEach((c, i) => {
-            const node = findNearest(L.latLng(c));
-            const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
-            m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10] }).openTooltip();
-            markers[i] = m;
-
-            // ADDITION: Real-time label updates while dragging [cite: 2025-12-26]
-            m.on('drag', function(e) {
-                const nearest = findNearest(m.getLatLng());
-                m.getTooltip().setContent(nearest.properties.name);
-            });
-
-            m.on('dragend', () => {
-                const final = findNearest(m.getLatLng());
-                m.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
-                m.getTooltip().setContent(final.properties.name);
-                syncRoute();
-            });
-        });
-
-        routingControl = L.Routing.control({
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
-            createMarker: () => null,
-            addWaypoints: false,
-            routeWhileDragging: false,
-            show: false,
-            lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
-        }).addTo(map);
-
-        routingControl.on('routesfound', (e) => {
-            const route = e.routes[0];
-            updateCapsule(route);
-        });
-        syncRoute();
-    }
-
-    function updateCapsule(route) {
-        const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
-        const duration = Math.round(route.summary.totalTime / 60);
-        const h = Math.floor(duration / 60);
-        const m = duration % 60;
-        const dist = (route.summary.totalDistance / 1000).toFixed(1);
-        
-        const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
-        if (!etaMarker) {
-            etaMarker = L.marker(mid, { icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) }).addTo(map);
-        } else {
-            etaMarker.setLatLng(mid).setIcon(L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }));
-        }
-        if (window.updateVelocityDisplay) window.updateVelocityDisplay();
-    }
-
-    function syncRoute() {
-        if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
-    }
-    window.onload = init;
-</script>
-<script src="velocity-widget.js"></script>
-</body>
-</html>    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Anchor Restoration [LOCKED]</title>
+    <title>WEonG - Velocity Build [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -154,7 +32,8 @@
 <script>
     /**
      * [weong-route] - ANCHOR RESTORATION 2025.12.27
-     * Reassembling the "closed door" version with a functional routing utility.
+     * Status: Hard-Locked.
+     * Addition: Velocity Widget integration reinstated.
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
@@ -187,6 +66,12 @@
             const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
             m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10] }).openTooltip();
             markers[i] = m;
+            
+            m.on('drag', function(e) {
+                const nearest = findNearest(m.getLatLng());
+                m.getTooltip().setContent(nearest.properties.name);
+            });
+
             m.on('dragend', () => {
                 const final = findNearest(m.getLatLng());
                 m.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
@@ -195,7 +80,6 @@
             });
         });
 
-        // RESTORATION: Using the standard OSRM router mirror to restore the blue line [cite: 2025-12-27]
         routingControl = L.Routing.control({
             router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
             waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
@@ -208,6 +92,7 @@
 
         routingControl.on('routesfound', (e) => {
             const route = e.routes[0];
+            window.currentRouteData = route; // Essential for Velocity calculation
             updateCapsule(route);
         });
         syncRoute();
@@ -216,22 +101,4 @@
     function updateCapsule(route) {
         const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
         const duration = Math.round(route.summary.totalTime / 60);
-        const h = Math.floor(duration / 60);
-        const m = duration % 60;
-        const dist = (route.summary.totalDistance / 1000).toFixed(1);
-        
-        const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
-        if (!etaMarker) {
-            etaMarker = L.marker(mid, { icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) }).addTo(map);
-        } else {
-            etaMarker.setLatLng(mid).setIcon(L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }));
-        }
-    }
-
-    function syncRoute() {
-        if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
-    }
-    window.onload = init;
-</script>
-</body>
-</html>
+        const h = Math.floor(
