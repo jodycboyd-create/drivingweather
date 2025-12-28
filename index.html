@@ -2,163 +2,70 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WEonG - Mission Control [LOCKED 2025-12-27]</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    
-    <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #0a0a0a; overflow: hidden; }
-        
-        /* Tooltip & Capsule UI [cite: 2025-12-23] */
-        .snapping-label {
-            font-weight: bold; color: #0047AB; background: white; border: 2px solid #0047AB; 
-            padding: 4px 10px; border-radius: 8px; pointer-events: none; white-space: nowrap; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-family: sans-serif; font-size: 12px;
-        }
-        .leaflet-routing-container { display: none !important; }
-        .eta-capsule {
-            background: rgba(26, 115, 232, 0.95); backdrop-filter: blur(4px); color: white; 
-            padding: 6px 16px; border-radius: 20px; border: 1px solid white; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-family: sans-serif; 
-            display: flex; gap: 10px; align-items: center; white-space: nowrap; 
-            font-size: 14px; font-weight: 700;
-        }
-        
-        /* Widget Layout Anchors [cite: 2025-12-27] */
-        #weather-anchor { 
-            position: absolute; top: 20px; left: 20px; z-index: 1000; 
-            width: 280px; pointer-events: auto; 
-        }
-        #velocity-anchor { 
-            position: absolute; bottom: 30px; right: 20px; z-index: 1000; 
-            pointer-events: auto; 
-        }
-        
-        /* Mobile Adaptability */
-        @media (max-width: 600px) {
-            #weather-anchor { width: calc(100% - 40px); }
-            #velocity-anchor { left: 20px; right: 20px; display: flex; justify-content: center; }
-        }
-    </style>
-</head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Newfoundland Explorer | Baseline Build 2025-12-28</title>
+    <link rel="stylesheet" href="style.css">
+    </head>
 <body>
 
-    <div id="map"></div>
-    
-    <div id="weather-anchor"></div>
-    <div id="velocity-anchor"></div>
+    <header class="main-header">
+        <div class="container">
+            <div class="logo-area">
+                <h1>NL Navigator</h1>
+                <span class="version-tag">Build: 2025-12-28</span>
+            </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-    
-    <script src="weather-engine.js" defer></script>
-    <script src="velocity-widget.js" defer></script>
+            <div class="search-wrapper">
+                <div class="search-bar">
+                    <input 
+                        type="search" 
+                        id="site-search" 
+                        placeholder="Search regions or towns (e.g., Avalon, Gander)..." 
+                        aria-label="Search Newfoundland locations"
+                        list="location-suggestions">
+                    
+                    <button type="button" id="search-btn" class="search-icon-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+                </div>
 
-    <script>
-        /** * [weong-route] - MAIN ANCHOR POINT
-         * Restoration: Hierarchical Snapping & Component Bridge.
-         */
-        let map, markers = [null, null], routingControl, etaMarker = null;
-        window.communities = []; // Global Registry for Newfoundland Data [cite: 2025-12-26]
+                <datalist id="location-suggestions">
+                    </datalist>
+            </div>
+        </div>
+    </header>
 
-        async function init() {
-            map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
-            
-            L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-            }).addTo(map);
+    <main class="content-area">
+        <aside class="sidebar">
+            <nav id="region-nav">
+                <h3>Regions</h3>
+                <ul>
+                    <li><a href="#" data-region="Avalon">Avalon</a></li>
+                    <li><a href="#" data-region="Central">Central</a></li>
+                    <li><a href="#" data-region="Western">Western</a></li>
+                    <li><a href="#" data-region="Labrador">Labrador</a></li>
+                </ul>
+            </nav>
+        </aside>
 
-            try {
-                // Initializing the "Locked" Newfoundland Dataset [cite: 2025-12-26]
-                const res = await fetch('data/nl/communities.json');
-                const data = await res.json();
-                window.communities = data.features;
-                
-                if (window.communities.length > 0) {
-                    setupApp();
-                } else {
-                    console.error("Community data is empty.");
-                }
-            } catch (e) { 
-                console.error("Failed to load Newfoundland Community Database."); 
-            }
-        }
+        <section id="main-display" class="results-grid">
+            <div id="loader" class="hidden">Scanning Newfoundland Dataset...</div>
+            <div id="results-container">
+                </div>
+        </section>
+    </main>
 
-        function findNearest(latlng) {
-            return window.communities.reduce((prev, curr) => {
-                const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
-                const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
-                return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
-            });
-        }
+    <footer class="main-footer">
+        <div class="status-bar">
+            <span id="system-status">System Ready</span>
+            <span id="data-lock">Data Lock: Newfoundland Comprehensive [2025-12-26]</span>
+        </div>
+    </footer>
 
-        function setupApp() {
-            // Default: Corner Brook to St. John's
-            const starts = [[48.95, -57.95], [47.56, -52.71]];
-            
-            starts.forEach((c, i) => {
-                const node = findNearest(L.latLng(c));
-                const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
-                
-                m.bindTooltip(node.properties.name, { 
-                    permanent: true, className: 'snapping-label', direction: 'top', offset: [0, -10] 
-                }).openTooltip();
-                
-                markers[i] = m;
-                
-                m.on('drag', () => {
-                    const near = findNearest(m.getLatLng());
-                    m.getTooltip().setContent(near.properties.name);
-                });
-
-                m.on('dragend', () => {
-                    const final = findNearest(m.getLatLng());
-                    m.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
-                    m.getTooltip().setContent(final.properties.name);
-                    syncRoute();
-                });
-            });
-
-            routingControl = L.Routing.control({
-                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
-                createMarker: () => null,
-                addWaypoints: false,
-                show: false,
-                lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
-            }).addTo(map);
-
-            routingControl.on('routesfound', (e) => {
-                // Broadcast the route to all external widgets [cite: 2025-12-27]
-                window.dispatchEvent(new CustomEvent('weong:routeUpdated', { detail: e.routes[0] }));
-            });
-            
-            syncRoute();
-        }
-
-        // Catch the calculated speed data to update the map-top ETA capsule
-        window.addEventListener('weong:speedCalculated', (e) => {
-            const { h, m, dist, mid } = e.detail;
-            const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
-            
-            if (!etaMarker) {
-                etaMarker = L.marker(mid, { 
-                    icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) 
-                }).addTo(map);
-            } else {
-                etaMarker.setLatLng(mid).setIcon(L.divIcon({ 
-                    className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] 
-                }));
-            }
-        });
-
-        function syncRoute() { 
-            if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]); 
-        }
-
-        window.onload = init;
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
