@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Velocity Anchor [LOCKED]</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WEonG - Mobile Mission Control [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #0a0a0a; overflow: hidden; }
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white; border: 2px solid #0047AB; 
             padding: 4px 10px; border-radius: 8px; pointer-events: none; white-space: nowrap; 
@@ -21,16 +21,28 @@
             display: flex; gap: 10px; align-items: center; white-space: nowrap; 
             font-size: 14px; font-weight: 700;
         }
+        
+        /* Widget Anchor Points */
+        #weather-anchor { position: absolute; top: 20px; left: 20px; z-index: 1000; width: 280px; }
         #velocity-anchor { position: absolute; bottom: 30px; right: 20px; z-index: 1000; }
+        
+        @media (max-width: 600px) {
+            #weather-anchor { width: calc(100% - 40px); }
+            #velocity-anchor { left: 20px; right: 20px; display: flex; justify-content: center; }
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    
+    <div id="weather-anchor"></div>
     <div id="velocity-anchor"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    
     <script src="velocity-widget.js" defer></script>
+    <script src="weather-engine.js" defer></script>
 
     <script>
         /** [weong-route] - ANCHOR 2025.12.27 **/
@@ -45,13 +57,14 @@
             try {
                 const res = await fetch('data/nl/communities.json');
                 const data = await res.json();
-                communities = data.features;
-                if (communities.length > 0) setupApp();
+                // Expose communities globally for weather-engine.js to see [cite: 2025-12-27]
+                window.communities = data.features;
+                if (window.communities.length > 0) setupApp();
             } catch (e) { console.error("Data Load Error"); }
         }
 
         function findNearest(latlng) {
-            return communities.reduce((prev, curr) => {
+            return window.communities.reduce((prev, curr) => {
                 const p = L.latLng(prev.geometry.coordinates[1], prev.geometry.coordinates[0]);
                 const c = L.latLng(curr.geometry.coordinates[1], curr.geometry.coordinates[0]);
                 return latlng.distanceTo(c) < latlng.distanceTo(p) ? curr : prev;
@@ -85,13 +98,11 @@
             }).addTo(map);
 
             routingControl.on('routesfound', (e) => {
-                // Signal the widget that a route exists [cite: 2025-12-27]
                 window.dispatchEvent(new CustomEvent('weong:routeUpdated', { detail: e.routes[0] }));
             });
             syncRoute();
         }
 
-        // Listen for the calculated ETA from the widget [cite: 2025-12-27]
         window.addEventListener('weong:speedCalculated', (e) => {
             const { h, m, dist, mid } = e.detail;
             const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
@@ -105,6 +116,5 @@
         function syncRoute() { if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]); }
         window.onload = init;
     </script>
-    <script src="weather-engine.js" defer></script>
 </body>
 </html>
