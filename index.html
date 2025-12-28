@@ -3,50 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Hierarchical Speed [LOCKED]</title>
+    <title>WEonG - Clean Anchor [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
         .snapping-label {
-            font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 4px 10px; border-radius: 8px;
-            pointer-events: none; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            font-family: sans-serif; font-size: 12px;
+            font-weight: bold; color: #0047AB; background: white; border: 2px solid #0047AB; 
+            padding: 4px 10px; border-radius: 8px; pointer-events: none; white-space: nowrap; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-family: sans-serif; font-size: 12px;
         }
         .leaflet-routing-container { display: none !important; }
         .eta-capsule {
-            background: rgba(26, 115, 232, 0.95); backdrop-filter: blur(4px);
-            color: white; padding: 6px 16px; border-radius: 20px;
-            border: 1px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            font-family: sans-serif; display: flex; gap: 10px;
-            align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700;
+            background: rgba(26, 115, 232, 0.95); backdrop-filter: blur(4px); color: white; 
+            padding: 6px 16px; border-radius: 20px; border: 1px solid white; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-family: sans-serif; 
+            display: flex; gap: 10px; align-items: center; white-space: nowrap; 
+            font-size: 14px; font-weight: 700;
         }
-        #velocity-widget {
-            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
-            background: #1a1a1a; color: #00ff00; padding: 15px; border-radius: 10px;
-            font-family: 'Courier New', monospace; box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            border: 1px solid #333; min-width: 130px; text-align: center;
-        }
-        .v-label { font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 5px; }
-        .v-value { font-size: 24px; font-weight: bold; }
+        /* Landing Pad for External Widget */
+        #velocity-anchor { position: absolute; bottom: 30px; right: 20px; z-index: 1000; }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    <div id="velocity-widget">
-        <div class="v-label">Est. Cruising Speed</div>
-        <div class="v-value"><span id="speed-val">0</span> <small>km/h</small></div>
-    </div>
+    <div id="velocity-anchor"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="velocity-widget.js" defer></script>
 
     <script>
-        /**
-         * [weong-route] - ANCHOR RESTORATION 2025.12.27
-         * Restoration: Hierarchical Speed Tiering (100/90/80/50).
-         */
+        /** [weong-route] - ANCHOR 2025.12.27 **/
         let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
         async function init() {
@@ -76,7 +64,7 @@
             starts.forEach((c, i) => {
                 const node = findNearest(L.latLng(c));
                 const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
-                m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10] }).openTooltip();
+                m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', offset: [0, -10] }).openTooltip();
                 markers[i] = m;
                 m.on('drag', () => m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name));
                 m.on('dragend', () => {
@@ -92,63 +80,29 @@
                 waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
                 createMarker: () => null,
                 addWaypoints: false,
-                routeWhileDragging: false,
                 show: false,
                 lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
             }).addTo(map);
 
-            routingControl.on('routesfound', (e) => updateCapsule(e.routes[0]));
+            routingControl.on('routesfound', (e) => {
+                // Bridge to external widget [cite: 2025-12-27]
+                window.dispatchEvent(new CustomEvent('weong:routeUpdated', { detail: e.routes[0] }));
+            });
             syncRoute();
         }
 
-        function calculateVelocity(route) {
-            const distKm = route.summary.totalDistance / 1000;
-            const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
-            
-            // SPEED HIERARCHY LOGIC [cite: 2025-12-27]
-            let speed = 80; // Base: Branch Road
-
-            // 1. TCH Artery Check (Main Latitudinal Corridor) [cite: 2025-12-27]
-            if (distKm > 40 && mid.lat > 48.8) {
-                speed = 100;
-            }
-            
-            // 2. National Park Check (Gros Morne / Terra Nova) [cite: 2025-12-27]
-            const inGrosMorne = (mid.lat > 49.3 && mid.lng < -57.5);
-            const inTerraNova = (mid.lat > 48.3 && mid.lat < 48.7 && mid.lng > -54.3);
-            if (inGrosMorne || inTerraNova) {
-                speed = 90;
-            }
-
-            // 3. Local/Town Check (Very short trips) [cite: 2025-12-27]
-            if (distKm < 8) {
-                speed = 50;
-            }
-
-            document.getElementById('speed-val').innerText = speed;
-            return speed;
-        }
-
-        function updateCapsule(route) {
-            const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
-            const distKm = route.summary.totalDistance / 1000;
-            const speed = calculateVelocity(route);
-            
-            const calculatedMinutes = (distKm / speed) * 60;
-            const h = Math.floor(calculatedMinutes / 60);
-            const m = Math.round(calculatedMinutes % 60);
-            
-            const html = `<div class="eta-capsule">${h}h ${m}m | ${distKm.toFixed(1)} km</div>`;
+        // Bridge listener for velocity updates from widget [cite: 2025-12-27]
+        window.addEventListener('weong:speedCalculated', (e) => {
+            const { h, m, dist, mid } = e.detail;
+            const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
             if (!etaMarker) {
                 etaMarker = L.marker(mid, { icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) }).addTo(map);
             } else {
                 etaMarker.setLatLng(mid).setIcon(L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }));
             }
-        }
+        });
 
-        function syncRoute() {
-            if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
-        }
+        function syncRoute() { if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]); }
         window.onload = init;
     </script>
 </body>
