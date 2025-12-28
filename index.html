@@ -3,18 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Velocity Calibrated [LOCKED]</title>
+    <title>WEonG - Synchronized Build [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
+        
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 8px;
             pointer-events: none; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             font-family: sans-serif; font-size: 12px;
         }
+
         .leaflet-routing-container { display: none !important; }
+
         .eta-capsule {
             background: rgba(26, 115, 232, 0.95); backdrop-filter: blur(4px);
             color: white; padding: 6px 16px; border-radius: 20px;
@@ -22,6 +25,7 @@
             font-family: sans-serif; display: flex; gap: 10px;
             align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700;
         }
+
         #velocity-widget {
             position: absolute; bottom: 30px; right: 20px; z-index: 1000;
             background: #1a1a1a; color: #00ff00; padding: 15px; border-radius: 10px;
@@ -46,7 +50,7 @@
     <script>
         /**
          * [weong-route] - ANCHOR RESTORATION 2025.12.27
-         * Calibration: Adjusted velocity to reflect TCH 100km/h standards.
+         * Final Update: Synchronized Capsule Time with 100km/h TCH Standard.
          */
         let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
@@ -101,7 +105,6 @@
 
             routingControl.on('routesfound', (e) => {
                 updateCapsule(e.routes[0]);
-                calculateVelocity(e.routes[0]);
             });
 
             syncRoute();
@@ -110,31 +113,33 @@
         function calculateVelocity(route) {
             const distKm = route.summary.totalDistance / 1000;
             const timeHr = route.summary.totalTime / 3600;
-            
-            // CALIBRATION LOGIC [cite: 2025-12-27]
-            // If the distance is significant (TCH travel), we normalize to 100km/h.
-            // If shorter branch travel, we allow the calculated average.
             let velocity = Math.round(distKm / timeHr);
             
+            // TCH Standard Normalization [cite: 2025-12-27]
             if (distKm > 50) { 
-                // Normalize major routes to 100km/h TCH standard
                 velocity = 100; 
             } else {
-                // Apply a 1.15x modifier to short routes to account for 
-                // routing engine over-caution on branches [cite: 2025-12-27]
                 velocity = Math.min(Math.round(velocity * 1.15), 90);
             }
             
             document.getElementById('speed-val').innerText = velocity;
+            return velocity;
         }
 
         function updateCapsule(route) {
             const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
-            const duration = Math.round(route.summary.totalTime / 60);
-            const h = Math.floor(duration / 60), m = duration % 60;
-            const dist = (route.summary.totalDistance / 1000).toFixed(1);
+            const distKm = route.summary.totalDistance / 1000;
             
-            const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
+            // Sync duration with cruising speed [cite: 2025-12-27]
+            const speed = calculateVelocity(route);
+            const calculatedMinutes = (distKm / speed) * 60;
+            
+            const h = Math.floor(calculatedMinutes / 60);
+            const m = Math.round(calculatedMinutes % 60);
+            const distLabel = distKm.toFixed(1);
+            
+            const html = `<div class="eta-capsule">${h}h ${m}m | ${distLabel} km</div>`;
+            
             if (!etaMarker) {
                 etaMarker = L.marker(mid, { icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) }).addTo(map);
             } else {
