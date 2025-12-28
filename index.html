@@ -3,70 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>NL Navigator | Baseline Build 2025-12-28</title>
     <link rel="stylesheet" href="style.css">
     </head>
 <body>
-    <div class="app-container">
+    <div id="app-wrapper">
         <header class="system-header">
-            <div class="brand-section">
-                <h1>NL Navigator</h1>
-                <div class="meta-data">
-                    <span class="badge">Build: 2025-12-28</span>
-                    <span class="badge">Data Lock: 2025-12-26</span>
+            <div class="brand-container">
+                <div class="logo-group">
+                    <h1>NL Navigator</h1>
+                    <div class="build-info">
+                        <span class="tag">BASELINE: 2025-12-28</span>
+                        <span class="tag">DATA LOCK: 2025-12-26</span>
+                    </div>
                 </div>
-            </div>
-
-            <div class="search-interface">
-                <div class="search-input-group">
-                    <input 
-                        type="search" 
-                        id="site-search" 
-                        placeholder="Search regions, towns, or alerts..." 
-                        list="nl-locations-list">
-                    <button id="search-trigger" aria-label="Perform Search">🔍</button>
+                
+                <div class="search-engine-interface">
+                    <div class="search-input-container">
+                        <span class="search-icon">🔍</span>
+                        <input 
+                            type="search" 
+                            id="site-search" 
+                            placeholder="Search Newfoundland locations, routes, or Level 3 alerts..." 
+                            list="nl-comprehensive-list">
+                        <button id="search-execute-btn">EXECUTE SEARCH</button>
+                    </div>
+                    <datalist id="nl-comprehensive-list">
+                        </datalist>
                 </div>
-                <datalist id="nl-locations-list">
-                    </datalist>
             </div>
         </header>
 
-        <div class="main-layout">
-            <aside class="sidebar">
-                <nav class="region-nav">
+        <div class="workspace-layout">
+            <aside class="sidebar-monitor">
+                <section class="nav-module">
                     <h2>Primary Regions</h2>
-                    <ul id="region-links">
-                        <li><a href="#" data-region="Avalon">Avalon</a></li>
-                        <li><a href="#" data-region="Central">Central</a></li>
-                        <li><a href="#" data-region="Western">Western</a></li>
-                        <li><a href="#" data-region="Labrador">Labrador</a></li>
-                    </ul>
-                </nav>
+                    <nav id="sidebar-nav">
+                        <ul>
+                            <li><a href="#" class="region-trigger" data-region="Avalon">Avalon Peninsula</a></li>
+                            <li><a href="#" class="region-trigger" data-region="Central">Central Newfoundland</a></li>
+                            <li><a href="#" class="region-trigger" data-region="Western">Western Newfoundland & Gros Morne</a></li>
+                            <li><a href="#" class="region-trigger" data-region="Northern">Northern Peninsula</a></li>
+                            <li><a href="#" class="region-trigger" data-region="Labrador">Labrador</a></li>
+                        </ul>
+                    </nav>
+                </section>
 
-                <div class="system-monitor">
-                    <h3>System Status</h3>
-                    <div class="monitor-card">
-                        <p><strong>Database:</strong> Comprehensive [Locked]</p>
-                        <p><strong>[weong-route]:</strong> <span class="status-active">Level 3 Monitor Active</span></p>
+                <section class="system-status-module">
+                    <h2>System Status</h2>
+                    <div class="status-card" id="weong-route-monitor">
+                        <div class="status-header">
+                            <span class="status-label">[weong-route]</span>
+                            <span class="status-indicator pulse-green">ACTIVE</span>
+                        </div>
+                        <p class="status-detail">Level 3 Exception Trigger: Enabled</p>
                     </div>
-                </div>
+                    <div class="status-card" id="data-integrity-monitor">
+                        <div class="status-header">
+                            <span class="status-label">DATABASE</span>
+                            <span class="status-indicator locked">LOCKED</span>
+                        </div>
+                        <p class="status-detail">Comprehensive Newfoundland Dataset Loaded</p>
+                    </div>
+                </section>
             </aside>
 
-            <main class="content-display">
-                <header class="content-header">
-                    <div class="breadcrumb">Newfoundland Deep-Dive > <span id="view-title">All Results</span></div>
-                    <div id="status-message">Scanning Newfoundland Dataset...</div>
-                </header>
+            <main class="data-viewport">
+                <div class="viewport-header">
+                    <div class="breadcrumb-trail">
+                        <span class="root">Root</span> / <span class="current-loc">Newfoundland Deep-Dive</span>
+                    </div>
+                    <div class="filter-controls">
+                        <label>Filter Level:</label>
+                        <select id="level-filter">
+                            <option value="all">All Levels</option>
+                            <option value="3">Level 3 (Alerts Only)</option>
+                        </select>
+                    </div>
+                </div>
 
-                <section id="results-grid" class="grid-view">
-                    </section>
+                <section id="main-content-area">
+                    <div id="data-loader" class="loader-overlay hidden">
+                        <div class="spinner"></div>
+                        <p>Accessing Locked Dataset...</p>
+                    </div>
+                    
+                    <div id="results-grid-container" class="grid-display">
+                        </div>
+                </section>
             </main>
         </div>
 
-        <footer class="system-footer">
-            <div class="footer-wrap">
-                <span class="lock-icon">🔒</span>
-                <p>Newfoundland Comprehensive Data Permanently Stored | Session: 2025-12-28</p>
+        <footer class="global-footer">
+            <div class="footer-status-bar">
+                <div class="lock-status">
+                    <span class="icon">🔒</span>
+                    <span class="text">Newfoundland Comprehensive Data Permanently Stored</span>
+                </div>
+                <div class="session-stamp">
+                    Session Anchor: 2025-12-28 | Version 4.0.1
+                </div>
             </div>
         </footer>
     </div>
