@@ -3,93 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>NL Navigator | Baseline Build 2025-12-27</title>
     
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app-wrapper">
-        <header class="system-header">
-            <div class="brand-container">
-                <div class="logo-group">
-                    <h1>NL Navigator</h1>
-                    <div class="build-info">
-                        <span class="tag">BASELINE: 2025-12-27</span>
-                        <span class="tag">DATA LOCK: 2025-12-26</span>
-                    </div>
+    <div id="app-container">
+        <header id="main-header">
+            <div class="logo-wrap">
+                <h1>NL Navigator</h1>
+                <div class="metadata">
+                    <span class="status-tag">ANCHOR: 2025-12-27</span>
+                    <span class="status-tag">DATA LOCK: 2025-12-26</span>
                 </div>
             </div>
         </header>
 
-        <div class="workspace-layout">
-            <aside class="sidebar-monitor">
-                <section class="nav-module">
+        <div id="content-layout">
+            <aside id="system-sidebar">
+                <section class="nav-group">
                     <h2>Primary Regions</h2>
-                    <nav id="sidebar-nav">
-                        <ul>
-                            <li><a href="#" class="region-trigger" data-region="Avalon">Avalon Peninsula</a></li>
-                            <li><a href="#" class="region-trigger" data-region="Central">Central Newfoundland</a></li>
-                            <li><a href="#" class="region-trigger" data-region="Western">Western Newfoundland</a></li>
-                            <li><a href="#" class="region-trigger" data-region="Northern">Northern Peninsula</a></li>
-                            <li><a href="#" class="region-trigger" data-region="Labrador">Labrador</a></li>
-                        </ul>
+                    <nav id="region-navigation">
+                        <button class="region-btn" data-region="Avalon">Avalon Peninsula</button>
+                        <button class="region-btn" data-region="Central">Central Newfoundland</button>
+                        <button class="region-btn" data-region="Western">Western Newfoundland</button>
+                        <button class="region-btn" data-region="Northern">Northern Peninsula</button>
+                        <button class="region-btn" data-region="Labrador">Labrador</button>
                     </nav>
                 </section>
 
-                <section class="system-status-module">
+                <section class="monitor-group">
                     <h2>System Status</h2>
-                    <div class="status-card" id="weong-route-monitor">
-                        <div class="status-header">
-                            <span class="status-label">[weong-route]</span>
-                            <span class="status-indicator pulse-green">ACTIVE</span>
+                    <div class="status-card active" id="weong-route-status">
+                        <div class="card-head">
+                            <span class="label">[weong-route]</span>
+                            <span class="indicator">ACTIVE</span>
                         </div>
-                        <p class="status-detail">Level 3 Exception Trigger: Enabled</p>
+                        <p>Level 3 Exception Monitor Enabled</p>
                     </div>
-                    <div class="status-card" id="data-integrity-monitor">
-                        <div class="status-header">
-                            <span class="status-label">DATABASE</span>
-                            <span class="status-indicator locked">LOCKED</span>
+                    <div class="status-card locked">
+                        <div class="card-head">
+                            <span class="label">DATABASE</span>
+                            <span class="indicator">LOCKED</span>
                         </div>
-                        <p class="status-detail">Comprehensive Newfoundland Dataset</p>
+                        <p>Source: communities.json</p>
                     </div>
                 </section>
             </aside>
 
-            <main class="data-viewport">
-                <div class="viewport-header">
-                    <div class="breadcrumb-trail">
-                        <span class="root">Root</span> / <span class="current-loc">Newfoundland Deep-Dive</span>
+            <main id="map-viewport">
+                <div id="map"></div>
+                
+                <section id="info-panel">
+                    <div class="panel-header">
+                        <span id="breadcrumb">Newfoundland Deep-Dive / All Locations</span>
                     </div>
-                </div>
-
-                <div id="map-interface">
-                    <div id="map"></div>
-                </div>
-
-                <section id="content-display-area">
-                    <div id="results-grid-container" class="grid-display">
+                    <div id="data-grid" class="community-grid">
                         </div>
                 </section>
             </main>
         </div>
 
-        <footer class="global-footer">
-            <div class="footer-status-bar">
-                <div class="lock-status">
-                    <span class="icon">🔒</span>
-                    <span class="text">Newfoundland Comprehensive Data Permanently Stored</span>
-                </div>
-                <div class="session-stamp">
-                    Session Anchor: 2025-12-27
-                </div>
+        <footer id="system-footer">
+            <div class="footer-bar">
+                <span class="lock-icon">🔒</span>
+                <p>Newfoundland Comprehensive Data Permanently Stored | Build: 2025-12-28</p>
             </div>
         </footer>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
     <script src="script.js"></script>
 </body>
 </html>
