@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Solidified Anchor [RESTORED]</title>
+    <title>WEonG - Reassembled Anchor [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
         
-        /* Solidified Snapping Label Style [cite: 2025-12-27] */
+        /* Anchor: Snapping Labels [cite: 2025-12-27] */
         .snapping-label {
             font-weight: bold; color: #0047AB; background: white;
             border: 2px solid #0047AB; padding: 4px 10px; border-radius: 8px;
@@ -19,14 +19,14 @@
 
         .leaflet-routing-container { display: none !important; }
         
-        /* Solidified Pill Capsule Style [cite: 2025-12-27] */
+        /* Anchor: Pill Capsule [cite: 2025-12-27] */
         .eta-capsule {
-            background: rgba(26, 115, 232, 0.9);
+            background: rgba(26, 115, 232, 0.95);
             backdrop-filter: blur(4px);
-            color: white; padding: 5px 15px; border-radius: 20px;
+            color: white; padding: 6px 16px; border-radius: 20px;
             border: 1px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif; display: flex; gap: 10px;
-            align-items: center; white-space: nowrap; font-size: 13px; font-weight: 600;
+            align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700;
         }
     </style>
 </head>
@@ -37,21 +37,21 @@
 
 <script>
     /**
-     * [weong-route] - ANCHOR POINT RESTORATION 2025.12.27
-     * Building: House restoration with a functional service addition.
-     * Logic: Maintains original snapping and markers. 
+     * [weong-route] - PROJECT REASSEMBLY 2025.12.27
+     * Logic: Re-sequenced initialization to force the route layer to render.
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
     async function init() {
+        // Foundation: Map initialization [cite: 2025-12-27]
         map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
         window.weongMap = map;
 
-        // Solidified Foundation: Google Roadmap Tiles [cite: 2025-12-27]
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
         }).addTo(map);
 
+        // Utility: Fetch community data [cite: 2025-12-26]
         try {
             const res = await fetch('data/nl/communities.json');
             const data = await res.json();
@@ -71,6 +71,7 @@
     function setupApp() {
         const starts = [[48.95, -57.95], [47.56, -52.71]];
         
+        // Framing: Setup Markers & Snapping [cite: 2025-12-27]
         starts.forEach((c, i) => {
             const node = findNearest(L.latLng(c));
             const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { 
@@ -78,18 +79,13 @@
             }).addTo(map);
 
             m.bindTooltip(node.properties.name, { 
-                permanent: true, 
-                className: 'snapping-label',
-                direction: 'top',
-                sticky: true,
-                offset: [0, -10]
+                permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10]
             }).openTooltip();
 
             markers[i] = m;
             
-            m.on('drag', function(e) {
-                const nearest = findNearest(m.getLatLng());
-                m.getTooltip().setContent(nearest.properties.name);
+            m.on('drag', () => {
+                m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name);
             });
 
             m.on('dragend', () => {
@@ -100,7 +96,7 @@
             });
         });
 
-        // ADDITION: Switched to robust OSRM server to restore the blue line [cite: 2025-12-27]
+        // Addition: Use the global OSRM server for high-reliability route geometry [cite: 2025-12-27]
         routingControl = L.Routing.control({
             serviceUrl: 'https://router.project-osrm.org/route/v1',
             waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
@@ -116,6 +112,9 @@
             window.currentRouteData = route;
             updateCapsule(route);
         });
+
+        // Force an initial draw after the house is framed
+        setTimeout(syncRoute, 100);
     }
 
     function updateCapsule(route) {
