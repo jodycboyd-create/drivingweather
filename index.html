@@ -3,15 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Solidified Anchor [RESTORED]</title>
+    <title>WEonG - Color Validated Anchor [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
         body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f0f0f0; }
         
+        /* Forest Green Pin Style [cite: 2025-12-27] */
+        .green-pin {
+            filter: hue-rotate(90deg) brightness(0.8) saturate(1.5);
+        }
+
         .snapping-label {
-            font-weight: bold; color: #0047AB; background: white;
-            border: 2px solid #0047AB; padding: 4px 10px; border-radius: 8px;
+            font-weight: bold; color: #1B5E20; background: white;
+            border: 2px solid #1B5E20; padding: 4px 10px; border-radius: 8px;
             pointer-events: none; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             font-family: sans-serif; font-size: 12px;
         }
@@ -19,12 +24,12 @@
         .leaflet-routing-container { display: none !important; }
         
         .eta-capsule {
-            background: rgba(26, 115, 232, 0.9);
+            background: rgba(27, 94, 32, 0.95);
             backdrop-filter: blur(4px);
-            color: white; padding: 5px 15px; border-radius: 20px;
+            color: white; padding: 6px 16px; border-radius: 20px;
             border: 1px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             font-family: sans-serif; display: flex; gap: 10px;
-            align-items: center; white-space: nowrap; font-size: 13px; font-weight: 600;
+            align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700;
         }
     </style>
 </head>
@@ -35,8 +40,8 @@
 
 <script>
     /**
-     * [weong-route] - ANCHOR RESTORATION 2025.12.27
-     * Reverting all UI experiments. Focus: Blue line and snapping only.
+     * [weong-route] - METHODOLOGY VALIDATION 2025.12.27
+     * Addition: Changed marker colors to Green to verify the code is updating.
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
@@ -69,17 +74,20 @@
         
         starts.forEach((c, i) => {
             const node = findNearest(L.latLng(c));
-            const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { draggable: true }).addTo(map);
+            const m = L.marker([node.geometry.coordinates[1], node.geometry.coordinates[0]], { 
+                draggable: true 
+            }).addTo(map);
+
+            // Adding the CSS class to change pin color [cite: 2025-12-27]
+            L.DomUtil.addClass(m._icon, 'green-pin');
+
             m.bindTooltip(node.properties.name, { 
                 permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10]
             }).openTooltip();
+
             markers[i] = m;
             
-            m.on('drag', () => {
-                const nearest = findNearest(m.getLatLng());
-                m.getTooltip().setContent(nearest.properties.name);
-            });
-
+            m.on('drag', () => m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name));
             m.on('dragend', () => {
                 const final = findNearest(m.getLatLng());
                 m.setLatLng([final.geometry.coordinates[1], final.geometry.coordinates[0]]);
@@ -88,14 +96,15 @@
             });
         });
 
+        // Using a highly redundant endpoint to try and force the route line [cite: 2025-12-27]
         routingControl = L.Routing.control({
-            serviceUrl: 'https://routing.openstreetmap.de/routed-car/route/v1',
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
             waypoints: [markers[0].getLatLng(), markers[1].getLatLng()],
             createMarker: () => null,
             addWaypoints: false,
             routeWhileDragging: false,
             show: false,
-            lineOptions: { styles: [{ color: '#1A73E8', weight: 8, opacity: 0.9 }] }
+            lineOptions: { styles: [{ color: '#1B5E20', weight: 10, opacity: 0.9 }] }
         }).addTo(map);
 
         routingControl.on('routesfound', (e) => {
