@@ -101,4 +101,28 @@
     function updateCapsule(route) {
         const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
         const duration = Math.round(route.summary.totalTime / 60);
-        const h = Math.floor(
+        const h = Math.floor(duration / 60);
+        const m = duration % 60;
+        const dist = (route.summary.totalDistance / 1000).toFixed(1);
+        
+        const html = `<div class="eta-capsule">${h}h ${m}m | ${dist} km</div>`;
+        if (!etaMarker) {
+            etaMarker = L.marker(mid, { icon: L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }) }).addTo(map);
+        } else {
+            etaMarker.setLatLng(mid).setIcon(L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }));
+        }
+
+        // VELOCITY HOOK: Trigger widget update if script is loaded [cite: 2025-12-27]
+        if (window.updateVelocityDisplay) {
+            window.updateVelocityDisplay();
+        }
+    }
+
+    function syncRoute() {
+        if (routingControl) routingControl.setWaypoints([markers[0].getLatLng(), markers[1].getLatLng()]);
+    }
+    window.onload = init;
+</script>
+<script src="velocity-widget.js"></script>
+</body>
+</html>
