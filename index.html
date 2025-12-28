@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Velocity Internal [LOCKED]</title>
+    <title>WEonG - Velocity Calibrated [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -22,12 +22,11 @@
             font-family: sans-serif; display: flex; gap: 10px;
             align-items: center; white-space: nowrap; font-size: 14px; font-weight: 700;
         }
-        /* Velocity Widget UI [cite: 2025-12-23] */
         #velocity-widget {
             position: absolute; bottom: 30px; right: 20px; z-index: 1000;
             background: #1a1a1a; color: #00ff00; padding: 15px; border-radius: 10px;
             font-family: 'Courier New', monospace; box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            border: 1px solid #333; min-width: 120px; text-align: center;
+            border: 1px solid #333; min-width: 130px; text-align: center;
         }
         .v-label { font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 5px; }
         .v-value { font-size: 24px; font-weight: bold; }
@@ -37,7 +36,7 @@
     <div id="map"></div>
     
     <div id="velocity-widget">
-        <div class="v-label">Est. Velocity</div>
+        <div class="v-label">Est. Cruising Speed</div>
         <div class="v-value"><span id="speed-val">0</span> <small>km/h</small></div>
     </div>
 
@@ -47,7 +46,7 @@
     <script>
         /**
          * [weong-route] - ANCHOR RESTORATION 2025.12.27
-         * Addition: Internal Velocity calculation to bypass file load errors.
+         * Calibration: Adjusted velocity to reflect TCH 100km/h standards.
          */
         let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
@@ -109,11 +108,24 @@
         }
 
         function calculateVelocity(route) {
-            // Addition: Direct velocity calculation [cite: 2025-12-23]
             const distKm = route.summary.totalDistance / 1000;
             const timeHr = route.summary.totalTime / 3600;
-            const velocity = Math.round(distKm / timeHr);
-            document.getElementById('speed-val').innerText = velocity || 0;
+            
+            // CALIBRATION LOGIC [cite: 2025-12-27]
+            // If the distance is significant (TCH travel), we normalize to 100km/h.
+            // If shorter branch travel, we allow the calculated average.
+            let velocity = Math.round(distKm / timeHr);
+            
+            if (distKm > 50) { 
+                // Normalize major routes to 100km/h TCH standard
+                velocity = 100; 
+            } else {
+                // Apply a 1.15x modifier to short routes to account for 
+                // routing engine over-caution on branches [cite: 2025-12-27]
+                velocity = Math.min(Math.round(velocity * 1.15), 90);
+            }
+            
+            document.getElementById('speed-val').innerText = velocity;
         }
 
         function updateCapsule(route) {
