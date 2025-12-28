@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEonG - Velocity Build [LOCKED]</title>
+    <title>WEonG - Solidified Anchor [LOCKED]</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
@@ -26,18 +26,23 @@
 </head>
 <body>
 <div id="map"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
     /**
      * [weong-route] - ANCHOR RESTORATION 2025.12.27
-     * Status: Hard-Locked.
-     * Addition: Velocity Widget integration reinstated.
+     * Fix: Wrapped initialization in a strict safety check to prevent grey screen.
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
     async function init() {
+        if (typeof L === 'undefined') {
+            console.error("Leaflet failed to load.");
+            return;
+        }
+
         map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
@@ -48,7 +53,7 @@
             const data = await res.json();
             communities = data.features;
             if (communities.length > 0) setupApp();
-        } catch (e) { console.error("Data Load Error"); }
+        } catch (e) { console.error("Data Load Error: communities.json missing?"); }
     }
 
     function findNearest(latlng) {
@@ -67,9 +72,8 @@
             m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10] }).openTooltip();
             markers[i] = m;
             
-            m.on('drag', function(e) {
-                const nearest = findNearest(m.getLatLng());
-                m.getTooltip().setContent(nearest.properties.name);
+            m.on('drag', function() {
+                m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name);
             });
 
             m.on('dragend', () => {
@@ -92,7 +96,7 @@
 
         routingControl.on('routesfound', (e) => {
             const route = e.routes[0];
-            window.currentRouteData = route; // Essential for Velocity calculation
+            window.currentRouteData = route;
             updateCapsule(route);
         });
         syncRoute();
@@ -112,10 +116,7 @@
             etaMarker.setLatLng(mid).setIcon(L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }));
         }
 
-        // VELOCITY HOOK: Trigger widget update if script is loaded [cite: 2025-12-27]
-        if (window.updateVelocityDisplay) {
-            window.updateVelocityDisplay();
-        }
+        if (window.updateVelocityDisplay) window.updateVelocityDisplay();
     }
 
     function syncRoute() {
@@ -123,6 +124,7 @@
     }
     window.onload = init;
 </script>
+
 <script src="velocity-widget.js"></script>
 </body>
 </html>
