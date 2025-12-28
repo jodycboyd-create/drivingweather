@@ -33,16 +33,11 @@
 <script>
     /**
      * [weong-route] - ANCHOR RESTORATION 2025.12.27
-     * Fix: Wrapped initialization in a strict safety check to prevent grey screen.
+     * Fix: Sequence-locked widget loading.
      */
     let map, communities = [], markers = [null, null], routingControl, etaMarker = null;
 
     async function init() {
-        if (typeof L === 'undefined') {
-            console.error("Leaflet failed to load.");
-            return;
-        }
-
         map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
         L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
@@ -53,7 +48,7 @@
             const data = await res.json();
             communities = data.features;
             if (communities.length > 0) setupApp();
-        } catch (e) { console.error("Data Load Error: communities.json missing?"); }
+        } catch (e) { console.error("Data Load Error"); }
     }
 
     function findNearest(latlng) {
@@ -72,7 +67,7 @@
             m.bindTooltip(node.properties.name, { permanent: true, className: 'snapping-label', direction: 'top', sticky: true, offset: [0, -10] }).openTooltip();
             markers[i] = m;
             
-            m.on('drag', function() {
+            m.on('drag', () => {
                 m.getTooltip().setContent(findNearest(m.getLatLng()).properties.name);
             });
 
@@ -99,7 +94,13 @@
             window.currentRouteData = route;
             updateCapsule(route);
         });
+
         syncRoute();
+
+        // ADDITION: Safely load widget only after app setup is complete [cite: 2025-12-27]
+        const widgetScript = document.createElement('script');
+        widgetScript.src = 'velocity-widget.js';
+        document.body.appendChild(widgetScript);
     }
 
     function updateCapsule(route) {
@@ -116,7 +117,9 @@
             etaMarker.setLatLng(mid).setIcon(L.divIcon({ className: '', html: html, iconSize: [160, 40], iconAnchor: [80, 20] }));
         }
 
-        if (window.updateVelocityDisplay) window.updateVelocityDisplay();
+        if (window.updateVelocityDisplay) {
+            window.updateVelocityDisplay();
+        }
     }
 
     function syncRoute() {
@@ -124,7 +127,5 @@
     }
     window.onload = init;
 </script>
-
-<script src="velocity-widget.js"></script>
 </body>
 </html>
