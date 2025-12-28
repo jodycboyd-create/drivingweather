@@ -1,40 +1,37 @@
-/** [weong-route] Velocity & Time Widget Module **/
+/** [weong-route] Tactical Velocity & Time Module **/
 (function() {
     let speedOffset = 0; 
     let lastRoute = null;
-    let departureTime = new Date(); // Defaults to "Now"
+    let departureOffsetMins = 0; // Minutes from "Now"
 
-    // 1. Sleek UI Styles
     const style = document.createElement('style');
     style.innerHTML = `
         #v-ui { 
-            background: rgba(20, 20, 20, 0.95); color: #00ff00; 
-            padding: 20px; border-radius: 16px; font-family: 'Courier New', monospace; 
-            border: 1px solid #333; text-align: center; width: 220px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+            background: rgba(15, 15, 15, 0.98); color: #00ff00; 
+            padding: 18px; border-radius: 24px; font-family: 'Courier New', monospace; 
+            border: 1px solid #00ff0033; text-align: center; width: 240px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6); backdrop-filter: blur(12px);
+            user-select: none;
         }
-        .v-section { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #333; }
-        .v-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .v-section { margin-bottom: 20px; }
+        .v-label { font-size: 10px; color: #555; letter-spacing: 2px; margin-bottom: 12px; font-weight: bold; }
         
-        .v-label { font-size: 9px; color: #888; letter-spacing: 2px; margin-bottom: 8px; }
-        .v-controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
-        
-        /* Interactive Inputs */
-        .v-time-input {
-            background: #000; color: #00ff00; border: 1px solid #444;
-            padding: 5px; border-radius: 4px; font-family: monospace; font-size: 16px;
-            cursor: pointer; outline: none; text-align: center;
-        }
+        /* Time Scrubber Styling */
+        .scrubber-container { position: relative; width: 100%; height: 40px; overflow: hidden; background: #000; border-radius: 8px; border: 1px solid #222; margin-bottom: 5px; cursor: ew-resize; }
+        #v-time-display { font-size: 22px; font-weight: bold; line-height: 40px; color: #00ff00; text-shadow: 0 0 10px #00ff0066; }
+        .scrubber-hint { font-size: 8px; color: #444; text-transform: uppercase; margin-top: 4px; }
+
+        /* Speed Controls */
+        .v-controls { display: flex; align-items: center; justify-content: space-around; background: #000; border-radius: 12px; padding: 10px; border: 1px solid #222; }
         .v-btn { 
-            background: #2a2a2a; color: #00ff00; border: 1px solid #444; 
-            border-radius: 50%; width: 30px; height: 30px; cursor: pointer; 
-            font-weight: bold; font-size: 18px; line-height: 1;
+            background: #1a1a1a; color: #00ff00; border: 1px solid #333; 
+            border-radius: 10px; width: 44px; height: 44px; cursor: pointer; 
+            font-size: 24px; transition: all 0.2s;
         }
-        .v-btn:hover { background: #00ff00; color: #000; }
-        
-        .v-val-box { min-width: 90px; }
-        .v-main-text { font-size: 18px; font-weight: bold; color: #fff; }
-        .v-sub-text { font-size: 11px; color: #00ff00; display: block; height: 14px; }
+        .v-btn:active { background: #00ff00; color: #000; transform: scale(0.9); }
+        .v-val-box { display: flex; flex-direction: column; }
+        .v-main-text { font-size: 16px; font-weight: bold; color: #fff; }
+        .v-sub-text { font-size: 10px; color: #00ff00; height: 12px; }
     `;
     document.head.appendChild(style);
 
@@ -42,14 +39,17 @@
     container.innerHTML = `
         <div id="v-ui">
             <div class="v-section">
-                <div class="v-label">DEPARTURE TIME</div>
-                <input type="time" id="v-time-picker" class="v-time-input">
+                <div class="v-label">DEPARTURE WINDOW</div>
+                <div class="scrubber-container" id="time-scrubber">
+                    <div id="v-time-display">LOADING...</div>
+                </div>
+                <div class="scrubber-hint">← SLIDE TO ADJUST TIME →</div>
             </div>
 
-            <div class="v-section">
+            <div class="v-section" style="margin-bottom:0">
                 <div class="v-label">CRUISING PACE</div>
                 <div class="v-controls">
-                    <button class="v-btn" id="v-down">-</button>
+                    <button class="v-btn" id="v-down">−</button>
                     <div class="v-val-box">
                         <span id="v-label" class="v-main-text">POSTED</span>
                         <span id="v-offset" class="v-sub-text"></span>
@@ -57,13 +57,31 @@
                     <button class="v-btn" id="v-up">+</button>
                 </div>
             </div>
-            <div style="font-size:9px; color:#444">WEonG VELOCITY ENGINE v1.2</div>
         </div>
     `;
 
-    // Initialize time picker to current time
-    const now = new Date();
-    document.getElementById('v-time-picker').value = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+    // Time Scrubber Logic (Mouse & Touch) [cite: 2025-12-27]
+    let isDragging = false;
+    let startX;
+    const scrubber = document.getElementById('time-scrubber');
+
+    const handleStart = (e) => { isDragging = true; startX = (e.pageX || e.touches[0].pageX); };
+    const handleMove = (e) => {
+        if (!isDragging) return;
+        const x = (e.pageX || e.touches[0].pageX);
+        const walk = (x - startX) * 2; // Sensitivity
+        departureOffsetMins += (walk > 0 ? 5 : -5); // Snap to 5 min increments
+        startX = x;
+        update();
+    };
+    const handleEnd = () => { isDragging = false; };
+
+    scrubber.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    scrubber.addEventListener('touchstart', handleStart);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleEnd);
 
     function getBaseSpeed(route) {
         const dist = route.summary.totalDistance / 1000;
@@ -83,7 +101,12 @@
         const base = getBaseSpeed(lastRoute);
         const actualSpeed = base + speedOffset;
         
-        // Update UI
+        // Update Time Display
+        const depDate = new Date();
+        depDate.setMinutes(depDate.getMinutes() + departureOffsetMins);
+        document.getElementById('v-time-display').innerText = depDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+        // Update Speed UI
         const offsetEl = document.getElementById('v-offset');
         const labelEl = document.getElementById('v-label');
         if (speedOffset === 0) {
@@ -94,15 +117,9 @@
             labelEl.innerText = "LIMIT";
         }
 
-        // Calculate Times
-        const timeVal = document.getElementById('v-time-picker').value.split(':');
-        const depDate = new Date();
-        depDate.setHours(parseInt(timeVal[0]), parseInt(timeVal[1]), 0);
-
         const distKm = lastRoute.summary.totalDistance / 1000;
         const totalMins = (distKm / actualSpeed) * 60;
         
-        // Broadcast to Map and Weather Engine
         window.dispatchEvent(new CustomEvent('weong:speedCalculated', { 
             detail: { 
                 h: Math.floor(totalMins / 60), 
@@ -115,13 +132,7 @@
         }));
     }
 
-    // Event Listeners
-    window.addEventListener('weong:routeUpdated', (e) => {
-        lastRoute = e.detail;
-        update();
-    });
-
-    document.getElementById('v-time-picker').onchange = update;
+    window.addEventListener('weong:routeUpdated', (e) => { lastRoute = e.detail; update(); });
     document.getElementById('v-up').onclick = () => { speedOffset += 5; update(); };
     document.getElementById('v-down').onclick = () => { speedOffset -= 5; update(); };
 })();
