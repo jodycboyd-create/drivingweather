@@ -3,98 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>NL Navigator | Baseline Build 2025-12-28</title>
     <link rel="stylesheet" href="style.css">
     </head>
 <body>
-
-    <header class="main-header">
-        <div class="header-container">
-            <div class="branding">
+    <div class="app-container">
+        <header class="system-header">
+            <div class="brand-section">
                 <h1>NL Navigator</h1>
-                <p class="build-ver">Build: 2025-12-28 | Data Lock: 2025-12-26</p>
+                <div class="meta-data">
+                    <span class="badge">Build: 2025-12-28</span>
+                    <span class="badge">Data Lock: 2025-12-26</span>
+                </div>
             </div>
 
-            <div class="search-section">
-                <div class="search-group">
+            <div class="search-interface">
+                <div class="search-input-group">
                     <input 
                         type="search" 
                         id="site-search" 
-                        placeholder="Search regions, towns, or Level 3 alerts..." 
-                        aria-label="Search Newfoundland locations"
-                        list="location-suggestions">
-                    
-                    <button type="button" id="search-btn">
-                        <span class="search-icon">🔍</span>
-                    </button>
+                        placeholder="Search regions, towns, or alerts..." 
+                        list="nl-locations-list">
+                    <button id="search-trigger" aria-label="Perform Search">🔍</button>
                 </div>
-                <datalist id="location-suggestions">
-                    <option value="Avalon Peninsula">
-                    <option value="Bonavista">
-                    <option value="Burin Peninsula">
-                    <option value="Central Newfoundland">
-                    <option value="Corner Brook">
-                    <option value="Gander">
-                    <option value="Gros Morne">
-                    <option value="St. John's">
-                    <option value="Western Newfoundland">
-                </datalist>
+                <datalist id="nl-locations-list">
+                    </datalist>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <div class="app-layout">
-        <aside class="sidebar">
-            <nav id="region-nav">
-                <h3>Primary Regions</h3>
-                <ul class="region-list">
-                    <li><a href="#" class="nav-link" data-region="Avalon">Avalon</a></li>
-                    <li><a href="#" class="nav-link" data-region="Central">Central</a></li>
-                    <li><a href="#" class="nav-link" data-region="Western">Western</a></li>
-                    <li><a href="#" class="nav-link" data-region="Labrador">Labrador</a></li>
-                </ul>
-                
-                <hr>
-                
-                <div class="status-indicators">
+        <div class="main-layout">
+            <aside class="sidebar">
+                <nav class="region-nav">
+                    <h2>Primary Regions</h2>
+                    <ul id="region-links">
+                        <li><a href="#" data-region="Avalon">Avalon</a></li>
+                        <li><a href="#" data-region="Central">Central</a></li>
+                        <li><a href="#" data-region="Western">Western</a></li>
+                        <li><a href="#" data-region="Labrador">Labrador</a></li>
+                    </ul>
+                </nav>
+
+                <div class="system-monitor">
                     <h3>System Status</h3>
-                    <div class="status-item">
-                        <span class="status-dot green"></span>
-                        <p>Database: Comprehensive [Locked]</p>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-dot" id="exception-dot"></span>
-                        <p>[weong-route]: Level 3 Monitor Active</p>
+                    <div class="monitor-card">
+                        <p><strong>Database:</strong> Comprehensive [Locked]</p>
+                        <p><strong>[weong-route]:</strong> <span class="status-active">Level 3 Monitor Active</span></p>
                     </div>
                 </div>
-            </nav>
-        </aside>
+            </aside>
 
-        <main class="content-body">
-            <section id="info-bar">
-                <div id="breadcrumb">Newfoundland Deep-Dive > <span id="current-view">All Results</span></div>
-                <div id="result-count">Showing all locations</div>
-            </section>
+            <main class="content-display">
+                <header class="content-header">
+                    <div class="breadcrumb">Newfoundland Deep-Dive > <span id="view-title">All Results</span></div>
+                    <div id="status-message">Scanning Newfoundland Dataset...</div>
+                </header>
 
-            <section id="main-display">
-                <div id="loader" class="hidden">
-                    <div class="spinner"></div>
-                    <p>Scanning Newfoundland Dataset...</p>
-                </div>
-                
-                <div id="results-grid" class="grid-container">
-                    </div>
-            </section>
-        </main>
-    </div>
-
-    <footer class="system-footer">
-        <div class="footer-content">
-            <span class="lock-indicator">🔒 Newfoundland Comprehensive Data Permanently Stored</span>
-            <span class="timestamp">Session: 2025-12-28</span>
+                <section id="results-grid" class="grid-view">
+                    </section>
+            </main>
         </div>
-    </footer>
+
+        <footer class="system-footer">
+            <div class="footer-wrap">
+                <span class="lock-icon">🔒</span>
+                <p>Newfoundland Comprehensive Data Permanently Stored | Session: 2025-12-28</p>
+            </div>
+        </footer>
+    </div>
 
     <script src="script.js"></script>
 </body>
