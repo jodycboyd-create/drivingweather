@@ -1,39 +1,90 @@
-/**
- * route-engine.js
- * PATH: /engine/engine/route-engine.js
- */
-const RouteEngine = {
-    control: null,
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>NL Navigator | Magnetic Snap Fix</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100vw; background: #aad3df; }
+        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 2px 5px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="engine/route-engine.js"></script>
+    <script>
+        const map = L.map('map').setView([49.0, -56.0], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    init: function(mapInstance) {
-        if (!mapInstance) return;
-        this.control = L.Routing.control({
-            waypoints: [],
-            router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'driving'
-            }),
-            lineOptions: {
-                styles: [{ color: '#0070bb', weight: 6, opacity: 0.8 }]
-            },
-            show: false,
-            addWaypoints: false,
-            routeWhileDragging: false,
-            fitSelectedRoutes: false 
-        }).addTo(mapInstance);
+        let communityPoints = [];
+        let hubMarkers = [];
 
-        this.control.on('routingerror', function(e) {
-            console.warn("[weong-route] Level 3 Exception Triggered:", e.error.message);
-        });
-    },
+        // Handshake to nested module [cite: 2025-12-27]
+        window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-    calculateRoute: function(start, end) {
-        if (!this.control) return;
-        this.control.setWaypoints([
-            L.latLng(start[0], start[1]),
-            L.latLng(end[0], end[1])
-        ]);
-    }
-};
+        // Load locked-in Newfoundland dataset [cite: 2025-12-26]
+        fetch('../data/nl/communities.json')
+            .then(res => res.json())
+            .then(data => {
+                communityPoints = data.features.map(f => ({
+                    lat: f.geometry.coordinates[1],
+                    lng: f.geometry.coordinates[0],
+                    name: f.properties.name
+                }));
+                initDynamicHubs();
+            });
 
-window.addEventListener('map-ready', (e) => RouteEngine.init(e.detail.map));
+        function initDynamicHubs() {
+            const hubs = [
+                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
+                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
+            ];
+
+            hubs.forEach(h => {
+                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
+                marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
+                hubMarkers.push(marker);
+
+                // CRITICAL FIX: Direct coordinate overwrite during drag
+                marker.on('drag', function (e) {
+                    const nearest = getNearest(e.target.getLatLng());
+                    
+                    // Force the marker to the nearest community coordinate [cite: 2025-12-26]
+                    marker.setLatLng([nearest.lat, nearest.lng]); 
+                    marker.setTooltipContent(nearest.name);
+                    
+                    // Route immediately from the new snapped position
+                    updateRoute();
+                });
+            });
+            setTimeout(updateRoute, 500);
+        }
+
+        function updateRoute() {
+            if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
+                const p1 = hubMarkers[0].getLatLng();
+                const p2 = hubMarkers[1].getLatLng();
+                // We pass the snapped LatLngs to the engine [cite: 2025-12-23]
+                RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
+            }
+        }
+
+        function getNearest(target) {
+            let closest = communityPoints[0];
+            let minDist = Infinity;
+            communityPoints.forEach(p => {
+                const d = Math.hypot(p.lat - target.lat, p.lng - target.lng);
+                if (d < minDist) {
+                    minDist = d;
+                    closest = p;
+                }
+            });
+            return closest;
+        }
+    </script>
+</body>
+</html>
