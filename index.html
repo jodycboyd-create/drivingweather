@@ -2,56 +2,53 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Data Bridge</title>
+    <title>NL Navigator | Community Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
-        #status { 
+        #debug-log { 
             position: absolute; top: 10px; left: 50px; z-index: 1000; 
-            background: white; padding: 5px 10px; border: 2px solid red;
+            background: rgba(255,255,255,0.9); padding: 10px; border: 2px solid #333;
+            font-family: monospace; font-size: 12px;
         }
     </style>
 </head>
 <body>
-    <div id="status">DATABASE: DISCONNECTED</div>
+    <div id="debug-log">Status: Initializing...</div>
     <div id="map"></div>
 
     <script>
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+        const log = (msg) => document.getElementById('debug-log').innerText = msg;
+
         /**
-         * 1. THE VERCEL BYPASS
-         * Instead of relative pathing, we calculate the site root.
+         * THE ARCHITECTURAL FIX
+         * We must go UP from /engine/ to reach /data/
          */
-        const siteRoot = window.location.origin;
-        const dataUrl = `${siteRoot}/data/nl/communities.json`;
-
-        console.log("Attempting Connection to:", dataUrl);
-
-        fetch(dataUrl)
+        fetch('../data/nl/communities.json')
             .then(response => {
-                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status} - Path Mismatch`);
                 return response.json();
             })
             .then(data => {
-                document.getElementById('status').innerText = `✅ CONNECTED: ${data.length} PINS`;
-                document.getElementById('status').style.borderColor = "green";
+                log(`✅ Connected: ${data.length} Communities Found`);
                 
-                // 2. Drop all pins from communities.json [cite: 2025-12-26]
-                data.forEach(c => {
-                    if (c.lat && c.lng) {
-                        L.marker([c.lat, c.lng])
+                // Drop a pin for every entry in the .json file
+                data.forEach(community => {
+                    if (community.lat && community.lng) {
+                        L.marker([community.lat, community.lng])
                             .addTo(map)
-                            .bindPopup(`<b>${c.name}</b><br>${c.region}`);
+                            .bindPopup(`<b>${community.name}</b><br>Region: ${community.region}`);
                     }
                 });
             })
             .catch(err => {
-                console.error("Linkage failed:", err);
-                document.getElementById('status').innerText = "❌ CONNECTION FAILED - CHECK FOLDER STRUCTURE";
+                log(`❌ Error: ${err.message}`);
+                console.error("Database connection failed:", err);
             });
     </script>
 </body>
