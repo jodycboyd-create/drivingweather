@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Core Reset</title>
+    <title>NL Navigator | GeoJSON Bridge</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -13,37 +13,33 @@
 <body>
     <div id="map"></div>
     <script>
-        // 1. Initialize basic map
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         /**
-         * 2. The Absolute Base Connection
-         * We are targeting the file confirmed in your directory tree
+         * GEOJSON ADAPTER
+         * Navigates the features array to find community details.
          */
         fetch('../data/nl/communities.json')
-            .then(res => {
-                if(!res.ok) throw new Error(`Server Error: ${res.status}`);
-                return res.json();
-            })
-            .then(data => {
-                // Ensure we have an array to prevent "forEach is not a function"
-                const list = Array.isArray(data) ? data : [];
-                
-                if (list.length === 0) {
-                    L.popup().setLatLng([49, -56]).setContent("Connected, but JSON is empty!").openOn(map);
-                    return;
-                }
+            .then(res => res.json())
+            .then(geojsonData => {
+                // Accessing the features array found in your file
+                const communities = geojsonData.features;
 
-                list.forEach(c => {
-                    if (c.lat && c.lng) {
-                        L.marker([c.lat, c.lng]).addTo(map).bindPopup(c.name);
+                communities.forEach(feature => {
+                    const props = feature.properties;
+                    const coords = feature.geometry.coordinates;
+
+                    // GeoJSON uses [lng, lat], Leaflet uses [lat, lng]
+                    if (coords && props) {
+                        L.marker([coords[1], coords[0]])
+                            .addTo(map)
+                            .bindPopup(`<b>${props.name}</b><br>${props.region}`);
                     }
                 });
             })
             .catch(err => {
-                // Visual confirmation of the exact failure point
-                L.popup().setLatLng([49, -56]).setContent(`Connection Failed: ${err.message}`).openOn(map);
+                console.error("Linkage failed:", err);
             });
     </script>
 </body>
