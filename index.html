@@ -3,27 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Gold Standard Build</title>
+    <title>NL Navigator | Anchor Build</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
-        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 3px 8px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        #vercel-status { position: absolute; bottom: 20px; left: 10px; z-index: 1000; background: white; padding: 5px 10px; border: 2px solid #333; font-family: monospace; font-weight: bold; }
+        .hub-label { 
+            font-weight: bold; background: white; border: 2px solid #0070bb; 
+            padding: 3px 8px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+        }
+        #vercel-verify { 
+            position: absolute; bottom: 20px; left: 10px; z-index: 1000; 
+            background: white; padding: 5px 10px; border: 2px solid #333;
+            font-family: monospace; font-weight: bold;
+        }
     </style>
 </head>
 <body>
-    <div id="vercel-status">Build: v.2025.12.29.04</div>
+
+    <div id="vercel-verify">Build: v.2025.12.29.05</div>
     <div id="map"></div>
 
     <script src="engine/route-engine.js"></script>
 
     <script>
-        /** * DEC 27 GOLD STANDARD RESTORATION [cite: 2025-12-27]
-         * Objective: Real-time snap and label sync. No ocean drift.
+        /** * ANCHOR POINT RESTORATION 
+         * Always build on existing code and introduce improvements [cite: 2025-12-26]
          */
         const map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -31,76 +41,81 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake: Alert the RouteEngine that the map is ready
+        // Handshake: Alert the RouteEngine that the map is ready [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Loading the locked-in 290-line dataset [cite: 2025-12-26]
-        async function loadData() {
+        // Comprehensive Dataset Loading [cite: 2025-12-26]
+        async function initializeData() {
             try {
                 const response = await fetch('data/nl/communities.json');
                 const data = await response.json();
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
-                    name: f.properties.name || "Unknown"
+                    name: f.properties.name || "Unnamed Road"
                 }));
-                initMarkers();
-            } catch (e) {
-                console.error("Data load error", e);
+                createHubMarkers();
+            } catch (err) {
+                console.error("[Data Error]", err);
             }
         }
 
-        function initMarkers() {
-            const hubs = [
+        function createHubMarkers() {
+            const positions = [
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
                 { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
             ];
 
-            hubs.forEach(h => {
-                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
-                marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
+            positions.forEach(pos => {
+                const marker = L.marker([pos.lat, pos.lng], { draggable: true }).addTo(map);
+                marker.bindTooltip(pos.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // REAL-TIME SNAPPING LOGIC [cite: 2025-12-26, 2025-12-27]
-                marker.on('drag', function (e) {
-                    const nearest = findNearest(e.target.getLatLng());
-                    
-                    // 1. Force visual snap to community point
+                // --- MAGNETIC SNAP LOGIC [cite: 2025-12-26, 2025-12-27] ---
+                marker.on('drag', function(e) {
+                    const nearest = findNearestCommunity(e.target.getLatLng());
+                    // Physically jump the marker to the community coordinate
                     marker.setLatLng([nearest.lat, nearest.lng]);
-                    
-                    // 2. Immediate label update to town name
+                    // Update the label instantly
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // ROUTE UPDATE TRIGGER [cite: 2025-12-23]
+                // Trigger route only after marker is locked on land [cite: 2025-12-23]
                 marker.on('dragend', () => {
-                    updateRoute();
+                    refreshRoute();
                 });
             });
-            setTimeout(updateRoute, 1000);
+
+            setTimeout(refreshRoute, 1000);
         }
 
-        function updateRoute() {
+        function refreshRoute() {
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
-                // Pass snapped coords to engine
+                // Pass land-locked points to the external engine
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
 
-        function findNearest(target) {
+        /**
+         * Exhaustive search of the 290-line dataset [cite: 2025-12-26]
+         */
+        function findNearestCommunity(target) {
             let closest = communityPoints[0];
             let minDist = Infinity;
             for (let i = 0; i < communityPoints.length; i++) {
                 const p = communityPoints[i];
                 const d = Math.sqrt(Math.pow(p.lat - target.lat, 2) + Math.pow(p.lng - target.lng, 2));
-                if (d < minDist) { minDist = d; closest = p; }
+                if (d < minDist) {
+                    minDist = d;
+                    closest = p;
+                }
             }
             return closest;
         }
 
-        loadData();
+        initializeData();
     </script>
 </body>
 </html>
