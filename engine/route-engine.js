@@ -1,14 +1,12 @@
 /**
  * route-engine.js
- * ANCHOR: 2025-12-27
+ * PATH: /engine/engine/route-engine.js
  */
 const RouteEngine = {
     control: null,
 
     init: function(mapInstance) {
         if (!mapInstance) return;
-
-        // Using standard L.Routing.control for maximum compatibility [cite: 2025-12-23]
         this.control = L.Routing.control({
             waypoints: [],
             router: L.Routing.osrmv1({
@@ -16,17 +14,16 @@ const RouteEngine = {
                 profile: 'driving'
             }),
             lineOptions: {
-                styles: [{ color: '#0070bb', weight: 6, opacity: 0.9 }]
+                styles: [{ color: '#0070bb', weight: 6, opacity: 0.8 }]
             },
             show: false,
             addWaypoints: false,
             routeWhileDragging: false,
-            fitSelectedRoutes: false
+            fitSelectedRoutes: false 
         }).addTo(mapInstance);
 
-        // [weong-route] Exception Handler [cite: 2025-12-23]
         this.control.on('routingerror', function(e) {
-            console.error("[weong-route] Routing Failed:", e.error.message);
+            console.warn("[weong-route] Level 3 Exception Triggered:", e.error.message);
         });
     },
 
