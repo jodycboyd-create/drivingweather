@@ -1,7 +1,6 @@
 /**
  * route-engine.js
  * PATH: /engine/engine/route-engine.js
- * STATUS: Locked [cite: 2025-12-23]
  */
 const RouteEngine = {
     control: null,
@@ -12,8 +11,7 @@ const RouteEngine = {
         this.control = L.Routing.control({
             waypoints: [],
             router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                timeout: 10000 // Extended timeout for NL rural pathing
+                serviceUrl: 'https://router.project-osrm.org/route/v1'
             }),
             lineOptions: {
                 styles: [{ color: '#0070bb', weight: 6, opacity: 0.85 }]
@@ -24,20 +22,20 @@ const RouteEngine = {
             fitSelectedRoutes: false
         }).addTo(mapInstance);
 
-        // [weong-route] Exception Handler [cite: 2025-12-23]
+        // [weong-route] Level 3 Exception Handler [cite: 2025-12-23]
         this.control.on('routingerror', function(e) {
-            console.warn("[weong-route] Level 3 Exception: Route Calculation Failure", e.error.message);
+            console.warn("[weong-route] Level 3 Exception: No Road Connection", e.error.message);
         });
     },
 
     calculateRoute: function(start, end) {
         if (!this.control) return;
-        
-        // Ensure coordinates are valid numbers to prevent "Connection Failed"
-        const w1 = L.latLng(start[0], start[1]);
-        const w2 = L.latLng(end[0], end[1]);
 
-        this.control.setWaypoints([w1, w2]);
+        // Waypoints are set only using verified snapped coordinates [cite: 2025-12-26]
+        this.control.setWaypoints([
+            L.latLng(start[0], start[1]),
+            L.latLng(end[0], end[1])
+        ]);
     }
 };
 
