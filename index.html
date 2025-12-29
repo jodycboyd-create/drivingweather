@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Gold Standard Hard-Lock</title>
+    <title>NL Navigator | Absolute Snap Lock</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -26,16 +26,16 @@
 </head>
 <body>
 
-    <div id="vercel-verify">Build: v.2025.12.29.07</div>
+    <div id="vercel-verify">Build: v.2025.12.29.08</div>
     <div id="map"></div>
 
     <script src="engine/route-engine.js"></script>
 
     <script>
         /**
-         * BUILD 07: THE HARD-LOCK PROTOCOL
-         * Overcomes the "Gray Line Drift" by forcing the coordinate hijack
-         * during the 'move' event, not just 'drag'.
+         * BUILD 08: THE ULTIMATE HIJACK
+         * Prevents "Gray Line Drift" by sanitizing coordinates BEFORE 
+         * they reach the routing engine [cite: 2025-12-26].
          */
         const map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -58,56 +58,11 @@
             } catch (err) { console.error(err); }
         }
 
-        function initMarkers() {
-            const startPoints = [
-                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
-                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
-            ];
-
-            startPoints.forEach(p => {
-                const marker = L.marker([p.lat, p.lng], { 
-                    draggable: true,
-                    riseOnHover: true 
-                }).addTo(map);
-
-                marker.bindTooltip(p.name, { permanent: true, direction: 'top', className: 'hub-label' });
-                hubMarkers.push(marker);
-
-                /**
-                 * THE HARD-LOCK INTERCEPTOR
-                 * We use 'move' because it fires more reliably than 'drag' 
-                 * when external routing engines are trying to fight for control.
-                 */
-                const snapMarker = (e) => {
-                    const nearest = findNearest(e.latlng || marker.getLatLng());
-                    
-                    // Stop recursion and force the snap
-                    if (marker.getLatLng().lat !== nearest.lat || marker.getLatLng().lng !== nearest.lng) {
-                        marker.setLatLng([nearest.lat, nearest.lng]);
-                        marker.getTooltip().setContent(nearest.name);
-                    }
-                };
-
-                marker.on('move', snapMarker);
-                marker.on('drag', snapMarker);
-
-                // Re-calculate route only when marker is stationary and snapped
-                marker.on('dragend', () => {
-                    if (typeof RouteEngine !== 'undefined') {
-                        const coords = hubMarkers.map(m => [m.getLatLng().lat, m.getLatLng().lng]);
-                        RouteEngine.calculateRoute(coords[0], coords[1]);
-                    }
-                });
-            });
-            
-            setTimeout(() => {
-                if(typeof RouteEngine !== 'undefined') {
-                    RouteEngine.calculateRoute([47.5615, -52.7126], [48.9515, -57.9482]);
-                }
-            }, 1000);
-        }
-
-        function findNearest(target) {
+        /**
+         * COMPREHENSIVE SNAPPING (DEC 26/27 Logic) [cite: 2025-12-26, 2025-12-27]
+         */
+        function getSanitizedPoint(target) {
+            if (communityPoints.length === 0) return target;
             let closest = communityPoints[0];
             let minDist = Infinity;
             for (let i = 0; i < communityPoints.length; i++) {
@@ -116,6 +71,47 @@
                 if (d < minDist) { minDist = d; closest = p; }
             }
             return closest;
+        }
+
+        function initMarkers() {
+            const startPoints = [
+                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
+                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
+            ];
+
+            startPoints.forEach(p => {
+                const marker = L.marker([p.lat, p.lng], { draggable: true }).addTo(map);
+                marker.bindTooltip(p.name, { permanent: true, direction: 'top', className: 'hub-label' });
+                hubMarkers.push(marker);
+
+                // VISUAL SYNC: Only moves the pin to town centers
+                marker.on('drag', function(e) {
+                    const snapped = getSanitizedPoint(e.target.getLatLng());
+                    marker.setLatLng([snapped.lat, snapped.lng]);
+                    marker.getTooltip().setContent(snapped.name);
+                });
+
+                // ENGINE SYNC: Forces the route to use the snapped center [cite: 2025-12-23]
+                marker.on('dragend', () => {
+                    triggerSecureRoute();
+                });
+            });
+            setTimeout(triggerSecureRoute, 1000);
+        }
+
+        /**
+         * THE HIJACK WRAPPER
+         * building on RouteEngine rather than replacing it [cite: 2025-12-26].
+         */
+        function triggerSecureRoute() {
+            if (typeof RouteEngine !== 'undefined' && hubMarkers.length === 2) {
+                // We pull the CURRENT visual position, which is already snapped
+                const p1 = hubMarkers[0].getLatLng();
+                const p2 = hubMarkers[1].getLatLng();
+                
+                console.log(`[Hijack] Sending road-legal coords: ${p1}, ${p2}`);
+                RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
+            }
         }
 
         loadDataset();
