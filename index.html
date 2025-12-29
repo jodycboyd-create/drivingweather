@@ -2,103 +2,70 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Magnetic Linkage</title>
+    <title>NL Navigator | Community Connection</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
+        .status-pill { 
+            position: absolute; top: 10px; right: 10px; z-index: 1000; 
+            background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-family: sans-serif; font-size: 12px;
+        }
     </style>
 </head>
 <body>
+    <div class="status-pill" id="db-status">Connecting to Database...</div>
     <div id="map"></div>
 
     <script>
+        // 1. Initialize Map
         const map = L.map('map').setView([49.0, -56.0], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-        let communityData = []; // The source of truth
-        let connections = L.layerGroup().addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
 
         /**
-         * 1. ARCHITECTURE FIX: Absolute Path Fetching
-         * This bypasses the Vercel pathing errors seen in image_9522ed.jpg
+         * 2. ARCHITECTURE CONNECTION
+         * Target: /data/nl/communities.json
          */
-        async function loadDatabase() {
-            try {
-                const response = await fetch('../data/nl/communities.json');
-                if (!response.ok) throw new Error("Fetch failed");
-                communityData = await response.json();
-                console.log("Data Locked:", communityData.length);
-                initHubs();
-            } catch (err) {
-                console.error("Vercel Path Blocked. Retrying with absolute root...");
-                // Fallback for Vercel deployment environments
-                const fallback = await fetch('/data/nl/communities.json');
-                communityData = await fallback.json();
-                initHubs();
+        async function connectToDatabase() {
+            const statusEl = document.getElementById('db-status');
+            
+            // Try relative path first, then absolute root for Vercel
+            const paths = ['../data/nl/communities.json', '/data/nl/communities.json'];
+            
+            for (let path of paths) {
+                try {
+                    const response = await fetch(path);
+                    if (response.ok) {
+                        const communities = await response.json();
+                        renderCommunities(communities);
+                        statusEl.innerText = `✅ Connected: ${communities.length} Communities`;
+                        statusEl.style.color = "green";
+                        return; // Exit loop on success
+                    }
+                } catch (e) {
+                    console.warn(`Path failed: ${path}`);
+                }
             }
+            statusEl.innerText = "❌ All Paths Failed";
+            statusEl.style.color = "red";
         }
 
-        function initHubs() {
-            // Default Hubs at St. John's and Corner Brook [cite: 2025-12-27]
-            const hubs = [
-                { name: "St. John's Hub", lat: 47.5615, lng: -52.7126 },
-                { name: "Corner Brook Hub", lat: 48.9515, lng: -57.9482 }
-            ];
-
-            hubs.forEach(h => {
-                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
-                marker.bindTooltip(h.name, { permanent: true });
-
-                // Magnetic Snap Logic [cite: 2025-12-23]
-                marker.on('drag', function (e) {
-                    const nearest = getNearestCommunity(e.target.getLatLng());
-                    e.target.setLatLng(nearest);
-                    drawLinks();
-                });
-
-                marker.on('dragend', drawLinks);
-            });
-            drawLinks();
-        }
-
-        function getNearestCommunity(target) {
-            if (communityData.length === 0) return target;
-            let closest = communityData[0];
-            let minDist = Infinity;
-
-            communityData.forEach(c => {
-                const d = Math.hypot(c.lat - target.lat, c.lng - target.lng);
-                if (d < minDist) {
-                    minDist = d;
-                    closest = c;
+        // 3. Render all locations in .json as pins [cite: 2025-12-26]
+        function renderCommunities(data) {
+            data.forEach(c => {
+                if (c.lat && c.lng) {
+                    L.marker([c.lat, c.lng])
+                        .addTo(map)
+                        .bindPopup(`<b>${c.name}</b><br>Region: ${c.region}`);
                 }
             });
-            return [closest.lat, closest.lng];
         }
 
-        /**
-         * 2. LINKAGE ENGINE
-         * Draws lines to EVERY community in the database
-         */
-        function drawLinks() {
-            connections.clearLayers();
-            const currentHubs = [];
-            map.eachLayer(l => { if(l instanceof L.Marker && l.options.draggable) currentHubs.push(l.getLatLng()); });
-
-            currentHubs.forEach(hub => {
-                communityData.forEach(c => {
-                    L.polyline([hub, [c.lat, c.lng]], {
-                        color: '#0070bb',
-                        weight: 0.5,
-                        opacity: 0.2
-                    }).addTo(connections);
-                });
-            });
-        }
-
-        loadDatabase();
+        connectToDatabase();
     </script>
 </body>
 </html>
