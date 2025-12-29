@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Gold Standard Restoration</title>
+    <title>NL Navigator | Gold Standard Hard-Lock</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -26,15 +26,16 @@
 </head>
 <body>
 
-    <div id="vercel-verify">Build: v.2025.12.29.06</div>
+    <div id="vercel-verify">Build: v.2025.12.29.07</div>
     <div id="map"></div>
 
     <script src="engine/route-engine.js"></script>
 
     <script>
         /**
-         * FULL RESTORATION OF THE DECEMBER 27th ANCHOR POINT
-         * Principle: Never draw to the mouse; only draw to the snapped point.
+         * BUILD 07: THE HARD-LOCK PROTOCOL
+         * Overcomes the "Gray Line Drift" by forcing the coordinate hijack
+         * during the 'move' event, not just 'drag'.
          */
         const map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -42,10 +43,8 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake for sub-engines [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Load the locked-in 290-line dataset [cite: 2025-12-26]
         async function loadDataset() {
             try {
                 const response = await fetch('data/nl/communities.json');
@@ -53,87 +52,68 @@
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
-                    name: f.properties.name || "Unnamed Point"
+                    name: f.properties.name || "Road Point"
                 }));
-                console.log("[System] NL Dataset Locked In.");
-                initInteractiveMarkers();
-            } catch (err) {
-                console.error("[Data Error]", err);
-            }
+                initMarkers();
+            } catch (err) { console.error(err); }
         }
 
-        function initInteractiveMarkers() {
-            const startHobs = [
+        function initMarkers() {
+            const startPoints = [
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
                 { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
             ];
 
-            startHobs.forEach(h => {
-                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
-                marker.bindTooltip(h.name, { 
-                    permanent: true, 
-                    direction: 'top', 
-                    className: 'hub-label' 
-                });
+            startPoints.forEach(p => {
+                const marker = L.marker([p.lat, p.lng], { 
+                    draggable: true,
+                    riseOnHover: true 
+                }).addTo(map);
+
+                marker.bindTooltip(p.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
                 /**
-                 * THE SNAP LOCK (GOLD STANDARD)
-                 * Intercepts the drag event and forces the pin to stay on land.
+                 * THE HARD-LOCK INTERCEPTOR
+                 * We use 'move' because it fires more reliably than 'drag' 
+                 * when external routing engines are trying to fight for control.
                  */
-                marker.on('drag', function(e) {
-                    const mousePos = e.target.getLatLng();
-                    const nearest = findNearestCommunity(mousePos);
+                const snapMarker = (e) => {
+                    const nearest = findNearest(e.latlng || marker.getLatLng());
                     
-                    // 1. Force the visual marker position to the snapped coordinate
-                    marker.setLatLng([nearest.lat, nearest.lng]);
-                    
-                    // 2. Update the label name instantly [cite: 2025-12-26]
-                    marker.getTooltip().setContent(nearest.name);
-                });
+                    // Stop recursion and force the snap
+                    if (marker.getLatLng().lat !== nearest.lat || marker.getLatLng().lng !== nearest.lng) {
+                        marker.setLatLng([nearest.lat, nearest.lng]);
+                        marker.getTooltip().setContent(nearest.name);
+                    }
+                };
 
-                /**
-                 * ROUTE TRIGGER
-                 * Only fires once the marker has stopped moving on a valid point [cite: 2025-12-23]
-                 */
+                marker.on('move', snapMarker);
+                marker.on('drag', snapMarker);
+
+                // Re-calculate route only when marker is stationary and snapped
                 marker.on('dragend', () => {
-                    requestRoute();
+                    if (typeof RouteEngine !== 'undefined') {
+                        const coords = hubMarkers.map(m => [m.getLatLng().lat, m.getLatLng().lng]);
+                        RouteEngine.calculateRoute(coords[0], coords[1]);
+                    }
                 });
             });
-
-            setTimeout(requestRoute, 1000);
+            
+            setTimeout(() => {
+                if(typeof RouteEngine !== 'undefined') {
+                    RouteEngine.calculateRoute([47.5615, -52.7126], [48.9515, -57.9482]);
+                }
+            }, 1000);
         }
 
-        function requestRoute() {
-            if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
-                // Pull from the SNAPPED marker positions, not the mouse released position.
-                const p1 = hubMarkers[0].getLatLng();
-                const p2 = hubMarkers[1].getLatLng();
-                
-                console.log(`[Routing] Updating path between snapped points.`);
-                RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
-            }
-        }
-
-        /**
-         * Exhaustive Distance Calculation [cite: 2025-12-26]
-         */
-        function findNearestCommunity(target) {
+        function findNearest(target) {
             let closest = communityPoints[0];
             let minDist = Infinity;
-            
             for (let i = 0; i < communityPoints.length; i++) {
                 const p = communityPoints[i];
-                // Hypotenuse calculation for precision snapping
-                const d = Math.sqrt(
-                    Math.pow(p.lat - target.lat, 2) + 
-                    Math.pow(p.lng - target.lng, 2)
-                );
-
-                if (d < minDist) {
-                    minDist = d;
-                    closest = p;
-                }
+                const d = Math.sqrt(Math.pow(p.lat - target.lat, 2) + Math.pow(p.lng - target.lng, 2));
+                if (d < minDist) { minDist = d; closest = p; }
             }
             return closest;
         }
