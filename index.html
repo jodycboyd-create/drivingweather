@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Core Engine</title>
+    <title>NL Navigator | System Reset</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -10,7 +10,7 @@
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
-        .hub-label { font-weight: bold; background: white; border: 1px solid #333; padding: 2px 5px; }
+        .hub-label { font-weight: bold; background: white; border: 1px solid #333; padding: 2px 5px; border-radius: 3px; }
     </style>
 </head>
 <body>
@@ -23,23 +23,22 @@
         let communityPoints = [];
         let hubMarkers = [];
 
+        // Correct Handshake: Ensure map is passed to RouteEngine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Correct Architectural Path
         fetch('../data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
-                // FLIP LOGIC: GeoJSON [lng, lat] -> Leaflet [lat, lng]
+                // GeoJSON Flip: Features are [lng, lat], we need [lat, lng]
                 communityPoints = data.features.map(f => ({
-                    lat: f.geometry.coordinates[1], 
-                    lng: f.geometry.coordinates[0], 
+                    lat: f.geometry.coordinates[1],
+                    lng: f.geometry.coordinates[0],
                     name: f.properties.name
                 }));
                 initDynamicHubs();
             });
 
         function initDynamicHubs() {
-            // Default anchor points [cite: 2025-12-27]
             const hubs = [
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
                 { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
@@ -50,21 +49,21 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                marker.on('drag', function (e) {
-                    const nearest = getNearest(e.target.getLatLng());
-                    e.target.setLatLng([nearest.lat, nearest.lng]);
-                    e.target.setTooltipContent(nearest.name);
+                marker.on('dragend', function () {
+                    const nearest = getNearest(marker.getLatLng());
+                    marker.setLatLng([nearest.lat, nearest.lng]);
+                    marker.setTooltipContent(nearest.name);
                     updateRoute();
                 });
             });
-            updateRoute();
+            // Delay initial route to ensure OSRM server connection
+            setTimeout(updateRoute, 1000);
         }
 
         function updateRoute() {
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
-                // Passing verified [lat, lng] to the engine
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
