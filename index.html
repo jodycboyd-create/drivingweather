@@ -8,14 +8,18 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     
-    <title>NL Navigator | Baseline Build 2025-12-27</title>
+    <title>NL Navigator | Baseline 2025-12-27</title>
     
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     
-    <link rel="stylesheet" href="style.css?v=20251229.01">
+    <link rel="stylesheet" href="style.css?v=20251229.02">
 </head>
 <body>
+    <div style="background: #ff0000; color: #fff; padding: 5px; text-align: center; font-family: monospace; font-size: 12px;">
+        LIVE SYNC VERIFIED: 2025-12-29 16:17 NST
+    </div>
+
     <div id="app-container">
         <header id="main-header">
             <div class="logo-wrap">
@@ -96,6 +100,7 @@
                         <div class="breadcrumb">
                             <span class="root">Root</span> / <span class="current">Newfoundland Deep-Dive</span>
                         </div>
+                        <button id="export-trigger" style="font-size: 10px;">Export</button>
                     </div>
                     
                     <div id="data-display-container">
@@ -114,6 +119,6 @@
         </footer>
     </div>
 
-    <script src="weather-engine.js?v=20251229.01"></script>
+    <script src="weather-engine.js?v=20251229.02"></script>
 </body>
 </html>
