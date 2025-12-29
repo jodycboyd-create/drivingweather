@@ -1,62 +1,112 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Hard-Wired Build</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NL Navigator | Anchor Point 2025-12-27</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
-        body { margin: 0; padding: 0; }
-        #map { height: 100vh; width: 100vw; background: #aad3df; }
-        .ui-overlay { 
-            position: absolute; top: 10px; left: 10px; z-index: 999; 
-            background: white; padding: 15px; border-radius: 8px; font-family: sans-serif;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); border-left: 5px solid #0070bb;
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Primary Regions UI */
+        .header-bar { background: #f8f9fa; border-bottom: 1px solid #ddd; padding: 15px; }
+        .region-nav { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .region-btn { 
+            padding: 8px 15px; border: 1px solid #666; border-radius: 4px; 
+            background: white; cursor: pointer; font-size: 14px;
+        }
+        
+        #map { flex-grow: 1; width: 100%; background: #aad3df; }
+        
+        .status-box { 
+            position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+            background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
     </style>
 </head>
 <body>
 
-    <div class="ui-overlay">
-        <h2 style="margin:0 0 5px 0">NL Navigator</h2>
-        <div id="status" style="font-weight: bold; color: green;">✅ LOCAL DATA ACTIVE</div>
-        <hr>
-        Avalon: <b id="c-avalon">0</b> | Central: <b id="c-central">0</b> | Western: <b id="c-western">0</b>
-    </div>
+<div id="app-container">
+    <header class="header-bar">
+        <h1 style="margin:0; font-size: 24px;">NL Navigator</h1>
+        <div style="font-size: 12px; color: #666;">
+            ANCHOR: 2025-12-27 | DATA LOCK: 2025-12-26
+        </div>
+        
+        <div class="region-nav">
+            <button class="region-btn">Avalon Peninsula <b id="c-avalon">0</b></button>
+            <button class="region-btn">Central Newfoundland <b id="c-central">0</b></button>
+            <button class="region-btn">Western Newfoundland <b id="c-western">0</b></button>
+            <button class="region-btn">Northern Peninsula <b id="c-northern">0</b></button>
+            <button class="region-btn">Labrador <b id="c-labrador">0</b></button>
+        </div>
+    </header>
 
     <div id="map"></div>
 
-    <script>
-        // 1. Initialize Map (OpenStreetMap Tiles)
-        const map = L.map('map').setView([49.0, -56.0], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19, attribution: '© OpenStreetMap'
-        }).addTo(map);
+    <div class="status-box">
+        <b>System Status:</b> <span id="status">Connecting...</span><br>
+        <small>Source: communities.json</small>
+    </div>
+</div>
 
-        // 2. HARD-WIRED DATA: Bypassing GitHub/Vercel connection issues
-        const localData = [
-            { "name": "St. John's", "region": "Avalon", "lat": 47.5615, "lng": -52.7126 },
-            { "name": "Gander", "region": "Central", "lat": 48.9578, "lng": -54.6084 },
-            { "name": "Corner Brook", "region": "Western", "lat": 48.9515, "lng": -57.9482 }
-            // Add more communities here as needed
-        ];
+<script>
+    // 1. Initialize Map centered on Newfoundland
+    const map = L.map('map').setView([49.0, -56.0], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-        // 3. Update UI & Drop Pins immediately
-        const counts = { Avalon: 0, Central: 0, Western: 0 };
-        
-        localData.forEach(c => {
-            // Count
-            if (counts.hasOwnProperty(c.region)) counts[c.region]++;
+    // 2. Fetch locked-in communities.json
+    async function initNavigation() {
+        try {
+            const response = await fetch('data/nl/communities.json');
+            if (!response.ok) throw new Error("File Path Error");
+            const data = await response.json();
             
-            // Drop Pin
-            L.marker([c.lat, c.lng])
-                .addTo(map)
-                .bindPopup(`<b>${c.name}</b><br>Region: ${c.region}`);
-        });
+            document.getElementById('status').innerText = "✅ DATABASE LOCKED";
+            document.getElementById('status').style.color = "green";
 
-        document.getElementById('c-avalon').innerText = counts.Avalon;
-        document.getElementById('c-central').innerText = counts.Central;
-        document.getElementById('c-western').innerText = counts.Western;
-    </script>
+            const counts = { 
+                "Avalon": 0, "Central": 0, "Western": 0, 
+                "Northern Peninsula": 0, "Labrador": 0 
+            };
+
+            data.forEach(place => {
+                if (place.lat && place.lng) {
+                    // Place Pins
+                    L.marker([place.lat, place.lng])
+                        .addTo(map)
+                        .bindPopup(`<b>${place.name}</b><br>Region: ${place.region}`);
+                    
+                    // Increment Counts based on your dataset regions
+                    if (place.region.includes("Avalon")) counts.Avalon++;
+                    else if (place.region.includes("Central")) counts.Central++;
+                    else if (place.region.includes("Western")) counts.Western++;
+                    else if (place.region.includes("Northern")) counts["Northern Peninsula"]++;
+                    else if (place.region.includes("Labrador")) counts.Labrador++;
+                }
+            });
+
+            // 3. Update the UI buttons with real data
+            document.getElementById('c-avalon').innerText = counts.Avalon;
+            document.getElementById('c-central').innerText = counts.Central;
+            document.getElementById('c-western').innerText = counts.Western;
+            document.getElementById('c-northern').innerText = counts["Northern Peninsula"];
+            document.getElementById('c-labrador').innerText = counts.Labrador;
+
+        } catch (err) {
+            document.getElementById('status').innerText = "❌ Connection Failed";
+            document.getElementById('status').style.color = "red";
+        }
+    }
+
+    initNavigation();
+</script>
+
 </body>
 </html>
