@@ -13,20 +13,17 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     
-    <link rel="stylesheet" href="style.css?v=1.0.4">
+    <link rel="stylesheet" href="style.css?v=20251229.01">
 </head>
 <body>
     <div id="app-container">
         <header id="main-header">
             <div class="logo-wrap">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
-                    <circle cx="12" cy="10" r="3"/>
-                </svg>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
                 <h1>NL Navigator</h1>
                 <div class="metadata">
-                    <span class="status-tag anchor">ANCHOR: 2025-12-27</span>
-                    <span class="status-tag lock">DATA LOCK: 2025-12-26</span>
+                    <span class="status-tag">ANCHOR: 2025-12-27</span>
+                    <span class="status-tag">DATA LOCK: 2025-12-26</span>
                 </div>
             </div>
             <div class="header-controls">
@@ -41,23 +38,23 @@
                     <nav id="region-navigation">
                         <button class="region-btn" data-region="Avalon">
                             <span class="btn-text">Avalon Peninsula</span>
-                            <span class="count-badge">0</span>
+                            <span class="count-badge" id="count-avalon">0</span>
                         </button>
                         <button class="region-btn" data-region="Central">
                             <span class="btn-text">Central Newfoundland</span>
-                            <span class="count-badge">0</span>
+                            <span class="count-badge" id="count-central">0</span>
                         </button>
                         <button class="region-btn" data-region="Western">
                             <span class="btn-text">Western Newfoundland</span>
-                            <span class="count-badge">0</span>
+                            <span class="count-badge" id="count-western">0</span>
                         </button>
                         <button class="region-btn" data-region="Northern">
                             <span class="btn-text">Northern Peninsula</span>
-                            <span class="count-badge">0</span>
+                            <span class="count-badge" id="count-northern">0</span>
                         </button>
                         <button class="region-btn" data-region="Labrador">
                             <span class="btn-text">Labrador</span>
-                            <span class="count-badge">0</span>
+                            <span class="count-badge" id="count-labrador">0</span>
                         </button>
                     </nav>
                 </section>
@@ -69,11 +66,10 @@
                     <div class="status-card active" id="weong-route-status">
                         <div class="card-head">
                             <span class="label">[weong-route]</span>
-                            <span class="indicator-dot pulse"></span>
                             <span class="indicator-text">ACTIVE</span>
                         </div>
                         <div class="card-body">
-                            <p>Level 3 Exception Trigger: <span class="hl-green">Enabled</span></p>
+                            <p>Level 3 Exception Monitor: <span class="highlight">ENABLED</span></p>
                         </div>
                     </div>
 
@@ -93,28 +89,16 @@
             <main id="map-viewport">
                 <div id="map-frame">
                     <div id="map"></div>
-                    <div id="map-ui-overlay">
-                        <button id="reset-view" title="Reset View">⟲</button>
-                    </div>
                 </div>
 
                 <section id="info-panel">
                     <div class="panel-header">
                         <div class="breadcrumb">
-                            <span class="root">Root</span>
-                            <span class="sep">/</span>
-                            <span class="current">Newfoundland Deep-Dive</span>
-                        </div>
-                        <div class="panel-actions">
-                            <button id="export-csv">Export</button>
+                            <span class="root">Root</span> / <span class="current">Newfoundland Deep-Dive</span>
                         </div>
                     </div>
                     
                     <div id="data-display-container">
-                        <div id="grid-loader" class="hidden">
-                            <div class="spinner"></div>
-                            <p>Accessing Locked Dataset...</p>
-                        </div>
                         <div id="data-grid" class="community-grid">
                             </div>
                     </div>
@@ -123,19 +107,13 @@
         </div>
 
         <footer id="system-footer">
-            <div class="footer-bar">
-                <div class="security-stamp">
-                    <span class="icon">🔒</span>
-                    <span class="text">Newfoundland Comprehensive Data Permanently Stored</span>
-                </div>
-                <div class="build-version">
-                    Session Anchor: 2025-12-28 | Baseline Reverted
-                </div>
+            <div class="footer-content">
+                <span class="icon">🔒</span>
+                <p>Newfoundland Comprehensive Data Permanently Stored | Baseline: 2025-12-27</p>
             </div>
         </footer>
     </div>
 
-    <script src="weather-engine.js?v=1.0.4"></script>
-    <script src="velocity-widget.js?v=1.0.4"></script>
+    <script src="weather-engine.js?v=20251229.01"></script>
 </body>
 </html>
