@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Locked Snap & Route</title>
+    <title>NL Navigator | Real-Time Snap & Route Sync</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -23,10 +23,10 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Critical handshake for the route-engine [cite: 2025-12-27]
+        // Handshake: Alert the nested RouteEngine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Re-loading the comprehensive final dataset [cite: 2025-12-26]
+        // Load the 290-line community dataset [cite: 2025-12-26]
         fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -49,25 +49,28 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // THE RECOVERED SNAP CODE: Real-time coordinate hijacking [cite: 2025-12-26]
+                // RE-INCORPORATED SNAPPING: Marker jumps and label updates in real-time [cite: 2025-12-26]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
-                    // Force the marker to the community point immediately
+                    // 1. Force visual snap to community
                     marker.setLatLng([nearest.lat, nearest.lng]);
+                    // 2. Immediate label update [cite: 2025-12-26]
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // RECOVERED ROUTE TRIGGER: Only fire when settled on a community [cite: 2025-12-23]
-                marker.on('dragend', () => updateRoute());
+                // IMMEDIATE ROUTE UPDATE: Triggered as soon as the pin is dropped [cite: 2025-12-23]
+                marker.on('dragend', () => {
+                    updateRoute();
+                });
             });
             setTimeout(updateRoute, 1000);
         }
 
         function updateRoute() {
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
-                // We pull the ALREADY SNAPPED coordinates from the markers
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
+                // Pass the final land-locked coordinates to the engine [cite: 2025-12-23]
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
