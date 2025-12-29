@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Magnetic Hubs</title>
+    <title>NL Navigator | Magnetic Linkage</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -17,19 +17,31 @@
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        let communityData = [];
+        let communityData = []; // The source of truth
         let connections = L.layerGroup().addTo(map);
 
-        // 1. Core Architecture: Fetching communities.json
-        fetch('../data/nl/communities.json')
-            .then(res => res.json())
-            .then(data => {
-                communityData = data;
+        /**
+         * 1. ARCHITECTURE FIX: Absolute Path Fetching
+         * This bypasses the Vercel pathing errors seen in image_9522ed.jpg
+         */
+        async function loadDatabase() {
+            try {
+                const response = await fetch('../data/nl/communities.json');
+                if (!response.ok) throw new Error("Fetch failed");
+                communityData = await response.json();
+                console.log("Data Locked:", communityData.length);
                 initHubs();
-            });
+            } catch (err) {
+                console.error("Vercel Path Blocked. Retrying with absolute root...");
+                // Fallback for Vercel deployment environments
+                const fallback = await fetch('/data/nl/communities.json');
+                communityData = await fallback.json();
+                initHubs();
+            }
+        }
 
         function initHubs() {
-            // Default Hubs [cite: 2025-12-27]
+            // Default Hubs at St. John's and Corner Brook [cite: 2025-12-27]
             const hubs = [
                 { name: "St. John's Hub", lat: 47.5615, lng: -52.7126 },
                 { name: "Corner Brook Hub", lat: 48.9515, lng: -57.9482 }
@@ -37,59 +49,56 @@
 
             hubs.forEach(h => {
                 const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
-                marker.bindTooltip(h.name, { permanent: true, direction: 'top' });
+                marker.bindTooltip(h.name, { permanent: true });
 
+                // Magnetic Snap Logic [cite: 2025-12-23]
                 marker.on('drag', function (e) {
-                    const snappedCoord = getNearestCommunity(e.target.getLatLng());
-                    e.target.setLatLng(snappedCoord);
+                    const nearest = getNearestCommunity(e.target.getLatLng());
+                    e.target.setLatLng(nearest);
                     drawLinks();
                 });
 
                 marker.on('dragend', drawLinks);
             });
-            
             drawLinks();
         }
 
-        // 2. Magnetic Snap Logic: Restoring Closest Community [cite: 2025-12-23]
-        function getNearestCommunity(targetLatLng) {
-            let closest = targetLatLng;
+        function getNearestCommunity(target) {
+            if (communityData.length === 0) return target;
+            let closest = communityData[0];
             let minDist = Infinity;
 
             communityData.forEach(c => {
-                const dist = Math.sqrt(
-                    Math.pow(c.lat - targetLatLng.lat, 2) + 
-                    Math.pow(c.lng - targetLatLng.lng, 2)
-                );
-                if (dist < minDist) {
-                    minDist = dist;
-                    closest = [c.lat, c.lng];
+                const d = Math.hypot(c.lat - target.lat, c.lng - target.lng);
+                if (d < minDist) {
+                    minDist = d;
+                    closest = c;
                 }
             });
-            return closest;
+            return [closest.lat, closest.lng];
         }
 
-        // 3. Linkage Logic: Linking to all locations in communities.json
+        /**
+         * 2. LINKAGE ENGINE
+         * Draws lines to EVERY community in the database
+         */
         function drawLinks() {
             connections.clearLayers();
-            const hubPositions = [];
-            map.eachLayer(layer => {
-                if (layer instanceof L.Marker && layer.options.draggable) {
-                    hubPositions.push(layer.getLatLng());
-                }
-            });
+            const currentHubs = [];
+            map.eachLayer(l => { if(l instanceof L.Marker && l.options.draggable) currentHubs.push(l.getLatLng()); });
 
-            hubPositions.forEach(hubPos => {
+            currentHubs.forEach(hub => {
                 communityData.forEach(c => {
-                    L.polyline([hubPos, [c.lat, c.lng]], {
+                    L.polyline([hub, [c.lat, c.lng]], {
                         color: '#0070bb',
-                        weight: 1,
-                        opacity: 0.3,
-                        dashArray: '5, 5'
+                        weight: 0.5,
+                        opacity: 0.2
                     }).addTo(connections);
                 });
             });
         }
+
+        loadDatabase();
     </script>
 </body>
 </html>
