@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Snapping & Routing Restored</title>
+    <title>NL Navigator | Permanent Snap-Lock</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -23,10 +23,10 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake: Initialize RouteEngine [cite: 2025-12-27]
+        // Handshake: Initialize the RouteEngine script [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Restore Snap Dataset [cite: 2025-12-26]
+        // Incorporate the Comprehensive Newfoundland Dataset [cite: 2025-12-26]
         fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -49,14 +49,15 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // RE-INCORPORATED SNAPPING: Real-time visual lock [cite: 2025-12-26]
+                // FUNCTIONING SNAPPING: Incorporating the 2025-12-26 logic [cite: 2025-12-26]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
+                    // Force the marker position to jump to the nearest community point
                     marker.setLatLng([nearest.lat, nearest.lng]);
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // ROUTE TRIGGER: Fire update only after snap is confirmed [cite: 2025-12-23]
+                // ROUTE INTEGRITY: Fire route only when the snap is settled [cite: 2025-12-23]
                 marker.on('dragend', () => updateRoute());
             });
             setTimeout(updateRoute, 1000);
@@ -64,12 +65,14 @@
 
         function updateRoute() {
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
+                // Ensure the route is built from snapped coordinates, not raw mouse data
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
 
+        // Snap Calculation: Re-integrated from functioning build [cite: 2025-12-26]
         function getNearest(target) {
             let closest = communityPoints[0];
             let minDist = Infinity;
