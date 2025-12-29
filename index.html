@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Magnetic Architecture</title>
+    <title>NL Navigator | Dynamic Sensors</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -16,46 +16,49 @@
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        let communityPoints = []; // Memory for snapping logic
+        let communityPoints = []; // Locked-in GeoJSON data [cite: 2025-12-26]
 
-        // 1. Fetch from correct Architectural Path
+        // 1. Architecture-Respecting Fetch
         fetch('../data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
-                // Store coordinates for the Magnet logic
+                // Map GeoJSON features to accessible coordinates
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
                     name: f.properties.name
                 }));
 
-                // Render background community pins
-                communityPoints.forEach(p => {
-                    L.circleMarker([p.lat, p.lng], { radius: 3, color: '#3388ff' }).addTo(map);
-                });
-
-                initDraggableHubs();
+                initDynamicHubs();
             });
 
-        function initDraggableHubs() {
-            // Default Hub positions [cite: 2025-12-27]
+        function initDynamicHubs() {
+            // Baseline Hub coordinates [cite: 2025-12-27, 2025-12-28]
             const hubs = [
-                { name: "St. John's Hub", lat: 47.5615, lng: -52.7126 },
-                { name: "Corner Brook Hub", lat: 48.9515, lng: -57.9482 }
+                { id: 'avalon', name: "St. John's Hub", lat: 47.5615, lng: -52.7126 },
+                { id: 'west', name: "Corner Brook Hub", lat: 48.9515, lng: -57.9482 }
             ];
 
             hubs.forEach(h => {
                 const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
-                marker.bindTooltip(h.name, { permanent: true, direction: 'top' });
+                
+                // Initialize label with default name [cite: 2025-12-27]
+                marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
 
-                // Magnetic Snap Logic: Restoring Snap to closest [cite: 2025-12-23]
+                // 2. Magnetic Snap & Dynamic Label Update [cite: 2025-12-23]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
+                    
+                    // Snap the physical pin position
                     e.target.setLatLng([nearest.lat, nearest.lng]);
+                    
+                    // Update the label to the current community name
+                    e.target.setTooltipContent(nearest.name);
                 });
             });
         }
 
+        // 3. Proximity Logic: Finding the nearest point in the 290-line dataset
         function getNearest(target) {
             let closest = communityPoints[0];
             let minDist = Infinity;
