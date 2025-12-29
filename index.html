@@ -8,22 +8,25 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     
-    <title>NL Navigator | Baseline 2025-12-27</title>
+    <title>NL Navigator | Baseline Build 2025-12-27</title>
     
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     
-    <link rel="stylesheet" href="style.css?v=20251229.02">
+    <link rel="stylesheet" href="style.css?v=20251229.04">
 </head>
 <body>
-    <div style="background: #ff0000; color: #fff; padding: 5px; text-align: center; font-family: monospace; font-size: 12px;">
-        LIVE SYNC VERIFIED: 2025-12-29 16:17 NST
+    <div style="background: #0070bb; color: #fff; padding: 8px; text-align: center; font-family: 'Segoe UI', sans-serif; font-size: 14px; font-weight: bold; letter-spacing: 1px;">
+        RESTORE POINT: 2025-12-27 ANCHOR | SYNC: 2025-12-29 16:25 NST
     </div>
 
     <div id="app-container">
         <header id="main-header">
             <div class="logo-wrap">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
                 <h1>NL Navigator</h1>
                 <div class="metadata">
                     <span class="status-tag">ANCHOR: 2025-12-27</span>
@@ -100,7 +103,9 @@
                         <div class="breadcrumb">
                             <span class="root">Root</span> / <span class="current">Newfoundland Deep-Dive</span>
                         </div>
-                        <button id="export-trigger" style="font-size: 10px;">Export</button>
+                        <div class="panel-actions">
+                            <button id="export-trigger">Export CSV</button>
+                        </div>
                     </div>
                     
                     <div id="data-display-container">
@@ -119,6 +124,7 @@
         </footer>
     </div>
 
-    <script src="weather-engine.js?v=20251229.02"></script>
+    <script src="weather-engine.js?v=20251229.04"></script>
+    <script src="velocity-widget.js?v=20251229.04"></script>
 </body>
 </html>
