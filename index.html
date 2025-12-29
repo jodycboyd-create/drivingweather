@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Snap Priority Build</title>
+    <title>NL Navigator | Dec 27 Gold Standard</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -15,7 +15,9 @@
 </head>
 <body>
     <div id="map"></div>
+
     <script src="engine/route-engine.js"></script>
+
     <script>
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -23,10 +25,10 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake for sub-engine [cite: 2025-12-27]
+        // Handshake: Initializing the nested RouteEngine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Load the locked-in Newfoundland community database [cite: 2025-12-26]
+        // Loading the comprehensive Newfoundland dataset [cite: 2025-12-26]
         fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -49,18 +51,16 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // --- THE SNAP LOCK [cite: 2025-12-26] ---
+                // DEC 27 GOLD STANDARD: Visual Snap & Label Sync [cite: 2025-12-27]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
-                    
-                    // 1. Force visual snap: Pin jumps to community instantly
+                    // Force visual lock to community point immediately
                     marker.setLatLng([nearest.lat, nearest.lng]);
-                    
-                    // 2. Dynamic Label: Update text while dragging
+                    // Update label name in real-time while dragging
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // --- THE ROUTE TRIGGER ---
+                // DEC 27 GOLD STANDARD: Immediate Route Update on Drop [cite: 2025-12-27]
                 marker.on('dragend', () => {
                     updateRoute();
                 });
@@ -72,7 +72,7 @@
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
-                // Pass land-locked coordinates to ensure no ocean drift
+                // Pass snapped coordinates to route-engine.js
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
