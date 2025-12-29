@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | System Lock</title>
+    <title>NL Navigator | Snapping & Routing Fixed</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -23,13 +23,13 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Critical Handshake [cite: 2025-12-27]
+        // 1. Handshake: Notify route-engine.js immediately [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
+        // 2. Load Community Data
         fetch('../data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
-                // Feature mapping fix [cite: 2025-12-26]
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
@@ -49,26 +49,27 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // VISUAL LOCK: The pin physically cannot leave a community point [cite: 2025-12-26]
+                // MAGNETIC SNAP: Updates pin position in real-time [cite: 2025-12-26]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
                     marker.setLatLng([nearest.lat, nearest.lng]);
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // ROUTE TRIGGER: Only fire when the drag is finished to prevent ocean drift [cite: 2025-12-23]
+                // ROUTE TRIGGER: Update the line when the pin settles [cite: 2025-12-23]
                 marker.on('dragend', function() {
                     updateRoute();
                 });
             });
+            // Initial path draw
             setTimeout(updateRoute, 1000);
         }
 
         function updateRoute() {
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
-                // Ensure we use the SNAPPED coordinates from the markers
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
+                // Pass snapped coordinates to the sibling engine [cite: 2025-12-23]
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
