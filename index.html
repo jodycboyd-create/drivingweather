@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Final Lock-In</title>
+    <title>NL Navigator | Magnetic Snap Locked</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -23,12 +23,12 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Initialize handshake [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
         fetch('../data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
+                // FIX: Target data.features to avoid "forEach is not a function"
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
@@ -48,26 +48,25 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // VISUAL SNAP: High-frequency update for the pin position [cite: 2025-12-26]
+                // MAGNETIC SNAP: Force lock to community coordinates
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
                     marker.setLatLng([nearest.lat, nearest.lng]);
-                    marker.setTooltipContent(nearest.name);
+                    marker.getTooltip().setContent(nearest.name);
                 });
 
-                // ROUTE TRIGGER: Fire the engine only when movement stops to prevent "No Route" [cite: 2025-12-23]
+                // ROUTE UPDATE: Triggered only after the snap is confirmed
                 marker.on('dragend', function() {
                     updateRoute();
                 });
             });
-            setTimeout(updateRoute, 800);
+            setTimeout(updateRoute, 1000);
         }
 
         function updateRoute() {
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
-                // Pass snapped community coordinates to engine [cite: 2025-12-23, 2025-12-26]
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
