@@ -13,11 +13,11 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     
-    <link rel="stylesheet" href="style.css?v=20251229.04">
+    <link rel="stylesheet" href="style.css?v=20251229.FINAL">
 </head>
 <body>
-    <div style="background: #0070bb; color: #fff; padding: 8px; text-align: center; font-family: 'Segoe UI', sans-serif; font-size: 14px; font-weight: bold; letter-spacing: 1px;">
-        RESTORE POINT: 2025-12-27 ANCHOR | SYNC: 2025-12-29 16:25 NST
+    <div style="background: #2ecc71; color: #fff; padding: 10px; text-align: center; font-family: 'Segoe UI', sans-serif; font-size: 14px; font-weight: bold; border-bottom: 2px solid #27ae60;">
+        ✅ FULL ARCHITECTURE REVERTED | ANCHOR: 2025-12-27 | SYNC: 2025-12-29 16:29 NST
     </div>
 
     <div id="app-container">
@@ -29,8 +29,8 @@
                 </svg>
                 <h1>NL Navigator</h1>
                 <div class="metadata">
-                    <span class="status-tag">ANCHOR: 2025-12-27</span>
-                    <span class="status-tag">DATA LOCK: 2025-12-26</span>
+                    <span class="status-tag anchor">ANCHOR: 2025-12-27</span>
+                    <span class="status-tag data-lock">DATA LOCK: 2025-12-26</span>
                 </div>
             </div>
             <div class="header-controls">
@@ -41,7 +41,7 @@
         <div id="content-layout">
             <aside id="system-sidebar">
                 <section class="nav-group">
-                    <h2>Primary Regions</h2>
+                    <h2 class="sidebar-label">Primary Regions</h2>
                     <nav id="region-navigation">
                         <button class="region-btn" data-region="Avalon">
                             <span class="btn-text">Avalon Peninsula</span>
@@ -69,18 +69,19 @@
                 <hr class="sidebar-divider">
 
                 <section class="monitor-group">
-                    <h2>System Status</h2>
+                    <h2 class="sidebar-label">System Status</h2>
                     <div class="status-card active" id="weong-route-status">
                         <div class="card-head">
                             <span class="label">[weong-route]</span>
+                            <span class="indicator-dot pulse"></span>
                             <span class="indicator-text">ACTIVE</span>
                         </div>
                         <div class="card-body">
-                            <p>Level 3 Exception Monitor: <span class="highlight">ENABLED</span></p>
+                            <p>Level 3 Exception Trigger: <span class="highlight">Enabled</span></p>
                         </div>
                     </div>
 
-                    <div class="status-card locked" id="db-integrity">
+                    <div class="status-card locked" id="db-integrity-check">
                         <div class="card-head">
                             <span class="label">DATABASE</span>
                             <span class="indicator-text">LOCKED</span>
@@ -96,19 +97,24 @@
             <main id="map-viewport">
                 <div id="map-frame">
                     <div id="map"></div>
+                    <div id="map-ui-layer">
+                        <button id="recenter-map" title="Recenter">⟲</button>
+                    </div>
                 </div>
 
                 <section id="info-panel">
                     <div class="panel-header">
                         <div class="breadcrumb">
-                            <span class="root">Root</span> / <span class="current">Newfoundland Deep-Dive</span>
+                            <span class="root">Root</span>
+                            <span class="slash">/</span>
+                            <span class="current">Newfoundland Deep-Dive</span>
                         </div>
                         <div class="panel-actions">
-                            <button id="export-trigger">Export CSV</button>
+                            <button id="export-csv-btn">Export Results</button>
                         </div>
                     </div>
                     
-                    <div id="data-display-container">
+                    <div id="data-display-area">
                         <div id="data-grid" class="community-grid">
                             </div>
                     </div>
@@ -117,14 +123,19 @@
         </div>
 
         <footer id="system-footer">
-            <div class="footer-content">
-                <span class="icon">🔒</span>
-                <p>Newfoundland Comprehensive Data Permanently Stored | Baseline: 2025-12-27</p>
+            <div class="footer-bar">
+                <div class="security-seal">
+                    <span class="icon">🔒</span>
+                    <span class="seal-text">Newfoundland Comprehensive Data Permanently Stored</span>
+                </div>
+                <div class="build-info">
+                    Session Anchor: 2025-12-28 | Version 2.1.0-R
+                </div>
             </div>
         </footer>
     </div>
 
-    <script src="weather-engine.js?v=20251229.04"></script>
-    <script src="velocity-widget.js?v=20251229.04"></script>
+    <script src="weather-engine.js?v=20251229.FINAL"></script>
+    <script src="velocity-widget.js?v=20251229.FINAL"></script>
 </body>
 </html>
