@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Path Correction</title>
+    <title>NL Navigator | Snap-Route Sync</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -25,10 +25,10 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake: Initializing the nested RouteEngine [cite: 2025-12-27]
+        // Handshake to initialized the nested script [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Path Update: Reach into data/nl/
+        // Loading locked-in Newfoundland dataset [cite: 2025-12-26]
         fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -51,18 +51,21 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
+                // MAGNETIC LOCK: Force marker to community coords during drag [cite: 2025-12-26]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
-                    marker.setLatLng([nearest.lat, nearest.lng]);
+                    marker.setLatLng([nearest.lat, nearest.lng]); 
                     marker.getTooltip().setContent(nearest.name);
                 });
 
+                // ROUTE SYNC: Trigger update when snap is settled [cite: 2025-12-23]
                 marker.on('dragend', () => updateRoute());
             });
             setTimeout(updateRoute, 1000);
         }
 
         function updateRoute() {
+            // Only update if RouteEngine from /engine/route-engine.js is ready
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
