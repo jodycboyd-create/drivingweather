@@ -23,10 +23,10 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake: Alert the nested RouteEngine [cite: 2025-12-27]
+        // Alert the nested RouteEngine once the map instance is ready
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Load the 290-line community dataset [cite: 2025-12-26]
+        // Load the 290-line community dataset for snapping [cite: 2025-12-26]
         fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -49,28 +49,28 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // RE-INCORPORATED SNAPPING: Marker jumps and label updates in real-time [cite: 2025-12-26]
+                // REAL-TIME SNAP & LABEL: Marker jumps and label updates during movement [cite: 2025-12-26]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
-                    // 1. Force visual snap to community
+                    // 1. Force the marker to snap visually to the nearest community
                     marker.setLatLng([nearest.lat, nearest.lng]);
-                    // 2. Immediate label update [cite: 2025-12-26]
+                    // 2. Update the label text instantly to the community name
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // IMMEDIATE ROUTE UPDATE: Triggered as soon as the pin is dropped [cite: 2025-12-23]
+                // ROUTE UPDATE ON DROP: Trigger the line as soon as the pin is released [cite: 2025-12-23]
                 marker.on('dragend', () => {
                     updateRoute();
                 });
             });
-            setTimeout(updateRoute, 1000);
+            setTimeout(updateRoute, 1000); // Initial path draw
         }
 
         function updateRoute() {
+            // Pull the ALREADY SNAPPED coordinates from the markers to avoid ocean lines
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
-                // Pass the final land-locked coordinates to the engine [cite: 2025-12-23]
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
