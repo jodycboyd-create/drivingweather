@@ -4,22 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    
     <title>NL Navigator | Baseline Build 2025-12-27</title>
     
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     
-    <link rel="stylesheet" href="style.css?v=RESTORE_V1">
+    <link rel="stylesheet" href="style.css?v=HARD_REVERT_01">
 </head>
 <body>
-    <div style="background: #000; color: #fff; padding: 10px; text-align: center; font-family: monospace; font-size: 14px; font-weight: bold;">
-        STRUCTURAL ANCHOR RESTORED: 2025-12-29 16:35 NST
-    </div>
-
     <div id="app-container">
         <header id="main-header">
             <div class="logo-wrap">
@@ -41,7 +33,7 @@
         <div id="content-layout">
             <aside id="system-sidebar">
                 <section class="nav-group">
-                    <h2>Primary Regions</h2>
+                    <h2 class="sidebar-label">Primary Regions</h2>
                     <nav id="region-navigation">
                         <button class="region-btn" data-region="Avalon">
                             <span class="btn-text">Avalon Peninsula</span>
@@ -69,10 +61,11 @@
                 <hr class="sidebar-divider">
 
                 <section class="monitor-group">
-                    <h2>System Status</h2>
+                    <h2 class="sidebar-label">System Status</h2>
                     <div class="status-card active" id="weong-route-status">
                         <div class="card-head">
                             <span class="label">[weong-route]</span>
+                            <span class="indicator-dot pulse"></span>
                             <span class="indicator-text">ACTIVE</span>
                         </div>
                         <div class="card-body">
@@ -80,7 +73,7 @@
                         </div>
                     </div>
 
-                    <div class="status-card locked" id="db-integrity">
+                    <div id="db-integrity" class="status-card locked">
                         <div class="card-head">
                             <span class="label">DATABASE</span>
                             <span class="indicator-text">LOCKED</span>
@@ -114,14 +107,19 @@
         </div>
 
         <footer id="system-footer">
-            <div class="footer-content">
-                <span class="icon">🔒</span>
-                <p>Newfoundland Comprehensive Data Permanently Stored | Baseline: 2025-12-27</p>
+            <div class="footer-bar">
+                <div class="security-seal">
+                    <span class="icon">🔒</span>
+                    <span class="seal-text">Newfoundland Comprehensive Data Permanently Stored</span>
+                </div>
+                <div class="build-info">
+                    Session Anchor: 2025-12-28
+                </div>
             </div>
         </footer>
     </div>
 
-    <script src="weather-engine.js?v=RESTORE_V1"></script>
-    <script src="velocity-widget.js?v=RESTORE_V1"></script>
+    <script src="weather-engine.js?v=HARD_REVERT_01"></script>
+    <script src="velocity-widget.js?v=HARD_REVERT_01"></script>
 </body>
 </html>
