@@ -1,11 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charse<!DOCTYPE html>
-<html>
-<head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Direct Data Link</title>
+    <title>NL Navigator | Final Data Bridge</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -22,7 +19,7 @@
 
     <div class="ui-overlay">
         <h2 style="margin:0 0 5px 0">NL Navigator</h2>
-        <div id="status" style="color: orange;">Bypassing Local Path...</div>
+        <div id="status" style="font-weight: bold; color: #d35400;">Bypassing Local Path...</div>
         <hr>
         Avalon: <b id="c-avalon">0</b> | Central: <b id="c-central">0</b> | Western: <b id="c-western">0</b>
     </div>
@@ -30,36 +27,35 @@
     <div id="map"></div>
 
     <script>
-        // 1. Re-init the working basemap
+        // 1. Initialize Map with Place Names (as seen in image_94c14b.jpg)
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '© OpenStreetMap'
+            attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
         /**
-         * 2. THE HARD-LINK SOLUTION:
-         * Replace the URL below with your actual "Raw" GitHub URL.
-         * To get this: Go to GitHub, click communities.json, and click the "Raw" button.
+         * 2. THE HARD-LINK SOLUTION
+         * This targets the exact raw file from your 'drivingweather' repository.
          */
-        const RAW_DATA_URL = 'https://raw.githubusercontent.com/jodycboyd-create/drivingweather/main/data/nl/communities.json';
+        const RAW_URL = 'https://raw.githubusercontent.com/jodycboyd-create/drivingweather/main/data/nl/communities.json';
 
-        fetch(RAW_DATA_URL)
+        fetch(RAW_URL)
             .then(res => {
-                if(!res.ok) throw new Error("GitHub Link Failed");
+                if(!res.ok) throw new Error("GitHub Raw Access Denied");
                 return res.json();
             })
             .then(data => {
-                document.getElementById('status').innerHTML = "✅ DATA CONNECTED (RAW)";
+                document.getElementById('status').innerHTML = "✅ DATA CONNECTED: " + data.length;
                 document.getElementById('status').style.color = "green";
 
-                // Update Counters
+                // Update Counters for Primary Regions
                 ['Avalon', 'Central', 'Western'].forEach(reg => {
-                    const count = data.filter(c => c.region === reg).length;
+                    const count = data.filter(c => c.region && c.region.includes(reg)).length;
                     document.getElementById('c-' + reg.toLowerCase()).innerText = count;
                 });
 
-                // Drop the Pins [cite: 2025-12-26]
+                // Drop the Pins for communities
                 data.forEach((c) => {
                     if(c.lat && c.lng) {
                         L.marker([c.lat, c.lng])
@@ -69,93 +65,9 @@
                 });
             })
             .catch(err => {
-                document.getElementById('status').innerHTML = "❌ GitHub Link Blocked";
-                console.error(err);
+                document.getElementById('status').innerHTML = "❌ GitHub Connection Failed";
+                console.error("Critical Fetch Error:", err);
             });
-    </script>
-</body>
-</html>t="UTF-8">
-    <title>NL Navigator | Data Restoration</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        body { margin: 0; padding: 0; }
-        #map { height: 100vh; width: 100vw; background: #aad3df; }
-        .ui-overlay { 
-            position: absolute; top: 10px; left: 10px; z-index: 999; 
-            background: white; padding: 15px; border-radius: 8px; font-family: sans-serif;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); border-left: 5px solid #0070bb;
-        }
-        .success { color: green; font-weight: bold; }
-        .searching { color: orange; font-style: italic; }
-    </style>
-</head>
-<body>
-
-    <div class="ui-overlay">
-        <h2 style="margin:0 0 5px 0">NL Navigator</h2>
-        <div id="status" class="searching">Initing Engine...</div>
-        <div id="path-debug" style="font-size: 0.7em; color: #999;"></div>
-        <hr>
-        Avalon: <b id="c-avalon">0</b> | Central: <b id="c-central">0</b> | Western: <b id="c-western">0</b>
-    </div>
-
-    <div id="map"></div>
-
-    <script>
-        // 1. Initialize Map (Matched to your working basemap in image_94b8f1.jpg)
-        const map = L.map('map').setView([49.0, -56.0], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-
-        // 2. THE PATH ARRAY: We try every logical variation of your structure
-        const pathsToTry = [
-            'data/nl/communities.json',   // Standard relative
-            './data/nl/communities.json', // Explicit local
-            '/data/nl/communities.json'   // Root relative
-        ];
-
-        async function connectToDatabase() {
-            for (let path of pathsToTry) {
-                document.getElementById('path-debug').innerText = "Trying: " + path;
-                try {
-                    const response = await fetch(path);
-                    if (response.ok) {
-                        const data = await response.json();
-                        renderData(data, path);
-                        return; // Exit loop on success
-                    }
-                } catch (e) {
-                    console.warn("Path failed: " + path);
-                }
-            }
-            document.getElementById('status').innerHTML = "❌ <span style='color:red'>ALL PATHS FAILED</span>";
-        }
-
-        function renderData(data, successfulPath) {
-            document.getElementById('status').innerHTML = "✅ Connected!";
-            document.getElementById('status').className = "success";
-            document.getElementById('path-debug').innerText = "Source: " + successfulPath;
-
-            // Update Counts
-            ['Avalon', 'Central', 'Western'].forEach(reg => {
-                const count = data.filter(c => c.region === reg).length;
-                document.getElementById('c-' + reg.toLowerCase()).innerText = count;
-            });
-
-            // Drop Pins [cite: 2025-12-26]
-            data.forEach((c) => {
-                if(c.lat && c.lng) {
-                    L.marker([c.lat, c.lng])
-                        .addTo(map)
-                        .bindPopup(`<b>${c.name}</b><br>${c.region}`);
-                }
-            });
-        }
-
-        connectToDatabase();
     </script>
 </body>
 </html>
