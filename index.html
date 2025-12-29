@@ -1,95 +1,169 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Gold Standard Sync</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NL Navigator | Gold Standard Recovery</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
     <style>
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; font-family: sans-serif; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
-        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 2px 5px; border-radius: 4px; }
-        /* Vercel Verify Indicator */
-        #version-tag { 
-            position: absolute; bottom: 10px; left: 10px; z-index: 1000; 
-            background: rgba(255,255,255,0.8); padding: 5px; font-family: monospace; font-size: 10px; border: 1px solid #ccc;
+        
+        .hub-label { 
+            font-weight: bold; 
+            background: white; 
+            border: 2px solid #0070bb; 
+            padding: 3px 8px; 
+            border-radius: 4px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        #vercel-verify { 
+            position: absolute; 
+            bottom: 20px; 
+            left: 10px; 
+            z-index: 1000; 
+            background: white; 
+            padding: 5px 10px; 
+            border: 2px solid #333;
+            font-family: monospace;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <div id="version-tag">Build: v.2025.12.29.01</div>
+
+    <div id="vercel-verify">Build: v.2025.12.29.02</div>
     <div id="map"></div>
 
     <script src="engine/route-engine.js"></script>
 
     <script>
-        const map = L.map('map').setView([49.0, -56.0], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        /**
+         * DEC 27 GOLD STANDARD RESTORATION
+         * Focus: Comprehensive Snap Logic & Dataset Persistence
+         */
+        const map = L.map('map', {
+            zoomControl: true,
+            maxBounds: [[46.0, -60.0], [52.0, -52.0]]
+        }).setView([49.0, -56.0], 7);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake: Initializing the nested RouteEngine [cite: 2025-12-27]
+        // Critical signal to RouteEngine in /engine/ folder [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Loading the locked-in 290-line dataset [cite: 2025-12-26]
-        fetch('data/nl/communities.json')
-            .then(res => res.json())
-            .then(data => {
+        // Deep-Dive Dataset Restoration [cite: 2025-12-26]
+        async function loadNLData() {
+            try {
+                const response = await fetch('data/nl/communities.json');
+                const data = await response.json();
+                
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
-                    name: f.properties.name
+                    name: f.properties.name || "Unknown Point"
                 }));
-                initDynamicHubs();
-            });
 
-        function initDynamicHubs() {
-            const hubs = [
+                console.log(`[System] ${communityPoints.length} Newfoundland points locked in.`);
+                initHubs();
+            } catch (err) {
+                console.error("[Critical] Data load failed:", err);
+            }
+        }
+
+        function initHubs() {
+            const initialHubs = [
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
                 { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
             ];
 
-            hubs.forEach(h => {
-                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
-                marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
+            initialHubs.forEach((h, index) => {
+                const marker = L.marker([h.lat, h.lng], {
+                    draggable: true,
+                    autoPan: true
+                }).addTo(map);
+
+                marker.bindTooltip(h.name, { 
+                    permanent: true, 
+                    direction: 'top', 
+                    className: 'hub-label' 
+                });
+
                 hubMarkers.push(marker);
 
-                // GOLD STANDARD: Visual Snap & Label Update [cite: 2025-12-27]
-                marker.on('drag', function (e) {
-                    const nearest = getNearest(e.target.getLatLng());
-                    // Force visual lock
+                // --- GOLD STANDARD SNAP LOGIC (DEC 27) ---
+                marker.on('drag', function(e) {
+                    const currentPos = e.target.getLatLng();
+                    const nearest = findNearestCommunity(currentPos);
+                    
+                    // Force the marker to snap to the dataset coordinate
                     marker.setLatLng([nearest.lat, nearest.lng]);
-                    // Immediate label name change [cite: 2025-12-26]
+                    
+                    // Update label name immediately [cite: 2025-12-27]
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // GOLD STANDARD: Immediate Route on Drop [cite: 2025-12-27]
-                marker.on('dragend', () => updateRoute());
+                // Trigger route update only when movement stops [cite: 2025-12-23]
+                marker.on('dragend', () => {
+                    requestRouteUpdate();
+                });
             });
-            setTimeout(updateRoute, 1000);
+
+            // Initial route draw
+            setTimeout(requestRouteUpdate, 1500);
         }
 
-        function updateRoute() {
+        function requestRouteUpdate() {
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
-                const p1 = hubMarkers[0].getLatLng();
-                const p2 = hubMarkers[1].getLatLng();
-                // Coordinates are already snapped, so no ocean drift
-                RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
+                const start = hubMarkers[0].getLatLng();
+                const end = hubMarkers[1].getLatLng();
+                
+                console.log(`[Routing] Calculating path: ${hubMarkers[0].getTooltip().getContent()} to ${hubMarkers[1].getTooltip().getContent()}`);
+                
+                // Use the snapped coordinates to prevent ocean drift
+                RouteEngine.calculateRoute([start.lat, start.lng], [end.lat, end.lng]);
             }
         }
 
-        function getNearest(target) {
+        /**
+         * Comprehensive Magnetic Search
+         * Logic preserved from 2025-12-26 Build
+         */
+        function findNearestCommunity(target) {
+            if (communityPoints.length === 0) return target;
+
             let closest = communityPoints[0];
-            let minDist = Infinity;
-            communityPoints.forEach(p => {
-                const d = Math.hypot(p.lat - target.lat, p.lng - target.lng);
-                if (d < minDist) { minDist = d; closest = p; }
-            });
+            let shortestDistance = Infinity;
+
+            for (let i = 0; i < communityPoints.length; i++) {
+                const p = communityPoints[i];
+                // Hypotenuse distance for high-performance snapping
+                const dist = Math.sqrt(
+                    Math.pow(p.lat - target.lat, 2) + 
+                    Math.pow(p.lng - target.lng, 2)
+                );
+
+                if (dist < shortestDistance) {
+                    shortestDistance = dist;
+                    closest = p;
+                }
+            }
             return closest;
         }
+
+        // Start the engine
+        loadNLData();
     </script>
 </body>
 </html>
