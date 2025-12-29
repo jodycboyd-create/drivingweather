@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | System Reset</title>
+    <title>NL Navigator | Path Correction</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -15,7 +15,9 @@
 </head>
 <body>
     <div id="map"></div>
-    <script src="route-engine.js"></script>
+
+    <script src="engine/route-engine.js"></script>
+
     <script>
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -23,13 +25,14 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Correct Handshake: Ensure map is passed to RouteEngine [cite: 2025-12-27]
+        // Handshake for RouteEngine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
+        // Data is one level up and over in /data/nl/
         fetch('../data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
-                // GeoJSON Flip: Features are [lng, lat], we need [lat, lng]
+                // Mapping GeoJSON [lng, lat] to Leaflet [lat, lng]
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
@@ -56,7 +59,6 @@
                     updateRoute();
                 });
             });
-            // Delay initial route to ensure OSRM server connection
             setTimeout(updateRoute, 1000);
         }
 
