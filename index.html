@@ -2,70 +2,57 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Community Connection</title>
+    <title>NL Navigator | Data Bridge</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
-        .status-pill { 
-            position: absolute; top: 10px; right: 10px; z-index: 1000; 
-            background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            font-family: sans-serif; font-size: 12px;
+        #status { 
+            position: absolute; top: 10px; left: 50px; z-index: 1000; 
+            background: white; padding: 5px 10px; border: 2px solid red;
         }
     </style>
 </head>
 <body>
-    <div class="status-pill" id="db-status">Connecting to Database...</div>
+    <div id="status">DATABASE: DISCONNECTED</div>
     <div id="map"></div>
 
     <script>
-        // 1. Initialize Map
         const map = L.map('map').setView([49.0, -56.0], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         /**
-         * 2. ARCHITECTURE CONNECTION
-         * Target: /data/nl/communities.json
+         * 1. THE VERCEL BYPASS
+         * Instead of relative pathing, we calculate the site root.
          */
-        async function connectToDatabase() {
-            const statusEl = document.getElementById('db-status');
-            
-            // Try relative path first, then absolute root for Vercel
-            const paths = ['../data/nl/communities.json', '/data/nl/communities.json'];
-            
-            for (let path of paths) {
-                try {
-                    const response = await fetch(path);
-                    if (response.ok) {
-                        const communities = await response.json();
-                        renderCommunities(communities);
-                        statusEl.innerText = `✅ Connected: ${communities.length} Communities`;
-                        statusEl.style.color = "green";
-                        return; // Exit loop on success
+        const siteRoot = window.location.origin;
+        const dataUrl = `${siteRoot}/data/nl/communities.json`;
+
+        console.log("Attempting Connection to:", dataUrl);
+
+        fetch(dataUrl)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('status').innerText = `✅ CONNECTED: ${data.length} PINS`;
+                document.getElementById('status').style.borderColor = "green";
+                
+                // 2. Drop all pins from communities.json [cite: 2025-12-26]
+                data.forEach(c => {
+                    if (c.lat && c.lng) {
+                        L.marker([c.lat, c.lng])
+                            .addTo(map)
+                            .bindPopup(`<b>${c.name}</b><br>${c.region}`);
                     }
-                } catch (e) {
-                    console.warn(`Path failed: ${path}`);
-                }
-            }
-            statusEl.innerText = "❌ All Paths Failed";
-            statusEl.style.color = "red";
-        }
-
-        // 3. Render all locations in .json as pins [cite: 2025-12-26]
-        function renderCommunities(data) {
-            data.forEach(c => {
-                if (c.lat && c.lng) {
-                    L.marker([c.lat, c.lng])
-                        .addTo(map)
-                        .bindPopup(`<b>${c.name}</b><br>Region: ${c.region}`);
-                }
+                });
+            })
+            .catch(err => {
+                console.error("Linkage failed:", err);
+                document.getElementById('status').innerText = "❌ CONNECTION FAILED - CHECK FOLDER STRUCTURE";
             });
-        }
-
-        connectToDatabase();
     </script>
 </body>
 </html>
