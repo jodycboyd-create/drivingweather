@@ -23,14 +23,15 @@ const RouteEngine = {
             fitSelectedRoutes: false
         }).addTo(mapInstance);
 
-        // [weong-route] Monitor for connectivity issues [cite: 2025-12-23]
+        // [weong-route] Monitor for road connection errors
         this.control.on('routingerror', (e) => {
-            console.warn("[weong-route] Exception: No Road Link", e.error.message);
+            console.warn("[weong-route] Connection Failed:", e.error.message);
         });
     },
 
     calculateRoute: function(start, end) {
         if (!this.control) return;
+        // Use snapped lat/lng to avoid "ocean drift" gray lines
         this.control.setWaypoints([
             L.latLng(start[0], start[1]),
             L.latLng(end[0], end[1])
@@ -38,6 +39,4 @@ const RouteEngine = {
     }
 };
 
-window.addEventListener('map-ready', (e) => {
-    RouteEngine.init(e.detail.map);
-});
+window.addEventListener('map-ready', (e) => RouteEngine.init(e.detail.map));
