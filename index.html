@@ -11,41 +11,39 @@
     </style>
 </head>
 <body>
-
     <div id="map"></div>
-
     <script>
-        // 1. Initialize Map
+        // 1. Initialize basic map
         const map = L.map('map').setView([49.0, -56.0], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // 2. Core Connection
-        // Jumping up from current location to reach the data folder
+        /**
+         * 2. The Absolute Base Connection
+         * We are targeting the file confirmed in your directory tree
+         */
         fetch('../data/nl/communities.json')
-            .then(response => {
-                if (!response.ok) throw new Error("Path Mismatch");
-                return response.json();
+            .then(res => {
+                if(!res.ok) throw new Error(`Server Error: ${res.status}`);
+                return res.json();
             })
             .then(data => {
-                console.log("Database Linked:", data.length);
+                // Ensure we have an array to prevent "forEach is not a function"
+                const list = Array.isArray(data) ? data : [];
                 
-                // 3. Simple Pin Drop [cite: 2025-12-26]
-                data.forEach(c => {
+                if (list.length === 0) {
+                    L.popup().setLatLng([49, -56]).setContent("Connected, but JSON is empty!").openOn(map);
+                    return;
+                }
+
+                list.forEach(c => {
                     if (c.lat && c.lng) {
-                        L.marker([c.lat, c.lng])
-                            .addTo(map)
-                            .bindPopup(`<b>${c.name}</b>`);
+                        L.marker([c.lat, c.lng]).addTo(map).bindPopup(c.name);
                     }
                 });
             })
             .catch(err => {
-                // Visual error indicator on map
-                L.popup()
-                    .setLatLng([49, -56])
-                    .setContent(`Connection Failed: ${err.message}`)
-                    .openOn(map);
+                // Visual confirmation of the exact failure point
+                L.popup().setLatLng([49, -56]).setContent(`Connection Failed: ${err.message}`).openOn(map);
             });
     </script>
 </body>
