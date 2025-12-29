@@ -2,24 +2,25 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | EMERGENCY RESET</title>
+    <title>NL Navigator | Features & Place Names</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { margin: 0; padding: 0; }
-        #map { height: 100vh; width: 100vw; background: #242424; }
+        #map { height: 100vh; width: 100vw; background: #aad3df; }
         .ui-overlay { 
             position: absolute; top: 10px; left: 10px; z-index: 999; 
             background: white; padding: 15px; border-radius: 8px; font-family: sans-serif;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); border-left: 5px solid #0070bb;
         }
     </style>
 </head>
 <body>
 
     <div class="ui-overlay">
-        <h2 style="margin:0 0 10px 0">NL Navigator Reset</h2>
-        <div id="status">Connecting to Database...</div>
+        <h2 style="margin:0 0 5px 0">NL Navigator</h2>
+        <div id="status" style="font-weight: bold;">Locating data...</div>
+        <div style="font-size: 0.8em; color: #666; margin-bottom: 10px;">Build: 2025-12-29</div>
         <hr>
         Avalon: <b id="c-avalon">0</b> | Central: <b id="c-central">0</b> | Western: <b id="c-western">0</b>
     </div>
@@ -27,38 +28,44 @@
     <div id="map"></div>
 
     <script>
-        // 1. Force Map Init
+        // 1. Initialize Map on Newfoundland
         const map = L.map('map').setView([49.0, -56.0], 6);
         
-        // 2. Add High-Contrast Tiles (to prove rendering works)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        // 2. NEW BASEMAP: OpenStreetMap Standard (Shows Towns, Roads, Labels)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
-        // 3. The Big Bridge: Fetching from verified repo path
-        fetch('data/nl/communities.json')
-            .then(res => res.json())
+        // 3. TRY MULTIPLE PATHS to solve the Database Path Error
+        const dataPath = './data/nl/communities.json';
+
+        fetch(dataPath)
+            .then(res => {
+                if(!res.ok) throw new Error("Path Fail: " + dataPath);
+                return res.json();
+            })
             .then(data => {
-                document.getElementById('status').innerText = "✅ " + data.length + " Communities Found";
+                document.getElementById('status').innerHTML = "✅ Database Connected: " + data.length;
                 
-                // Update Counters
+                // Update Region Counters
                 ['Avalon', 'Central', 'Western'].forEach(reg => {
                     const count = data.filter(c => c.region === reg).length;
                     document.getElementById('c-' + reg.toLowerCase()).innerText = count;
                 });
 
-                // Drop the Pins [cite: 2025-12-26]
-                data.forEach((c, i) => {
+                // Drop Pins for communities [cite: 2025-12-26]
+                data.forEach((c) => {
                     if(c.lat && c.lng) {
-                        const marker = L.marker([c.lat, c.lng]).addTo(map)
-                            .bindPopup(`<b>${c.name}</b><br>${c.region}`);
-                        
-                        // Auto-open first two pins to verify logic
-                        if(i < 2) marker.openPopup();
+                        L.marker([c.lat, c.lng])
+                            .addTo(map)
+                            .bindPopup(`<b>${c.name}</b><br>Region: ${c.region}`);
                     }
                 });
             })
             .catch(err => {
-                document.getElementById('status').innerHTML = "❌ <span style='color:red'>Database Path Error</span>";
-                console.error(err);
+                document.getElementById('status').innerHTML = "❌ <span style='color:red'>Data Not Found</span>";
+                console.error("Path search failed:", err);
             });
     </script>
 </body>
