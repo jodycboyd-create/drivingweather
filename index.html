@@ -3,21 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <title>NL Navigator | Baseline Build 2025-12-27</title>
+    
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css">
+    
+    <link rel="stylesheet" href="style.css?v=1.0.4">
 </head>
 <body>
     <div id="app-container">
         <header id="main-header">
             <div class="logo-wrap">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
                 <h1>NL Navigator</h1>
                 <div class="metadata">
-                    <span class="status-tag">BASELINE: 2025-12-28</span>
-                    <span class="status-tag">DATA LOCK: 2025-12-26</span>
+                    <span class="status-tag anchor">ANCHOR: 2025-12-27</span>
+                    <span class="status-tag lock">DATA LOCK: 2025-12-26</span>
                 </div>
+            </div>
+            <div class="header-controls">
+                <span id="system-clock">2025-12-29</span>
             </div>
         </header>
 
@@ -26,45 +39,103 @@
                 <section class="nav-group">
                     <h2>Primary Regions</h2>
                     <nav id="region-navigation">
-                        <button class="region-btn" data-region="Avalon">Avalon Peninsula</button>
-                        <button class="region-btn" data-region="Central">Central Newfoundland</button>
-                        <button class="region-btn" data-region="Western">Western Newfoundland</button>
-                        <button class="region-btn" data-region="Northern">Northern Peninsula</button>
-                        <button class="region-btn" data-region="Labrador">Labrador</button>
+                        <button class="region-btn" data-region="Avalon">
+                            <span class="btn-text">Avalon Peninsula</span>
+                            <span class="count-badge">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Central">
+                            <span class="btn-text">Central Newfoundland</span>
+                            <span class="count-badge">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Western">
+                            <span class="btn-text">Western Newfoundland</span>
+                            <span class="count-badge">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Northern">
+                            <span class="btn-text">Northern Peninsula</span>
+                            <span class="count-badge">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Labrador">
+                            <span class="btn-text">Labrador</span>
+                            <span class="count-badge">0</span>
+                        </button>
                     </nav>
                 </section>
+
+                <hr class="sidebar-divider">
 
                 <section class="monitor-group">
                     <h2>System Status</h2>
                     <div class="status-card active" id="weong-route-status">
-                        <div class="card-head"><span class="label">[weong-route]</span><span class="indicator">ACTIVE</span></div>
-                        <p>Level 3 Exception Trigger: Enabled</p>
+                        <div class="card-head">
+                            <span class="label">[weong-route]</span>
+                            <span class="indicator-dot pulse"></span>
+                            <span class="indicator-text">ACTIVE</span>
+                        </div>
+                        <div class="card-body">
+                            <p>Level 3 Exception Trigger: <span class="hl-green">Enabled</span></p>
+                        </div>
                     </div>
-                    <div class="status-card locked">
-                        <div class="card-head"><span class="label">DATABASE</span><span class="indicator">LOCKED</span></div>
-                        <p>Comprehensive Newfoundland Dataset Loaded</p>
+
+                    <div class="status-card locked" id="db-integrity">
+                        <div class="card-head">
+                            <span class="label">DATABASE</span>
+                            <span class="indicator-text">LOCKED</span>
+                        </div>
+                        <div class="card-body">
+                            <p>Source: communities.json</p>
+                            <p>Integrity: Deep-Dive Verified</p>
+                        </div>
                     </div>
                 </section>
             </aside>
 
             <main id="map-viewport">
-                <div id="map"></div>
+                <div id="map-frame">
+                    <div id="map"></div>
+                    <div id="map-ui-overlay">
+                        <button id="reset-view" title="Reset View">⟲</button>
+                    </div>
+                </div>
+
                 <section id="info-panel">
-                    <div class="breadcrumb">Root / Newfoundland Deep-Dive</div>
-                    <div id="data-grid" class="community-grid">
+                    <div class="panel-header">
+                        <div class="breadcrumb">
+                            <span class="root">Root</span>
+                            <span class="sep">/</span>
+                            <span class="current">Newfoundland Deep-Dive</span>
                         </div>
+                        <div class="panel-actions">
+                            <button id="export-csv">Export</button>
+                        </div>
+                    </div>
+                    
+                    <div id="data-display-container">
+                        <div id="grid-loader" class="hidden">
+                            <div class="spinner"></div>
+                            <p>Accessing Locked Dataset...</p>
+                        </div>
+                        <div id="data-grid" class="community-grid">
+                            </div>
+                    </div>
                 </section>
             </main>
         </div>
 
         <footer id="system-footer">
             <div class="footer-bar">
-                <span class="icon">🔒</span>
-                <p>Newfoundland Comprehensive Data Permanently Stored | Session Anchor: 2025-12-28</p>
+                <div class="security-stamp">
+                    <span class="icon">🔒</span>
+                    <span class="text">Newfoundland Comprehensive Data Permanently Stored</span>
+                </div>
+                <div class="build-version">
+                    Session Anchor: 2025-12-28 | Baseline Reverted
+                </div>
             </div>
         </footer>
     </div>
-    <script src="weather-engine.js"></script>
-    <script src="velocity-widget.js"></script>
+
+    <script src="weather-engine.js?v=1.0.4"></script>
+    <script src="velocity-widget.js?v=1.0.4"></script>
 </body>
 </html>
