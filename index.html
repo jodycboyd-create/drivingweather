@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Snap-Route Sync</title>
+    <title>NL Navigator | Sync Lock</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -15,9 +15,7 @@
 </head>
 <body>
     <div id="map"></div>
-
     <script src="engine/route-engine.js"></script>
-
     <script>
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -25,10 +23,9 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake to initialized the nested script [cite: 2025-12-27]
+        // Critical: Signal the nested engine to initialize
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Loading locked-in Newfoundland dataset [cite: 2025-12-26]
         fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -51,24 +48,24 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // MAGNETIC LOCK: Force marker to community coords during drag [cite: 2025-12-26]
+                // VISUAL LOCK: Snap to community during drag
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
-                    marker.setLatLng([nearest.lat, nearest.lng]); 
+                    marker.setLatLng([nearest.lat, nearest.lng]);
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // ROUTE SYNC: Trigger update when snap is settled [cite: 2025-12-23]
+                // ROUTE RECOVERY: Update path ONLY when the snap is settled
                 marker.on('dragend', () => updateRoute());
             });
             setTimeout(updateRoute, 1000);
         }
 
         function updateRoute() {
-            // Only update if RouteEngine from /engine/route-engine.js is ready
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
+                // Pass snapped coordinates to the sub-engine
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
