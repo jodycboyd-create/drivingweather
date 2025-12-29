@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Magnetic Snap Locked</title>
+    <title>NL Navigator | Final Integration</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -15,7 +15,7 @@
 </head>
 <body>
     <div id="map"></div>
-    <script src="engine/route-engine.js"></script>
+    <script src="route-engine.js"></script>
     <script>
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -23,12 +23,13 @@
         let communityPoints = [];
         let hubMarkers = [];
 
+        // Handshake: Initialize RouteEngine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
         fetch('../data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
-                // FIX: Target data.features to avoid "forEach is not a function"
+                // FIX: Target 'features' array to prevent forEach error
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
@@ -48,17 +49,15 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // MAGNETIC SNAP: Force lock to community coordinates
+                // VISUAL SNAP: Lock the pin to a community during drag [cite: 2025-12-26]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
                     marker.setLatLng([nearest.lat, nearest.lng]);
-                    marker.getTooltip().setContent(nearest.name);
+                    marker.setTooltipContent(nearest.name);
                 });
 
-                // ROUTE UPDATE: Triggered only after the snap is confirmed
-                marker.on('dragend', function() {
-                    updateRoute();
-                });
+                // ROUTE TRIGGER: Update line only after snapping is complete [cite: 2025-12-23]
+                marker.on('dragend', () => updateRoute());
             });
             setTimeout(updateRoute, 1000);
         }
@@ -67,6 +66,7 @@
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
+                // Pass snapped coordinates to the engine
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
