@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Real-Time Snap & Route Sync</title>
+    <title>NL Navigator | Snap Priority Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -23,10 +23,10 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Alert the nested RouteEngine once the map instance is ready
+        // Handshake for sub-engine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Load the 290-line community dataset for snapping [cite: 2025-12-26]
+        // Load the locked-in Newfoundland community database [cite: 2025-12-26]
         fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -49,28 +49,30 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // REAL-TIME SNAP & LABEL: Marker jumps and label updates during movement [cite: 2025-12-26]
+                // --- THE SNAP LOCK [cite: 2025-12-26] ---
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
-                    // 1. Force the marker to snap visually to the nearest community
+                    
+                    // 1. Force visual snap: Pin jumps to community instantly
                     marker.setLatLng([nearest.lat, nearest.lng]);
-                    // 2. Update the label text instantly to the community name
+                    
+                    // 2. Dynamic Label: Update text while dragging
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // ROUTE UPDATE ON DROP: Trigger the line as soon as the pin is released [cite: 2025-12-23]
+                // --- THE ROUTE TRIGGER ---
                 marker.on('dragend', () => {
                     updateRoute();
                 });
             });
-            setTimeout(updateRoute, 1000); // Initial path draw
+            setTimeout(updateRoute, 1000);
         }
 
         function updateRoute() {
-            // Pull the ALREADY SNAPPED coordinates from the markers to avoid ocean lines
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
+                // Pass land-locked coordinates to ensure no ocean drift
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
