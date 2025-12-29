@@ -2,22 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Scratch Build</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NL Navigator | Leaflet Core Build</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
-        body { margin: 0; font-family: sans-serif; }
-        #map { height: 100vh; width: 100%; background: #ccd; }
-        .stats-overlay { position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        #map { flex-grow: 1; width: 100%; background: #ccd; }
+        .stats-bar { background: #0070bb; color: white; padding: 10px; display: flex; gap: 20px; font-weight: bold; }
+        .badge { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <div class="stats-overlay">
-        Avalon: <span id="count-avalon">0</span> | 
-        Central: <span id="count-central">0</span> | 
-        Western: <span id="count-western">0</span>
+
+    <div id="app-container">
+        <header class="stats-bar">
+            <span>Avalon: <span id="count-avalon" class="badge">0</span></span>
+            <span>Central: <span id="count-central" class="badge">0</span></span>
+            <span>Western: <span id="count-western" class="badge">0</span></span>
+            <span style="margin-left: auto;">[DATA LOCK: 2025-12-26]</span>
+        </header>
+
+        <div id="map"></div>
     </div>
-    <div id="map"></div>
+
     <script src="weather-engine.js"></script>
 </body>
 </html>
