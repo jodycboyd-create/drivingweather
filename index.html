@@ -15,9 +15,7 @@
 </head>
 <body>
     <div id="map"></div>
-
     <script src="engine/route-engine.js"></script>
-
     <script>
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -25,10 +23,10 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake: Initializing the nested RouteEngine [cite: 2025-12-27]
+        // Handshake: Alert the nested engine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Loading the comprehensive Newfoundland dataset [cite: 2025-12-26]
+        // Load the comprehensive Newfoundland dataset [cite: 2025-12-26]
         fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -51,19 +49,17 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // DEC 27 GOLD STANDARD: Visual Snap & Label Sync [cite: 2025-12-27]
+                // GOLD STANDARD SNAP: Jumps pin and updates label during drag [cite: 2025-12-27]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
-                    // Force visual lock to community point immediately
+                    // visual snap
                     marker.setLatLng([nearest.lat, nearest.lng]);
-                    // Update label name in real-time while dragging
+                    // dynamic label
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // DEC 27 GOLD STANDARD: Immediate Route Update on Drop [cite: 2025-12-27]
-                marker.on('dragend', () => {
-                    updateRoute();
-                });
+                // GOLD STANDARD ROUTE: Fires only when the pin is dropped [cite: 2025-12-27]
+                marker.on('dragend', () => updateRoute());
             });
             setTimeout(updateRoute, 1000);
         }
@@ -72,7 +68,7 @@
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
-                // Pass snapped coordinates to route-engine.js
+                // Send land-locked coordinates to the engine
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
