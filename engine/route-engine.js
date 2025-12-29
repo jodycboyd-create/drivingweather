@@ -1,6 +1,6 @@
 /**
  * route-engine.js
- * ANCHOR: 2025-12-29
+ * PATH: /engine/route-engine.js
  */
 const RouteEngine = {
     control: null,
@@ -23,18 +23,14 @@ const RouteEngine = {
             fitSelectedRoutes: false
         }).addTo(mapInstance);
 
-        // [weong-route] Level 3 Exception Monitor [cite: 2025-12-23]
+        // [weong-route] Monitor for connectivity issues [cite: 2025-12-23]
         this.control.on('routingerror', (e) => {
-            console.warn("[weong-route] Exception: No Road Link Found", e.error.message);
+            console.warn("[weong-route] Exception: No Road Link", e.error.message);
         });
     },
 
     calculateRoute: function(start, end) {
-        if (!this.control) {
-            console.error("RouteEngine not initialized");
-            return;
-        }
-        // Set waypoints based on snapped community coordinates
+        if (!this.control) return;
         this.control.setWaypoints([
             L.latLng(start[0], start[1]),
             L.latLng(end[0], end[1])
@@ -42,7 +38,6 @@ const RouteEngine = {
     }
 };
 
-// Ensure initialization on map-ready event [cite: 2025-12-27]
 window.addEventListener('map-ready', (e) => {
     RouteEngine.init(e.detail.map);
 });
