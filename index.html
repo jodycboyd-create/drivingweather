@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Architectural Build</title>
+    <title>NL Navigator | Magnetic Architecture</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -12,36 +12,63 @@
 </head>
 <body>
     <div id="map"></div>
-
     <script>
-        // 1. Initialize Map centered on Newfoundland
         const map = L.map('map').setView([49.0, -56.0], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        /** * 2. ARCHITECTURAL PATHING
-         * Target: ../data/nl/communities.json
-         */
+        let communityPoints = []; // Memory for snapping logic
+
+        // 1. Fetch from correct Architectural Path
         fetch('../data/nl/communities.json')
             .then(res => res.json())
-            .then(geojsonData => {
-                // Accessing the FeatureCollection 'features' array
-                const communities = geojsonData.features;
+            .then(data => {
+                // Store coordinates for the Magnet logic
+                communityPoints = data.features.map(f => ({
+                    lat: f.geometry.coordinates[1],
+                    lng: f.geometry.coordinates[0],
+                    name: f.properties.name
+                }));
 
-                communities.forEach(feature => {
-                    const props = feature.properties;
-                    const coords = feature.geometry.coordinates;
-
-                    // Mapping GeoJSON [lng, lat] to Leaflet [lat, lng]
-                    if (coords && props) {
-                        L.marker([coords[1], coords[0]])
-                            .addTo(map)
-                            .bindPopup(`<b>${props.name}</b><br>Region: ${props.region}`);
-                    }
+                // Render background community pins
+                communityPoints.forEach(p => {
+                    L.circleMarker([p.lat, p.lng], { radius: 3, color: '#3388ff' }).addTo(map);
                 });
-            })
-            .catch(err => console.error("Architecture Connection Error:", err));
+
+                initDraggableHubs();
+            });
+
+        function initDraggableHubs() {
+            // Default Hub positions [cite: 2025-12-27]
+            const hubs = [
+                { name: "St. John's Hub", lat: 47.5615, lng: -52.7126 },
+                { name: "Corner Brook Hub", lat: 48.9515, lng: -57.9482 }
+            ];
+
+            hubs.forEach(h => {
+                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
+                marker.bindTooltip(h.name, { permanent: true, direction: 'top' });
+
+                // Magnetic Snap Logic: Restoring Snap to closest [cite: 2025-12-23]
+                marker.on('drag', function (e) {
+                    const nearest = getNearest(e.target.getLatLng());
+                    e.target.setLatLng([nearest.lat, nearest.lng]);
+                });
+            });
+        }
+
+        function getNearest(target) {
+            let closest = communityPoints[0];
+            let minDist = Infinity;
+
+            communityPoints.forEach(p => {
+                const d = Math.hypot(p.lat - target.lat, p.lng - target.lng);
+                if (d < minDist) {
+                    minDist = d;
+                    closest = p;
+                }
+            });
+            return closest;
+        }
     </script>
 </body>
 </html>
