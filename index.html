@@ -1,112 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Anchor Point 2025-12-27</title>
-    
+    <title>NL Navigator</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #app-container { display: flex; flex-direction: column; height: 100vh; }
-        
-        /* Primary Regions UI */
-        .header-bar { background: #f8f9fa; border-bottom: 1px solid #ddd; padding: 15px; }
-        .region-nav { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
-        .region-btn { 
-            padding: 8px 15px; border: 1px solid #666; border-radius: 4px; 
-            background: white; cursor: pointer; font-size: 14px;
-        }
-        
-        #map { flex-grow: 1; width: 100%; background: #aad3df; }
-        
-        .status-box { 
-            position: absolute; bottom: 20px; left: 20px; z-index: 1000;
-            background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100vw; background: #aad3df; }
     </style>
 </head>
 <body>
 
-<div id="app-container">
-    <header class="header-bar">
-        <h1 style="margin:0; font-size: 24px;">NL Navigator</h1>
-        <div style="font-size: 12px; color: #666;">
-            ANCHOR: 2025-12-27 | DATA LOCK: 2025-12-26
-        </div>
-        
-        <div class="region-nav">
-            <button class="region-btn">Avalon Peninsula <b id="c-avalon">0</b></button>
-            <button class="region-btn">Central Newfoundland <b id="c-central">0</b></button>
-            <button class="region-btn">Western Newfoundland <b id="c-western">0</b></button>
-            <button class="region-btn">Northern Peninsula <b id="c-northern">0</b></button>
-            <button class="region-btn">Labrador <b id="c-labrador">0</b></button>
-        </div>
-    </header>
-
     <div id="map"></div>
 
-    <div class="status-box">
-        <b>System Status:</b> <span id="status">Connecting...</span><br>
-        <small>Source: communities.json</small>
-    </div>
-</div>
+    <script>
+        // 1. Initialize Map on NL
+        const map = L.map('map').setView([49.0, -56.0], 6);
+        
+        // 2. Basemap with Place Names & Features
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
 
-<script>
-    // 1. Initialize Map centered on Newfoundland
-    const map = L.map('map').setView([49.0, -56.0], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // 2. Fetch locked-in communities.json
-    async function initNavigation() {
-        try {
-            const response = await fetch('data/nl/communities.json');
-            if (!response.ok) throw new Error("File Path Error");
-            const data = await response.json();
-            
-            document.getElementById('status').innerText = "✅ DATABASE LOCKED";
-            document.getElementById('status').style.color = "green";
-
-            const counts = { 
-                "Avalon": 0, "Central": 0, "Western": 0, 
-                "Northern Peninsula": 0, "Labrador": 0 
-            };
-
-            data.forEach(place => {
-                if (place.lat && place.lng) {
-                    // Place Pins
-                    L.marker([place.lat, place.lng])
-                        .addTo(map)
-                        .bindPopup(`<b>${place.name}</b><br>Region: ${place.region}`);
-                    
-                    // Increment Counts based on your dataset regions
-                    if (place.region.includes("Avalon")) counts.Avalon++;
-                    else if (place.region.includes("Central")) counts.Central++;
-                    else if (place.region.includes("Western")) counts.Western++;
-                    else if (place.region.includes("Northern")) counts["Northern Peninsula"]++;
-                    else if (place.region.includes("Labrador")) counts.Labrador++;
-                }
-            });
-
-            // 3. Update the UI buttons with real data
-            document.getElementById('c-avalon').innerText = counts.Avalon;
-            document.getElementById('c-central').innerText = counts.Central;
-            document.getElementById('c-western').innerText = counts.Western;
-            document.getElementById('c-northern').innerText = counts["Northern Peninsula"];
-            document.getElementById('c-labrador').innerText = counts.Labrador;
-
-        } catch (err) {
-            document.getElementById('status').innerText = "❌ Connection Failed";
-            document.getElementById('status').style.color = "red";
-        }
-    }
-
-    initNavigation();
-</script>
-
+        // 3. The Required Architecture: Fetching communities.json
+        // Note: Using '../' because index.html is in /engine/ folder
+        fetch('../data/nl/communities.json')
+            .then(res => res.json())
+            .then(data => {
+                data.forEach(c => {
+                    if(c.lat && c.lng) {
+                        L.marker([c.lat, c.lng])
+                            .addTo(map)
+                            .bindPopup(`<b>${c.name}</b><br>${c.region}`);
+                    }
+                });
+            })
+            .catch(err => console.error("Database Connection Error:", err));
+    </script>
 </body>
 </html>
