@@ -2,29 +2,132 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Baseline 2025-12-27</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>NL Navigator | Baseline Build 2025-12-27</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="style.css">
+    
+    <link rel="stylesheet" href="style.css?v=20251229_PATH_FIX">
 </head>
 <body>
     <div id="app-container">
+        <header id="main-header">
+            <div class="logo-wrap">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
+                <h1>NL Navigator</h1>
+                <div class="metadata">
+                    <span class="status-tag">ANCHOR: 2025-12-27</span>
+                    <span class="status-tag">DATA LOCK: 2025-12-26</span>
+                </div>
+            </div>
+            <div class="header-controls">
+                <span id="system-clock">2025-12-29</span>
+            </div>
+        </header>
+
         <div id="content-layout">
             <aside id="system-sidebar">
-                <div class="region-grid">
-                    <button class="region-btn" data-region="Avalon">Avalon <span id="count-avalon">0</span></button>
-                    <button class="region-btn" data-region="Central">Central <span id="count-central">0</span></button>
-                    <button class="region-btn" data-region="Western">Western <span id="count-western">0</span></button>
-                    <button class="region-btn" data-region="Northern">Northern <span id="count-northern">0</span></button>
-                    <button class="region-btn" data-region="Labrador">Labrador <span id="count-labrador">0</span></button>
-                </div>
+                <section class="nav-group">
+                    <h2 class="sidebar-label">Primary Regions</h2>
+                    <nav id="region-navigation">
+                        <button class="region-btn" data-region="Avalon">
+                            <span class="btn-text">Avalon Peninsula</span>
+                            <span class="count-badge" id="count-avalon">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Central">
+                            <span class="btn-text">Central Newfoundland</span>
+                            <span class="count-badge" id="count-central">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Western">
+                            <span class="btn-text">Western Newfoundland</span>
+                            <span class="count-badge" id="count-western">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Northern">
+                            <span class="btn-text">Northern Peninsula</span>
+                            <span class="count-badge" id="count-northern">0</span>
+                        </button>
+                        <button class="region-btn" data-region="Labrador">
+                            <span class="btn-text">Labrador</span>
+                            <span class="count-badge" id="count-labrador">0</span>
+                        </button>
+                    </nav>
+                </section>
+
+                <hr class="sidebar-divider">
+
+                <section class="monitor-group">
+                    <h2 class="sidebar-label">System Status</h2>
+                    <div class="status-card active" id="weong-route-status">
+                        <div class="card-head">
+                            <span class="label">[weong-route]</span>
+                            <span class="indicator-dot pulse"></span>
+                            <span class="indicator-text">ACTIVE</span>
+                        </div>
+                        <div class="card-body">
+                            <p>Level 3 Exception Trigger: <span class="highlight">Enabled</span></p>
+                        </div>
+                    </div>
+
+                    <div class="status-card locked" id="db-integrity-check">
+                        <div class="card-head">
+                            <span class="label">DATABASE</span>
+                            <span class="indicator-text">LOCKED</span>
+                        </div>
+                        <div class="card-body">
+                            <p>Source: data/nl/communities.json</p>
+                            <p>Integrity: Deep-Dive Verified</p>
+                        </div>
+                    </div>
+                </section>
             </aside>
+
             <main id="map-viewport">
-                <div id="map" style="height: 600px; width: 100%;"></div>
-                <div id="data-grid" class="community-grid"></div>
+                <div id="map-frame">
+                    <div id="map"></div>
+                    <div id="map-ui-layer">
+                        <button id="recenter-map" title="Recenter">⟲</button>
+                    </div>
+                </div>
+
+                <section id="info-panel">
+                    <div class="panel-header">
+                        <div class="breadcrumb">
+                            <span class="root">Root</span> / <span class="current">Newfoundland Deep-Dive</span>
+                        </div>
+                        <div class="panel-actions">
+                            <button id="export-csv-btn">Export Results</button>
+                        </div>
+                    </div>
+                    
+                    <div id="data-display-area">
+                        <div id="data-grid" class="community-grid">
+                            </div>
+                    </div>
+                </section>
             </main>
         </div>
+
+        <footer id="system-footer">
+            <div class="footer-bar">
+                <div class="security-seal">
+                    <span class="icon">🔒</span>
+                    <span class="seal-text">Newfoundland Comprehensive Data Permanently Stored</span>
+                </div>
+                <div class="build-info">
+                    Session Anchor: 2025-12-28
+                </div>
+            </div>
+        </footer>
     </div>
+
     <script src="weather-engine.js"></script>
+    <script src="velocity-widget.js"></script>
+    <script src="engine/route-engine.js"></script>
+    <script src="engine/weather-bulletin.js"></script>
 </body>
 </html>
