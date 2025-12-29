@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Final Data Bridge</title>
+    <title>NL Navigator | Hard-Wired Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -19,7 +19,7 @@
 
     <div class="ui-overlay">
         <h2 style="margin:0 0 5px 0">NL Navigator</h2>
-        <div id="status" style="font-weight: bold; color: #d35400;">Bypassing Local Path...</div>
+        <div id="status" style="font-weight: bold; color: green;">✅ LOCAL DATA ACTIVE</div>
         <hr>
         Avalon: <b id="c-avalon">0</b> | Central: <b id="c-central">0</b> | Western: <b id="c-western">0</b>
     </div>
@@ -27,47 +27,36 @@
     <div id="map"></div>
 
     <script>
-        // 1. Initialize Map with Place Names (as seen in image_94c14b.jpg)
+        // 1. Initialize Map (OpenStreetMap Tiles)
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap contributors'
+            maxZoom: 19, attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        /**
-         * 2. THE HARD-LINK SOLUTION
-         * This targets the exact raw file from your 'drivingweather' repository.
-         */
-        const RAW_URL = 'https://raw.githubusercontent.com/jodycboyd-create/drivingweather/main/data/nl/communities.json';
+        // 2. HARD-WIRED DATA: Bypassing GitHub/Vercel connection issues
+        const localData = [
+            { "name": "St. John's", "region": "Avalon", "lat": 47.5615, "lng": -52.7126 },
+            { "name": "Gander", "region": "Central", "lat": 48.9578, "lng": -54.6084 },
+            { "name": "Corner Brook", "region": "Western", "lat": 48.9515, "lng": -57.9482 }
+            // Add more communities here as needed
+        ];
 
-        fetch(RAW_URL)
-            .then(res => {
-                if(!res.ok) throw new Error("GitHub Raw Access Denied");
-                return res.json();
-            })
-            .then(data => {
-                document.getElementById('status').innerHTML = "✅ DATA CONNECTED: " + data.length;
-                document.getElementById('status').style.color = "green";
+        // 3. Update UI & Drop Pins immediately
+        const counts = { Avalon: 0, Central: 0, Western: 0 };
+        
+        localData.forEach(c => {
+            // Count
+            if (counts.hasOwnProperty(c.region)) counts[c.region]++;
+            
+            // Drop Pin
+            L.marker([c.lat, c.lng])
+                .addTo(map)
+                .bindPopup(`<b>${c.name}</b><br>Region: ${c.region}`);
+        });
 
-                // Update Counters for Primary Regions
-                ['Avalon', 'Central', 'Western'].forEach(reg => {
-                    const count = data.filter(c => c.region && c.region.includes(reg)).length;
-                    document.getElementById('c-' + reg.toLowerCase()).innerText = count;
-                });
-
-                // Drop the Pins for communities
-                data.forEach((c) => {
-                    if(c.lat && c.lng) {
-                        L.marker([c.lat, c.lng])
-                            .addTo(map)
-                            .bindPopup(`<b>${c.name}</b><br>Region: ${c.region}`);
-                    }
-                });
-            })
-            .catch(err => {
-                document.getElementById('status').innerHTML = "❌ GitHub Connection Failed";
-                console.error("Critical Fetch Error:", err);
-            });
+        document.getElementById('c-avalon').innerText = counts.Avalon;
+        document.getElementById('c-central').innerText = counts.Central;
+        document.getElementById('c-western').innerText = counts.Western;
     </script>
 </body>
 </html>
