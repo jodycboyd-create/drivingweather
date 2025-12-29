@@ -16,7 +16,7 @@ const RouteEngine = {
 
         console.log("[route-engine] Initializing Leaflet Routing Engine...");
 
-        // Ensure we are using the Leaflet global 'L'
+        // Setup the OSRM Router
         this.control = L.Routing.control({
             waypoints: [],
             router: L.Routing.osrmv1({
@@ -25,19 +25,19 @@ const RouteEngine = {
             lineOptions: {
                 styles: [{ color: '#0070bb', weight: 5, opacity: 0.7 }]
             },
-            show: false, // Prevents the text itinerary from breaking the sidebar layout
+            show: false, // Prevents text itinerary from cluttering UI
             addWaypoints: false,
             routeWhileDragging: false,
-            fitSelectedRoutes: true
+            fitSelectedRoutes: false // Keeps zoom steady while dragging
         }).addTo(mapInstance);
 
         // LEVEL 3 EXCEPTION TRIGGER: [weong-route]
         this.control.on('routingerror', function(e) {
-            console.warn("[weong-route] Level 3 Exception Triggered:", e.error.message);
+            console.warn("[weong-route] Level 3 Exception Triggered: No Road Link Found", e.error.message);
         });
     },
 
-    // Function to calculate route between two points
+    // Function to calculate route between snapped community coordinates
     calculateRoute: function(startCoords, endCoords) {
         if (!this.control) return;
 
@@ -54,7 +54,7 @@ const RouteEngine = {
     }
 };
 
-// Auto-init listener
+// Auto-init listener triggered by index.html
 window.addEventListener('map-ready', (e) => {
     RouteEngine.init(e.detail.map);
 });
