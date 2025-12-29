@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Path Correction</title>
+    <title>NL Navigator | Snapping & Routing Restored</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -15,9 +15,7 @@
 </head>
 <body>
     <div id="map"></div>
-
     <script src="engine/route-engine.js"></script>
-
     <script>
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -25,14 +23,13 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // Handshake for RouteEngine [cite: 2025-12-27]
+        // Handshake: Initialize the routing engine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // Data is one level up and over in /data/nl/
+        // Load Newfoundland Community Database
         fetch('../data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
-                // Mapping GeoJSON [lng, lat] to Leaflet [lat, lng]
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
@@ -52,14 +49,15 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                marker.on('dragend', function () {
-                    const nearest = getNearest(marker.getLatLng());
-                    marker.setLatLng([nearest.lat, nearest.lng]);
-                    marker.setTooltipContent(nearest.name);
+                // RESTORED: Snap-to-Point logic during drag [cite: 2025-12-23, 2025-12-26]
+                marker.on('drag', function (e) {
+                    const nearest = getNearest(e.target.getLatLng());
+                    e.target.setLatLng([nearest.lat, nearest.lng]);
+                    e.target.setTooltipContent(nearest.name);
                     updateRoute();
                 });
             });
-            setTimeout(updateRoute, 1000);
+            setTimeout(updateRoute, 500);
         }
 
         function updateRoute() {
@@ -70,6 +68,7 @@
             }
         }
 
+        // The Magnetic "Gravity" Function [cite: 2025-12-26]
         function getNearest(target) {
             let closest = communityPoints[0];
             let minDist = Infinity;
