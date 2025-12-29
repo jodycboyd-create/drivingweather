@@ -2,12 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Route Engine</title>
+    <title>NL Navigator | Route Engine Bridge</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <style>
         body { margin: 0; padding: 0; }
@@ -26,10 +26,10 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // 1. Notify route-engine.js that map is ready
+        // 1. SIGNAL: Initialize the external route-engine.js
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // 2. Fetch Data via Architectural Path
+        // 2. DATA: Fetch from architectural path
         fetch('../data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
@@ -43,8 +43,8 @@
 
         function initDynamicHubs() {
             const hubs = [
-                { id: 'stj', name: "St. John's Hub", lat: 47.5615, lng: -52.7126 },
-                { id: 'cb', name: "Corner Brook Hub", lat: 48.9515, lng: -57.9482 }
+                { name: "St. John's Hub", lat: 47.5615, lng: -52.7126 },
+                { name: "Corner Brook Hub", lat: 48.9515, lng: -57.9482 }
             ];
 
             hubs.forEach(h => {
@@ -54,21 +54,25 @@
 
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
+                    
+                    // Snap physical position to GeoJSON coordinate [cite: 2025-12-26]
                     e.target.setLatLng([nearest.lat, nearest.lng]);
                     e.target.setTooltipContent(nearest.name);
                     
-                    // 3. Trigger Route Calculation [cite: 2025-12-23]
+                    // 3. TRIGGER: Call the routine in route-engine.js
                     updateRoute();
                 });
             });
-            updateRoute();
+            updateRoute(); // Initial path draw
         }
 
         function updateRoute() {
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
-                const p1 = hubMarkers[0].getLatLng();
-                const p2 = hubMarkers[1].getLatLng();
-                RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
+                const start = hubMarkers[0].getLatLng();
+                const end = hubMarkers[1].getLatLng();
+                
+                // ROUTINE CALL: Bridge to your external module
+                RouteEngine.calculateRoute([start.lat, start.lng], [end.lat, end.lng]);
             }
         }
 
