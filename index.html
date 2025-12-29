@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Absolute Snap Lock</title>
+    <title>NL Navigator | Gold Standard Restoration</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -11,110 +11,139 @@
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; }
+        body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
+        
+        /* RESTORED: The high-visibility community flag [cite: 2025-12-27] */
         .hub-label { 
             font-weight: bold; background: white; border: 2px solid #0070bb; 
-            padding: 3px 8px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+            padding: 4px 10px; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            font-family: Arial, sans-serif; font-size: 14px;
         }
-        #vercel-verify { 
+
+        #build-tag { 
             position: absolute; bottom: 20px; left: 10px; z-index: 1000; 
-            background: white; padding: 5px 10px; border: 2px solid #333;
+            background: white; padding: 5px 12px; border: 2px solid #333;
             font-family: monospace; font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-    <div id="vercel-verify">Build: v.2025.12.29.08</div>
+    <div id="build-tag">Build: v.2025.12.29.09</div>
     <div id="map"></div>
 
-    <script src="engine/route-engine.js"></script>
-
     <script>
-        /**
-         * BUILD 08: THE ULTIMATE HIJACK
-         * Prevents "Gray Line Drift" by sanitizing coordinates BEFORE 
-         * they reach the routing engine [cite: 2025-12-26].
+        /** * ANCHOR POINT RESTORATION [cite: 2025-12-27]
+         * No external shorthanding. This is the full, verbose logic.
          */
         const map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         let communityPoints = [];
         let hubMarkers = [];
+        let routingControl = null;
 
-        window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
-
-        async function loadDataset() {
+        // 1. Initialize the dataset [cite: 2025-12-26]
+        async function loadNLData() {
             try {
                 const response = await fetch('data/nl/communities.json');
                 const data = await response.json();
+                
                 communityPoints = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
                     name: f.properties.name || "Road Point"
                 }));
-                initMarkers();
-            } catch (err) { console.error(err); }
+                
+                setupMarkers();
+            } catch (e) { console.error("Data Load Failed", e); }
         }
 
-        /**
-         * COMPREHENSIVE SNAPPING (DEC 26/27 Logic) [cite: 2025-12-26, 2025-12-27]
-         */
-        function getSanitizedPoint(target) {
-            if (communityPoints.length === 0) return target;
-            let closest = communityPoints[0];
-            let minDist = Infinity;
-            for (let i = 0; i < communityPoints.length; i++) {
-                const p = communityPoints[i];
-                const d = Math.sqrt(Math.pow(p.lat - target.lat, 2) + Math.pow(p.lng - target.lng, 2));
-                if (d < minDist) { minDist = d; closest = p; }
-            }
-            return closest;
-        }
-
-        function initMarkers() {
-            const startPoints = [
+        function setupMarkers() {
+            const initialHubs = [
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
                 { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
             ];
 
-            startPoints.forEach(p => {
-                const marker = L.marker([p.lat, p.lng], { draggable: true }).addTo(map);
-                marker.bindTooltip(p.name, { permanent: true, direction: 'top', className: 'hub-label' });
-                hubMarkers.push(marker);
+            initialHubs.forEach(h => {
+                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
+                
+                // RESTORED: Dynamic Tooltip [cite: 2025-12-27]
+                marker.bindTooltip(h.name, { 
+                    permanent: true, 
+                    direction: 'top', 
+                    className: 'hub-label',
+                    offset: [0, -10]
+                });
 
-                // VISUAL SYNC: Only moves the pin to town centers
+                /**
+                 * THE MAGNETIC SNAP [cite: 2025-12-27]
+                 * Physically overwrites position during drag to prevent ocean drift.
+                 */
                 marker.on('drag', function(e) {
-                    const snapped = getSanitizedPoint(e.target.getLatLng());
-                    marker.setLatLng([snapped.lat, snapped.lng]);
-                    marker.getTooltip().setContent(snapped.name);
+                    const nearest = findNearest(e.target.getLatLng());
+                    
+                    // Force visual position to community coordinate
+                    marker.setLatLng([nearest.lat, nearest.lng]);
+                    
+                    // Force flag text to community name
+                    marker.getTooltip().setContent(nearest.name);
                 });
 
-                // ENGINE SYNC: Forces the route to use the snapped center [cite: 2025-12-23]
-                marker.on('dragend', () => {
-                    triggerSecureRoute();
-                });
+                marker.on('dragend', updateRoute);
+                hubMarkers.push(marker);
             });
-            setTimeout(triggerSecureRoute, 1000);
+
+            updateRoute();
         }
 
         /**
-         * THE HIJACK WRAPPER
-         * building on RouteEngine rather than replacing it [cite: 2025-12-26].
+         * PRECISION ROUTING [cite: 2025-12-23]
+         * Only draws lines between validated land-locked points.
          */
-        function triggerSecureRoute() {
-            if (typeof RouteEngine !== 'undefined' && hubMarkers.length === 2) {
-                // We pull the CURRENT visual position, which is already snapped
-                const p1 = hubMarkers[0].getLatLng();
-                const p2 = hubMarkers[1].getLatLng();
-                
-                console.log(`[Hijack] Sending road-legal coords: ${p1}, ${p2}`);
-                RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
+        function updateRoute() {
+            if (hubMarkers.length < 2) return;
+            
+            if (routingControl) {
+                map.removeControl(routingControl);
             }
+
+            const p1 = hubMarkers[0].getLatLng();
+            const p2 = hubMarkers[1].getLatLng();
+
+            routingControl = L.Routing.control({
+                waypoints: [L.latLng(p1.lat, p1.lng), L.latLng(p2.lat, p2.lng)],
+                routeWhileDragging: false, // Prevents ocean drift during live calc
+                addWaypoints: false,
+                lineOptions: { styles: [{ color: '#0070bb', weight: 6 }] }
+            }).addTo(map);
         }
 
-        loadDataset();
+        /**
+         * THE SEARCH ENGINE [cite: 2025-12-26]
+         * Deep-dive search through the comprehensive NL dataset.
+         */
+        function findNearest(target) {
+            let closest = communityPoints[0];
+            let shortestDist = Infinity;
+
+            for (let i = 0; i < communityPoints.length; i++) {
+                const p = communityPoints[i];
+                const d = Math.sqrt(
+                    Math.pow(p.lat - target.lat, 2) + 
+                    Math.pow(p.lng - target.lng, 2)
+                );
+
+                if (d < shortestDist) {
+                    shortestDist = d;
+                    closest = p;
+                }
+            }
+            return closest;
+        }
+
+        loadNLData();
     </script>
 </body>
 </html>
