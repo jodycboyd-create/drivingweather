@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Snapping & Routing Fixed</title>
+    <title>NL Navigator | Path Correction</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -15,7 +15,9 @@
 </head>
 <body>
     <div id="map"></div>
-    <script src="route-engine.js"></script>
+
+    <script src="engine/route-engine.js"></script>
+
     <script>
         const map = L.map('map').setView([49.0, -56.0], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -23,11 +25,11 @@
         let communityPoints = [];
         let hubMarkers = [];
 
-        // 1. Handshake: Notify route-engine.js immediately [cite: 2025-12-27]
+        // Handshake: Initializing the nested RouteEngine [cite: 2025-12-27]
         window.dispatchEvent(new CustomEvent('map-ready', { detail: { map: map } }));
 
-        // 2. Load Community Data
-        fetch('../data/nl/communities.json')
+        // Path Update: Reach into data/nl/
+        fetch('data/nl/communities.json')
             .then(res => res.json())
             .then(data => {
                 communityPoints = data.features.map(f => ({
@@ -49,19 +51,14 @@
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label' });
                 hubMarkers.push(marker);
 
-                // MAGNETIC SNAP: Updates pin position in real-time [cite: 2025-12-26]
                 marker.on('drag', function (e) {
                     const nearest = getNearest(e.target.getLatLng());
                     marker.setLatLng([nearest.lat, nearest.lng]);
                     marker.getTooltip().setContent(nearest.name);
                 });
 
-                // ROUTE TRIGGER: Update the line when the pin settles [cite: 2025-12-23]
-                marker.on('dragend', function() {
-                    updateRoute();
-                });
+                marker.on('dragend', () => updateRoute());
             });
-            // Initial path draw
             setTimeout(updateRoute, 1000);
         }
 
@@ -69,7 +66,6 @@
             if (hubMarkers.length === 2 && typeof RouteEngine !== 'undefined') {
                 const p1 = hubMarkers[0].getLatLng();
                 const p2 = hubMarkers[1].getLatLng();
-                // Pass snapped coordinates to the sibling engine [cite: 2025-12-23]
                 RouteEngine.calculateRoute([p1.lat, p1.lng], [p2.lat, p2.lng]);
             }
         }
