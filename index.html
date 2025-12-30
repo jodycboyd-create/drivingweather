@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Verified Shell</title>
+    <title>NL Navigator | Timestamp Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
         .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: sans-serif; }
-        #build-tag { position: absolute; bottom: 20px; left: 10px; z-index: 1000; background: white; padding: 5px; border: 1px solid #333; font-family: monospace; font-size: 10px; }
+        #build-tag { position: absolute; bottom: 20px; left: 10px; z-index: 1000; background: white; padding: 5px 10px; border: 2px solid #333; font-family: monospace; font-weight: bold; font-size: 12px; }
     </style>
 </head>
 <body>
-    <div id="build-tag">Build: 1735520820</div>
+    <div id="build-tag">Build: 1735524395</div>
     <div id="map"></div>
 
     <script>
-        // SHELL ONLY: Map and Markers
+        // GLOBAL STATE FOR ENGINE
         window.map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         window.hubMarkers = [];
@@ -33,13 +33,15 @@
                 const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
                 marker.bindTooltip(h.name, { permanent: true, className: 'hub-label' });
                 
-                // The shell only signals the engine; it doesn't know how to route.
+                // SHELL ACTION: Only tell the engine to work
                 marker.on('drag dragend', () => {
                     if (window.RouteEngine) window.RouteEngine.calculate();
                 });
                 window.hubMarkers.push(marker);
             });
-            window.dispatchEvent(new Event('shell-ready'));
+            
+            // Handshake Signal
+            window.dispatchEvent(new Event('shell-live'));
         }
         initApp();
     </script>
