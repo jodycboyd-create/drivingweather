@@ -1,25 +1,33 @@
-/** [weong-route] Core Routing Engine - Capsule HUD Build **/
-/** Locked: Dec 30, 2025 - Restored Ribbon & Minimalist Capsule **/
+/** [weong-route] Core Routing Engine - Integrated Capsule HUD **/
+/** Locked: Dec 30, 2025 - Restoration Build with Speed Offsets **/
 
 let currentRouteLayer = null;
 let metricFlagMarker = null;
 let routeTimeout = null;
 
+/**
+ * Capsule HUD Logic: Now incorporates global speed offsets
+ */
 function renderStandaloneFlag(route) {
     if (metricFlagMarker) window.map.removeLayer(metricFlagMarker);
 
     const distKm = route.distance / 1000;
     const midPoint = route.geometry.coordinates[Math.floor(route.geometry.coordinates.length / 2)];
     
-    // Speed Tiers: 100 (TCH), 80 (Branch), 50 (Local) [cite: 2025-12-30]
-    let avgSpeed = 80;
-    if (distKm > 45) avgSpeed = 100;
-    if (distKm < 6) avgSpeed = 50;
+    // 1. Determine Base Speed Tier [cite: 2025-12-30]
+    let baseSpeed = 80;
+    if (distKm > 45) baseSpeed = 100;
+    if (distKm < 6) baseSpeed = 50;
     
-    const totalMinutes = (distKm / avgSpeed) * 60;
+    // 2. Apply Widget Offset [cite: 2025-12-30]
+    const offset = window.currentSpeedOffset || 0;
+    const actualSpeed = baseSpeed + offset;
+    
+    // 3. Calculate Travel Time
+    const totalMinutes = (distKm / actualSpeed) * 60;
     const timeStr = `${Math.floor(totalMinutes / 60)}h ${Math.round(totalMinutes % 60)}m`;
 
-    // Capsule Style: Single line, uniform font, tactical separator [cite: 2025-12-30]
+    // Sleek Capsule HTML [cite: 2025-12-30]
     const flagHtml = `
         <div style="background: rgba(10,10,10,0.95); border: 1px solid rgba(255, 215, 0, 0.4); color: #fff; padding: 4px 14px; border-radius: 20px; font-family: 'Courier New', monospace; box-shadow: 0 4px 15px rgba(0,0,0,0.6); pointer-events: none; white-space: nowrap; display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 14px; font-weight: bold; letter-spacing: 0.5px;">${distKm.toFixed(1)}km</span>
@@ -42,7 +50,7 @@ function drawTacticalRoute(routeData) {
     if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
     currentRouteLayer = L.layerGroup().addTo(window.map);
 
-    // RESTORED: Tactical Ribbon [cite: 2025-12-27]
+    // RESTORED: Tactical Ribbon Style [cite: 2025-12-27]
     L.geoJSON(routeData.geometry, { style: { color: '#000', weight: 6, opacity: 0.3 } }).addTo(currentRouteLayer);
     L.geoJSON(routeData.geometry, { style: { color: '#2d2d2d', weight: 3, opacity: 1 } }).addTo(currentRouteLayer);
     L.geoJSON(routeData.geometry, { style: { color: '#FFD700', weight: 1, opacity: 1, dashArray: '6, 12' } }).addTo(currentRouteLayer);
