@@ -1,6 +1,7 @@
 /**
- * ROUTE-ENGINE.JS | ROBUST PRO BUILD
- * Fixed: Disappearing routes and handshake collisions.
+ * ROUTE-ENGINE.JS | SEGMENT-AWARE BUILD
+ * Updates: Lighter Grey Ribbon, Text-only Metrics, Segmented Speed Logic.
+ * [cite: 2025-12-30]
  */
 window.RouteEngine = {
     _layers: L.layerGroup(),
@@ -10,7 +11,6 @@ window.RouteEngine = {
     calculate: function() {
         if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) return;
 
-        // Abort any "in-flight" request to prevent ghost data
         if (this._abortController) this._abortController.abort();
         this._abortController = new AbortController();
 
@@ -22,7 +22,6 @@ window.RouteEngine = {
             .then(data => {
                 if (!data.routes || data.routes.length === 0) return;
 
-                // 1. ONLY CLEAR AFTER DATA ARRIVES (Prevents disappearing)
                 this._layers.clearLayers();
                 if (this._flag) window.map.removeLayer(this._flag);
 
@@ -30,28 +29,53 @@ window.RouteEngine = {
                 const coordinates = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 const distanceKm = route.distance / 1000;
 
-                // Weighted Speed: 90km/h (NL Standard)
-                const weightedSpeed = 90; 
-                const travelTimeHrs = distanceKm / weightedSpeed;
+                /**
+                 * 1. SEGMENTED SPEED CALCULATION
+                 * Logic: TCH (100) = 75%, Branch (80) = 20%, Local (50) = 5%
+                 * This follows the typical NL route profile from Hub to Destination.
+                 */
+                const tchDist = distanceKm * 0.75;
+                const branchDist = distanceKm * 0.20;
+                const localDist = distanceKm * 0.05;
+                
+                const travelTimeHrs = (tchDist / 100) + (branchDist / 80) + (localDist / 50);
                 const hours = Math.floor(travelTimeHrs);
                 const mins = Math.round((travelTimeHrs - hours) * 60);
 
-                // DRAW
-                L.polyline(coordinates, { color: '#222', weight: 10, opacity: 0.9 }).addTo(this._layers);
-                L.polyline(coordinates, { color: '#FFD700', weight: 2, dashArray: '10, 20' }).addTo(this._layers);
+                /**
+                 * 2. LIGHTER ROAD RIBBON
+                 * Changed from #222 to #666666 for better visibility.
+                 */
+                L.polyline(coordinates, { 
+                    color: '#666666', 
+                    weight: 9, 
+                    opacity: 0.85,
+                    lineCap: 'round' 
+                }).addTo(this._layers);
+
+                L.polyline(coordinates, { 
+                    color: '#FFD700', 
+                    weight: 2, 
+                    dashArray: '10, 20', 
+                    opacity: 1 
+                }).addTo(this._layers);
+
                 this._layers.addTo(window.map);
 
+                /**
+                 * 3. METRICS FLAG (No Icon)
+                 * Removed 🏁 icon as per instructions.
+                 */
                 const midIndex = Math.floor(coordinates.length / 2);
                 this._flag = L.marker(coordinates[midIndex], {
                     icon: L.divIcon({
                         className: 'route-flag-container',
-                        html: `<div class="route-bubble">🏁 ${distanceKm.toFixed(1)} km | ${hours}h ${mins}m</div>`,
+                        html: `<div class="route-bubble">${distanceKm.toFixed(1)} km | ${hours}h ${mins}m</div>`,
                         iconSize: [160, 30],
                         iconAnchor: [80, 15]
                     })
                 }).addTo(window.map);
                 
-                // Keep the route in view
                 window.map.fitBounds(L.polyline(coordinates).getBounds(), { padding: [40, 40] });
             })
             .catch(err => {
