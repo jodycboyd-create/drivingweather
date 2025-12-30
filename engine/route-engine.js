@@ -1,4 +1,4 @@
-/** [weong-route] Core Routing Engine - Speed Tier Build **/
+/** [weong-route] Core Routing Engine - Sleek HUD Build **/
 /** Locked: Dec 30, 2025 Baseline [cite: 2025-12-30] **/
 
 let currentRouteLayer = null;
@@ -6,8 +6,7 @@ let metricFlagMarker = null;
 let routeTimeout = null;
 
 /**
- * Tactical Speed Logic: NL Tiered System
- * Rules: TCH (100), Branch (80), Local (50) [cite: 2025-12-30]
+ * Tactical Speed Logic: NL Tiered System [cite: 2025-12-30]
  */
 function calculateStandaloneMetrics(route) {
     const distKm = route.distance / 1000;
@@ -15,50 +14,39 @@ function calculateStandaloneMetrics(route) {
     const lat = midPoint[1];
     const lng = midPoint[0];
 
-    // Determine Base Speed Tier
-    let avgSpeed = 80; // Default: Branch Roads (Irish Loop, Bonavista, etc.)
-    
-    // TCH Tier: High distance + main corridor lat/lng range
+    let avgSpeed = 80; 
     const isMainCorridor = (lat > 47.0 && lat < 49.5) && (lng > -59.5 && lng < -52.5);
-    if (distKm > 45 && isMainCorridor) {
-        avgSpeed = 100; // TCH Logic
-    }
     
-    // Local Tier: Short hops within municipalities
-    if (distKm < 6) {
-        avgSpeed = 50; // Local/Town Logic
-    }
+    if (distKm > 45 && isMainCorridor) avgSpeed = 100; // TCH [cite: 2025-12-30]
+    if (distKm < 6) avgSpeed = 50; // Local [cite: 2025-12-30]
     
     const totalMinutes = (distKm / avgSpeed) * 60;
     
     return {
-        h: Math.floor(totalMinutes / 60),
-        m: Math.round(totalMinutes % 60),
-        dist: distKm.toFixed(1),
-        speed: avgSpeed,
+        timeStr: `${Math.floor(totalMinutes / 60)}h ${Math.round(totalMinutes % 60)}m`,
+        distStr: `${distKm.toFixed(1)}km`,
         mid: { lat, lng }
     };
 }
 
+/**
+ * Sleek HUD Flag: No labels, minimal footprint [cite: 2025-12-30]
+ */
 function renderStandaloneFlag(metrics) {
     if (metricFlagMarker) window.map.removeLayer(metricFlagMarker);
 
     const flagHtml = `
-        <div style="background: rgba(10,10,10,0.95); border: 1px solid #FFD700; color: #fff; padding: 10px; border-radius: 4px; font-family: monospace; width: 150px; box-shadow: 0 6px 20px #000; pointer-events: none; border-left: 4px solid #FFD700;">
-            <div style="font-size: 9px; color: #FFD700; border-bottom: 1px solid #333; margin-bottom: 6px; font-weight: bold; letter-spacing: 1px;">SECTOR DATA</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px;">
-                <span style="color: #888;">DIST:</span><span style="text-align: right; color: #fff;">${metrics.dist}km</span>
-                <span style="color: #888;">EST.TIME:</span><span style="text-align: right; color: #fff;">${metrics.h}h ${metrics.m}m</span>
-                <span style="color: #888;">TIER:</span><span style="color: #00FF00; text-align: right; font-weight: bold;">${metrics.speed} km/h</span>
-            </div>
+        <div style="background: rgba(10,10,10,0.9); border-left: 3px solid #FFD700; color: #fff; padding: 6px 12px; border-radius: 2px; font-family: 'Courier New', monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.5); pointer-events: none; white-space: nowrap;">
+            <div style="font-size: 16px; font-weight: bold; letter-spacing: -0.5px;">${metrics.distStr}</div>
+            <div style="font-size: 13px; color: #00FF00; margin-top: -2px;">${metrics.timeStr}</div>
         </div>`;
 
     metricFlagMarker = L.marker([metrics.mid.lat, metrics.mid.lng], {
         icon: L.divIcon({ 
             html: flagHtml, 
-            className: 'tactical-flag', 
-            iconSize: [160, 75], 
-            iconAnchor: [80, 85] 
+            className: 'sleek-hud', 
+            iconSize: [100, 45], 
+            iconAnchor: [50, 50] 
         }),
         interactive: false
     }).addTo(window.map);
@@ -68,7 +56,6 @@ function drawTacticalRoute(routeData) {
     if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
     currentRouteLayer = L.layerGroup().addTo(window.map);
 
-    // Locked Ribbon Design [cite: 2025-12-27]
     L.geoJSON(routeData.geometry, { style: { color: '#000', weight: 6, opacity: 0.3 } }).addTo(currentRouteLayer);
     L.geoJSON(routeData.geometry, { style: { color: '#2d2d2d', weight: 3, opacity: 1 } }).addTo(currentRouteLayer);
     L.geoJSON(routeData.geometry, { 
@@ -90,13 +77,11 @@ export async function calculateRoute() {
             const data = await response.json();
             if (data.routes && data.routes[0]) {
                 const route = data.routes[0];
-                
                 drawTacticalRoute(route);
                 
                 const metrics = calculateStandaloneMetrics(route);
                 renderStandaloneFlag(metrics);
                 
-                // Keep system event alive
                 window.dispatchEvent(new CustomEvent('weong:routeUpdated', { 
                     detail: {
                         totalDistance: route.distance,
@@ -105,7 +90,7 @@ export async function calculateRoute() {
                 }));
             }
         } catch (e) {
-            console.warn("Route Logic: Link busy.");
+            console.warn("Route Logic: Link busy."); [cite: 2025-12-30]
         }
     }, 40);
 }
