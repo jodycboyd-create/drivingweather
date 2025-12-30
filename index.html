@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Full Handshake Build</title>
+    <title>NL Navigator | Final Handshake Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         .leaflet-routing-container, .hidden-panel { display: none !important; }
         .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: sans-serif; }
+        /* High Contrast Route Bubble */
         .route-bubble { background: rgba(17, 17, 17, 0.9); color: #FFD700; padding: 6px 14px; border: 1.5px solid rgba(255, 215, 0, 0.6); border-radius: 20px; font-weight: 700; font-family: sans-serif; font-size: 13px; }
     </style>
 </head>
@@ -16,31 +17,18 @@
     <div id="map"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="engine/route-engine.js"></script>
+    <script src="/engine/route-engine.js"></script>
 
     <script>
-        console.log("System: Initializing Leaflet Map...");
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         
         window.hubMarkers = [];
         window.communityData = [];
 
-        function snap(latlng) {
-            if (window.communityData.length === 0) return latlng;
-            let closest = window.communityData[0];
-            let minDist = Infinity;
-            window.communityData.forEach(p => {
-                const d = window.map.distance(latlng, [p.lat, p.lng]);
-                if (d < minDist) { minDist = d; closest = p; }
-            });
-            return closest;
-        }
-
         async function loadNL() {
             try {
-                console.log("System: Fetching community dataset...");
-                const res = await fetch('data/nl/communities.json');
+                const res = await fetch('/data/nl/communities.json');
                 const data = await res.json();
                 window.communityData = data.features.map(f => ({
                     lat: f.geometry.coordinates[1], 
@@ -48,63 +36,43 @@
                     name: f.properties.name || "Unnamed Point"
                 }));
                 init();
-            } catch (e) { console.error("Data Load Failed:", e); init(); }
+            } catch (e) { init(); }
         }
 
         function init() {
-            const starts = [
-                {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
-                {name:"St. John's", lat:47.5615, lng:-52.7126}
-            ];
-
+            const starts = [{name:"Corner Brook", lat:48.9515, lng:-57.9482}, {name:"St. John's", lat:47.5615, lng:-52.7126}];
             starts.forEach(s => {
                 const m = L.marker([s.lat, s.lng], { draggable: true }).addTo(window.map);
                 m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                 
-                m.on('drag', (e) => {
-                    const p = snap(e.target.getLatLng());
-                    e.target.setLatLng([p.lat, p.lng]);
-                    e.target.setTooltipContent(p.name);
-                });
-
                 m.on('dragend', () => {
-                    console.log("Marker: Drag End. Triggering engines...");
                     if (window.RouteEngine) window.RouteEngine.calculate();
                     window.dispatchEvent(new CustomEvent('engine-update'));
                 });
-
                 window.hubMarkers.push(m);
             });
-            
-            setTimeout(() => { 
-                console.log("System: Running first-load route calculation...");
-                if (window.RouteEngine) window.RouteEngine.calculate(); 
-            }, 500);
+            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); }, 500);
         }
-        
         loadNL();
     </script>
     
     <script type="module">
-        console.log("Modules: Attempting imports...");
-        
+        console.log("Handshake: Starting absolute path resolution...");
         try {
-            const { BulletinLogic } = await import('./weather-bulletin.js');
-            const { WeatherEngine } = await import('./engine/weather-engine.js');
-            const { VelocityWidget } = await import('./velocity-widget.js');
-
-            console.log("Modules: Successfully imported Bulletin, Weather, and Velocity.");
+            // Absolute paths bypass Vercel 404 routing errors
+            const { BulletinLogic } = await import('/weather-bulletin.js');
+            const { WeatherEngine } = await import('/engine/weather-engine.js');
+            const { VelocityWidget } = await import('/velocity-widget.js');
 
             window.addEventListener('engine-update', () => {
                 WeatherEngine.update(BulletinLogic);
                 VelocityWidget.refresh();
             });
 
-            // Trigger weather on load
             window.addEventListener('load', () => WeatherEngine.update(BulletinLogic));
-
+            console.log("Handshake: SUCCESS");
         } catch (err) {
-            console.error("Modules: One or more files failed to load. Check file paths!", err);
+            console.error("Handshake: FAILED. Check Vercel root directory.", err);
         }
     </script>
 </body>
