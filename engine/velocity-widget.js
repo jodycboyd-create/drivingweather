@@ -119,3 +119,10 @@ function update() {
 window.syncVelocity = (routeData) => {
     lastRoute = routeData;
     update();
+};
+
+window.addEventListener('weong:routeUpdated', (e) => window.syncVelocity(e.detail));
+document.getElementById('v-up').onclick = () => { speedOffset += 5; update(); };
+document.getElementById('v-down').onclick = () => { speedOffset -= 5; update(); };
+
+export { update };
