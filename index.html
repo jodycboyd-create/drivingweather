@@ -45,14 +45,28 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Baseline Build for Newfoundland [cite: 2025-12-28]
+        /** * GLOBAL SCOPE SETUP 
+         * Ensuring core map variables are accessible to all engines.
+         */
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         
         window.hubMarkers = [];
         window.communityData = [];
 
-        // LOAD DATA: Comprehensive Final Dataset [cite: 2025-12-26]
+        // SNAPPING LOGIC: Real-time road magnetism [cite: 2025-12-26]
+        function snap(latlng) {
+            if (window.communityData.length === 0) return latlng;
+            let closest = window.communityData[0];
+            let minDist = Infinity;
+            window.communityData.forEach(p => {
+                const d = window.map.distance(latlng, [p.lat, p.lng]);
+                if (d < minDist) { minDist = d; closest = p; }
+            });
+            return closest;
+        }
+
+        // LOAD DATA: Final Newfoundland Dataset [cite: 2025-12-26]
         async function loadNL() {
             try {
                 const res = await fetch('data/nl/communities.json');
@@ -69,18 +83,6 @@
             }
         }
 
-        // SNAPPING LOGIC: Magnetic road magnetism [cite: 2025-12-30]
-        function snap(latlng) {
-            if (window.communityData.length === 0) return latlng;
-            let closest = window.communityData[0];
-            let minDist = Infinity;
-            window.communityData.forEach(p => {
-                const d = window.map.distance(latlng, [p.lat, p.lng]);
-                if (d < minDist) { minDist = d; closest = p; }
-            });
-            return closest;
-        }
-
         function init() {
             const starts = [
                 {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
@@ -91,15 +93,14 @@
                 const m = L.marker([s.lat, s.lng], { draggable: true }).addTo(window.map);
                 m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                 
-                // Visual Snapping Only (Performance Optimized)
                 m.on('drag', function(e) {
                     const p = snap(e.target.getLatLng());
                     e.target.setLatLng([p.lat, p.lng]);
                     e.target.setTooltipContent(p.name);
                 });
 
-                // UNIFIED TRIGGER: Fire all systems once movement stops
                 m.on('dragend', function() {
+                    // Trigger Unified Calculation
                     if (window.RouteEngine) window.RouteEngine.calculate();
                     if (window.WeatherEngine) window.WeatherEngine.update();
                     if (window.VelocityWidget) window.VelocityWidget.refresh();
@@ -108,38 +109,37 @@
                 window.hubMarkers.push(m);
             });
 
-            // Dispatch Handshake to all engines
+            // Signal engines that markers are ready
             window.dispatchEvent(new Event('shell-live'));
         }
         
         loadNL();
     </script>
     
-    <script src="engine/route-engine.js"></script>
-
     <script type="module">
+        /**
+         * BRIDGE MODULE
+         * Connects root-level logic and engine-level modules to the global window.
+         */
         import { BulletinLogic } from './weather-bulletin.js';
-        window.BulletinLogic = BulletinLogic; 
-    </script>
+        import { WeatherEngine } from './engine/weather-engine.js';
+        import { VelocityWidget } from './velocity-widget.js';
 
-    <script type="module" src="engine/weather-engine.js"></script>
-    <script type="module" src="velocity-widget.js"></script>
-<script src="engine/route-engine.js"></script>
-
-    <script type="module">
-        // Import logic from root with error handling
-        import { BulletinLogic } from './weather-bulletin.js';
+        // Attach to window for drag event visibility
         window.BulletinLogic = BulletinLogic;
-        console.log("BulletinLogic Handshake: SUCCESS");
+        window.WeatherEngine = WeatherEngine;
+        window.VelocityWidget = VelocityWidget;
 
-        // Dynamically load engines to ensure sequence
-        import('./engine/weather-engine.js')
-            .then(() => console.log("WeatherEngine Handshake: SUCCESS"))
-            .catch(err => console.error("WeatherEngine Handshake: FAILED", err));
-
-        import('./velocity-widget.js')
-            .then(() => console.log("VelocityWidget Handshake: SUCCESS"))
-            .catch(err => console.error("VelocityWidget Handshake: FAILED", err));
+        // Dynamic load of Route Engine to ensure sequence
+        const routeScript = document.createElement('script');
+        routeScript.src = 'engine/route-engine.js';
+        routeScript.onload = () => {
+            console.log("Navigator Engines: Synchronized");
+            // Perform initial calculation for default route
+            if (window.RouteEngine) window.RouteEngine.calculate();
+            if (window.WeatherEngine) window.WeatherEngine.update();
+        };
+        document.head.appendChild(routeScript);
     </script>
 </body>
 </html>
