@@ -2,43 +2,40 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Tactical Build 2025</title>
+    <title>NL Navigator | Tactical Anchor Build</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <style>
-        :root {
-            --nl-blue: #0070bb;
-            --panel-bg: rgba(15, 15, 15, 0.95);
-            --tactical-gold: #FFD700;
-        }
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; font-family: sans-serif; }
-        #map { height: 100vh; width: 100vw; z-index: 1; position: absolute; top: 0; left: 0; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Tactical Widget Dock [cite: 2025-12-30] */
         #widget-dock { 
-            position: absolute; bottom: 30px; left: 25px; z-index: 1000;
+            position: absolute; bottom: 30px; left: 20px; z-index: 1000;
             display: flex; flex-direction: column; gap: 15px; pointer-events: none;
         }
         .widget-anchor { pointer-events: auto; }
 
-        /* High-Contrast Hub Labels [cite: 2025-12-30] */
+        /* RESTORED: Exact pin label styling from image_2266a7.png */
         .hub-label { 
-            font-weight: 800; background: white; border: 2px solid var(--nl-blue); 
-            padding: 5px 12px; border-radius: 6px; color: #111;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px;
-            text-transform: uppercase;
+            font-weight: bold; 
+            background: white; 
+            border: 2px solid #0070bb; 
+            padding: 4px 10px; 
+            border-radius: 4px;
+            color: #000;
+            font-size: 14px;
         }
 
-        .leaflet-routing-container { display: none !important; }
-        
         /* High Contrast Route Ribbon */
         .route-bubble { 
-            background: var(--panel-bg); color: var(--tactical-gold); padding: 8px 18px; 
-            border: 2px solid var(--tactical-gold); border-radius: 30px; 
-            font-weight: 900; font-size: 14px;
+            background: rgba(15, 15, 15, 0.95); 
+            color: #FFD700; 
+            padding: 8px 18px; 
+            border: 2px solid #FFD700; 
+            border-radius: 30px; 
+            font-weight: 900;
         }
     </style>
 </head>
@@ -56,84 +53,79 @@
     <script src="velocity-widget.js"></script>
 
     <script>
-        /** * CORE LOGIC BASELINE [cite: 2025-12-28, 2025-12-30]
-         * RESTORED: Full dataset handling for Newfoundland.
-         */
-        (function() {
-            console.log("System: Initializing Tactical Environment...");
+        /** [weong-route] Core Logic - Do Not Alter **/
+        window.addEventListener('DOMContentLoaded', function() {
+            // Map Initialization
+            window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
             
-            // 1. Initialize Map Immediately to prevent blank screen
-            const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([49.0, -56.0], 7);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            window.map = map;
-
             window.hubMarkers = [];
             window.communityData = [];
 
-            /** SNAPPING ENGINE [cite: 2025-12-26] **/
+            // SNAPPING ENGINE [cite: 2025-12-26]
             function snap(latlng) {
-                if (!window.communityData || window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Locating..." };
+                if (!window.communityData.length) return { lat: latlng.lat, lng: latlng.lng, name: "Locating..." };
                 let closest = window.communityData[0];
                 let minDist = Infinity;
                 window.communityData.forEach(p => {
-                    const d = map.distance(latlng, [p.lat, p.lng]);
+                    const d = window.map.distance(latlng, [p.lat, p.lng]);
                     if (d < minDist) { minDist = d; closest = p; }
                 });
                 return closest;
             }
 
-            /** DEEP DIVE LOADER [cite: 2025-12-26] **/
-            async function loadNLData() {
+            // DEEP DIVE DATA HANDSHAKE [cite: 2025-12-30]
+            async function loadData() {
                 try {
-                    const response = await fetch('data/nl/communities.json');
-                    const data = await response.json();
+                    const res = await fetch('data/nl/communities.json');
+                    const data = await res.json();
                     window.communityData = data.features.map(f => ({
                         lat: f.geometry.coordinates[1], 
                         lng: f.geometry.coordinates[0], 
                         name: f.properties.name
                     }));
                     console.log("System: NL Data Locked (" + window.communityData.length + " nodes)");
-                } catch (err) {
-                    console.warn("System: Dataset handshake failed, using baseline.");
+                } catch (e) { 
+                    console.warn("System: Using baseline hub coordinates.");
                 }
-                renderHubs();
+                init();
             }
 
-            function renderHubs() {
+            function init() {
                 const hubs = [
-                    { name: "Corner Brook", lat: 48.9515, lng: -57.9482 },
-                    { name: "St. John's", lat: 47.5615, lng: -52.7126 }
+                    {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
+                    {name:"St. John's", lat:47.5615, lng:-52.7126}
                 ];
                 
-                hubs.forEach(hub => {
-                    const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
-                    marker.bindTooltip(hub.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
+                hubs.forEach(h => {
+                    const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
                     
-                    marker.on('drag', function(e) {
+                    // Permanent labels with restored font settings
+                    m.bindTooltip(h.name, { 
+                        permanent: true, 
+                        className: 'hub-label', 
+                        direction: 'top', 
+                        offset: [0, -10] 
+                    });
+
+                    m.on('drag', (e) => {
                         const s = snap(e.target.getLatLng());
                         e.target.setLatLng([s.lat, s.lng]);
-                        e.target.setTooltipContent(s.name); // RESTORED label update [cite: 2025-12-30]
+                        e.target.setTooltipContent(s.name);
                     });
 
-                    marker.on('dragend', () => {
-                        if (window.RouteEngine) window.RouteEngine.calculate();
-                        syncWidgets();
+                    m.on('dragend', () => { 
+                        if(window.RouteEngine) window.RouteEngine.calculate(); 
                     });
-                    window.hubMarkers.push(marker);
+                    
+                    window.hubMarkers.push(m);
                 });
-                
-                if (window.RouteEngine) window.RouteEngine.calculate();
-                syncWidgets();
+
+                if(window.RouteEngine) window.RouteEngine.calculate();
             }
 
-            function syncWidgets() {
-                // Bridge logic for the Bulletin and Velocity modules [cite: 2025-12-30]
-                if (window.WeatherEngine && window.BulletinLogic) window.WeatherEngine.update(window.BulletinLogic);
-                if (window.VelocityWidget && typeof window.VelocityWidget.refresh === 'function') window.VelocityWidget.refresh();
-            }
-
-            loadNLData();
-        })();
+            loadData();
+        });
     </script>
 </body>
 </html>
