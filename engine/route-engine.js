@@ -1,50 +1,57 @@
 /**
- * ROUTE-ENGINE.JS | v.2025.12.29.18
- * Bridge Confirmation: Green Route + Midpoint Block
+ * ROUTE-ENGINE.JS | v.2025.12.29.19
+ * CORE FUNCTIONALITY: Blue Route + Physical Red Square
  */
 const RouteEngine = {
     _control: null,
     _block: null,
 
     calculateRoute: function(start, end) {
-        const map = window.map; // Accessing global map from anchor index.html
+        const map = window.map; 
         if (!map) return;
 
-        // Cleanup
         if (this._control) map.removeControl(this._control);
-        if (this._block) map.removeLayer(this._block);
+        if (this._block) this._block.remove();
 
-        // CHANGE: Routing color set to GREEN to verify this file is in control
+        // Standard Blue Route
         this._control = L.Routing.control({
             waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
             createMarker: () => null,
             addWaypoints: false,
-            routeWhileDragging: false,
             show: false,
-            lineOptions: { 
-                styles: [{ color: '#00FF00', weight: 8, opacity: 0.9 }] 
-            }
+            lineOptions: { styles: [{ color: '#0070bb', weight: 6 }] }
         }).addTo(map);
 
-        // CHANGE: Using 'routeselected' for higher reliability in drawing blocks
-        this._control.on('routeselected', (e) => {
-            const route = e.route;
+        this._control.on('routesfound', (e) => {
+            const route = e.routes[0];
             const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
+            
+            // Convert coordinate to a pixel point on the screen
+            const point = map.latLngToContainerPoint(mid);
 
-            // Create a 1km x 1km Red Square to confirm injection functionality
-            const bounds = [
-                [mid.lat - 0.01, mid.lng - 0.01], 
-                [mid.lat + 0.01, mid.lng + 0.01]
-            ];
+            // Create a physical HTML square block
+            this._block = document.createElement('div');
+            this._block.style.cssText = `
+                position: absolute;
+                width: 20px;
+                height: 20px;
+                background: red;
+                border: 2px solid black;
+                z-index: 1000;
+                left: ${point.x - 10}px;
+                top: ${point.y - 10}px;
+                pointer-events: none;
+            `;
 
-            this._block = L.rectangle(bounds, {
-                color: "#FF0000",
-                fillColor: "#FF0000",
-                fillOpacity: 1,
-                weight: 2
-            }).addTo(map);
+            // Append directly to the map container to ensure it is visible
+            document.getElementById('map').appendChild(this._block);
 
-            console.log("Confirmed: Route Green / Block Red at Midpoint.");
+            // Keep the block pinned during zooms/pans
+            map.on('viewreset move', () => {
+                const newPoint = map.latLngToContainerPoint(mid);
+                this._block.style.left = (newPoint.x - 10) + 'px';
+                this._block.style.top = (newPoint.y - 10) + 'px';
+            });
         });
     }
 };
