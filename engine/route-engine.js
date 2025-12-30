@@ -1,63 +1,10 @@
-/** [weong-route] Core Routing Engine - Integrated Capsule HUD **/
-/** Locked: Dec 30, 2025 - Restoration Build with Speed Offsets **/
-
-let currentRouteLayer = null;
-let metricFlagMarker = null;
-let routeTimeout = null;
-
-/**
- * Capsule HUD Logic: Now incorporates global speed offsets
+/** * [weong-route] Tactical Route Engine 
+ * Status: Anchored - Dec 30, 2025 [cite: 2025-12-30]
  */
-function renderStandaloneFlag(route) {
-    if (metricFlagMarker) window.map.removeLayer(metricFlagMarker);
 
-    const distKm = route.distance / 1000;
-    const midPoint = route.geometry.coordinates[Math.floor(route.geometry.coordinates.length / 2)];
-    
-    // 1. Determine Base Speed Tier [cite: 2025-12-30]
-    let baseSpeed = 80;
-    if (distKm > 45) baseSpeed = 100;
-    if (distKm < 6) baseSpeed = 50;
-    
-    // 2. Apply Widget Offset [cite: 2025-12-30]
-    const offset = window.currentSpeedOffset || 0;
-    const actualSpeed = baseSpeed + offset;
-    
-    // 3. Calculate Travel Time
-    const totalMinutes = (distKm / actualSpeed) * 60;
-    const timeStr = `${Math.floor(totalMinutes / 60)}h ${Math.round(totalMinutes % 60)}m`;
-
-    // Sleek Capsule HTML [cite: 2025-12-30]
-    const flagHtml = `
-        <div style="background: rgba(10,10,10,0.95); border: 1px solid rgba(255, 215, 0, 0.4); color: #fff; padding: 4px 14px; border-radius: 20px; font-family: 'Courier New', monospace; box-shadow: 0 4px 15px rgba(0,0,0,0.6); pointer-events: none; white-space: nowrap; display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 14px; font-weight: bold; letter-spacing: 0.5px;">${distKm.toFixed(1)}km</span>
-            <span style="color: #FFD700; font-weight: bold; opacity: 0.8;">|</span>
-            <span style="font-size: 14px; font-weight: bold; color: #00FF00; letter-spacing: 0.5px;">${timeStr}</span>
-        </div>`;
-
-    metricFlagMarker = L.marker([midPoint[1], midPoint[0]], {
-        icon: L.divIcon({ 
-            html: flagHtml, 
-            className: 'capsule-hud', 
-            iconSize: [160, 30], 
-            iconAnchor: [80, 15] 
-        }),
-        interactive: false
-    }).addTo(window.map);
-}
-
-function drawTacticalRoute(routeData) {
-    if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
-    currentRouteLayer = L.layerGroup().addTo(window.map);
-
-    // RESTORED: Tactical Ribbon Style [cite: 2025-12-27]
-    L.geoJSON(routeData.geometry, { style: { color: '#000', weight: 6, opacity: 0.3 } }).addTo(currentRouteLayer);
-    L.geoJSON(routeData.geometry, { style: { color: '#2d2d2d', weight: 3, opacity: 1 } }).addTo(currentRouteLayer);
-    L.geoJSON(routeData.geometry, { style: { color: '#FFD700', weight: 1, opacity: 1, dashArray: '6, 12' } }).addTo(currentRouteLayer);
-}
-
-export async function calculateRoute() {
-    if (!window.hubMarkers || window.hubMarkers.length < 2) return;
+let routeTimeout;
+function calculateRoute() {
+    if (window.hubMarkers.length < 2) return;
 
     clearTimeout(routeTimeout);
     routeTimeout = setTimeout(async () => {
@@ -69,8 +16,17 @@ export async function calculateRoute() {
             const response = await fetch(url);
             const data = await response.json();
             if (data.routes && data.routes[0]) {
-                drawTacticalRoute(data.routes[0]);
-                renderStandaloneFlag(data.routes[0]);
+                const route = data.routes[0];
+
+                // THE GLOBAL ANCHOR [cite: 2025-12-30]
+                // This allows weather-bulletin.js to "see" the coordinates.
+                window.currentRouteData = route; 
+
+                drawTacticalRoute(route);
+                renderStandaloneFlag(route);
+
+                // Broadcast update for immediate listeners [cite: 2025-12-30]
+                window.dispatchEvent(new CustomEvent('weong:routeUpdated', { detail: route }));
             }
         } catch (e) {
             console.warn("System: Nav link severed.");
@@ -78,5 +34,36 @@ export async function calculateRoute() {
     }, 40);
 }
 
-window.addEventListener('weong:ready', calculateRoute);
-window.addEventListener('weong:update', calculateRoute);
+function drawTacticalRoute(route) {
+    if (window.activeRoute) window.map.removeLayer(window.activeRoute);
+    window.activeRoute = L.geoJSON(route.geometry, {
+        style: { color: '#000', weight: 8, opacity: 0.9 }
+    }).addTo(window.map);
+    
+    // Add the high-contrast yellow dashed line
+    L.geoJSON(route.geometry, {
+        style: { color: '#FFD700', weight: 3, dashArray: '10, 10', opacity: 1 }
+    }).addTo(window.map);
+}
+
+function renderStandaloneFlag(route) {
+    const dist = (route.distance / 1000).toFixed(1);
+    const duration = Math.round(route.duration / 60);
+    const hours = Math.floor(duration / 60);
+    const mins = duration % 60;
+    
+    const midIdx = Math.floor(route.geometry.coordinates.length / 2);
+    const midPoint = route.geometry.coordinates[midIdx];
+
+    if (window.routeFlag) window.map.removeLayer(window.routeFlag);
+    window.routeFlag = L.marker([midPoint[1], midPoint[0]], {
+        icon: L.divIcon({
+            className: 'route-flag',
+            html: `<div style="background:rgba(0,0,0,0.85); color:#fff; padding:5px 10px; border:2px solid #FFD700; border-radius:15px; font-family:monospace; font-weight:bold; white-space:nowrap;">
+                   ${dist}km | <span style="color:#00FF00;">${hours}h ${mins}m</span></div>`,
+            iconSize: [120, 30]
+        })
+    }).addTo(window.map);
+}
+
+console.log("System: /engine/route-engine.js initialized.");
