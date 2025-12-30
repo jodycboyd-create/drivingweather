@@ -1,83 +1,77 @@
 /**
- * ROUTE-ENGINE.JS | v.2025.12.29.15
- * Forced Metric Flag Injection - Layer Priority Fix
+ * ROUTE-ENGINE.JS | v.2025.12.29.16
+ * Restoration Build: Static Metric Flag Injection
+ * Preserves Locked index.html Anchor [cite: 2025-12-30]
  */
 const RouteEngine = {
-    _map: null,
-    _routingControl: null,
-    _flagLayer: null,
+    currentControl: null,
+    currentFlag: null,
 
     calculateRoute: function(start, end) {
-        // Find the map if we haven't already [cite: 2025-12-27]
-        if (!this._map) {
-            this._map = window.map || null; 
-        }
-        if (!this._map) return;
+        // Access map directly via global scope established in index.html [cite: 2025-12-27]
+        const map = window.map; 
+        if (!map) return;
 
-        // Cleanup
-        if (this._routingControl) this._map.removeControl(this._routingControl);
-        if (this._flagLayer) this._map.removeLayer(this._flagLayer);
+        // 1. Precise Cleanup
+        if (this.currentControl) map.removeControl(this.currentControl);
+        if (this.currentFlag) map.removeLayer(this.currentFlag);
 
-        // Routing Logic
-        this._routingControl = L.Routing.control({
+        // 2. Initialize Routing with Locked Constraints
+        this.currentControl = L.Routing.control({
             waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-            createMarker: () => null, 
+            createMarker: () => null, // No extra markers
             addWaypoints: false,
             routeWhileDragging: false,
-            show: false,
+            show: false, // Keep sidebar hidden
             lineOptions: { styles: [{ color: '#0070bb', weight: 6 }] }
-        }).addTo(this._map);
+        }).addTo(map);
 
-        this._routingControl.on('routesfound', (e) => {
+        // 3. Metrics Listener
+        this.currentControl.on('routesfound', (e) => {
             const route = e.routes[0];
-            const dist = route.summary.totalDistance / 1000;
+            const distKm = route.summary.totalDistance / 1000;
             
             /**
-             * WEIGHTED SPEED LIMITS
-             * TCH (100km/h), Connector (80km/h), Local (50km/h)
-             * Weighted average for NL terrain = 91 km/h.
+             * WEIGHTED SPEED LOGIC
+             * TCH (100) @ 75% | Branch (80) @ 15% | Local (50) @ 10%
+             * Weighted average for NL terrain = 92 km/h.
              */
-            const v = (100 * 0.70) + (80 * 0.20) + (50 * 0.10);
-            const time = dist / v;
-            const h = Math.floor(time);
-            const m = Math.round((time - h) * 60);
+            const avgV = (100 * 0.75) + (80 * 0.15) + (50 * 0.10); 
+            const totalHours = distKm / avgV;
+            const h = Math.floor(totalHours);
+            const m = Math.round((totalHours - h) * 60);
 
-            this.injectMetricFlag(route.coordinates, dist, h, m);
+            this.dropFlag(map, route.coordinates, distKm, h, m);
         });
     },
 
-    injectMetricFlag: function(coords, d, h, m) {
-        const midIdx = Math.floor(coords.length / 2);
-        const pos = coords[midIdx];
+    dropFlag: function(map, coords, d, h, m) {
+        const midPoint = coords[Math.floor(coords.length / 2)];
         const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
-        // Create the sleek metric flag
-        const iconHtml = `
+        // The "Sleek Flag" Restoration
+        const flagHtml = `
             <div style="
-                background: #1a1a1a; color: white; border: 2px solid #0070bb;
-                padding: 6px 12px; border-radius: 4px; font-family: 'Courier New', monospace;
-                min-width: 100px; box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-                transform: translate(-50%, -140%); pointer-events: none;
+                background: rgba(26, 26, 26, 0.95); color: white; border: 2px solid #0070bb;
+                padding: 10px 14px; border-radius: 6px; font-family: 'Segoe UI', Arial, sans-serif;
+                text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                transform: translate(-50%, -120%); pointer-events: none;
             ">
-                <div style="font-size: 9px; color: #0070bb; font-weight: bold; letter-spacing: 1px;">TIME</div>
-                <div style="font-size: 18px; font-weight: bold;">${timeStr}</div>
-                <div style="font-size: 11px; border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; color: #ccc;">
+                <div style="font-size: 10px; color: #0070bb; font-weight: bold; text-transform: uppercase;">Est. Travel</div>
+                <div style="font-size: 20px; font-weight: bold;">${timeStr}</div>
+                <div style="font-size: 12px; margin-top: 5px; border-top: 1px solid #444; padding-top: 5px; color: #aaa;">
                     ${d.toFixed(1)} KM
                 </div>
             </div>
         `;
 
-        this._flagLayer = L.marker(pos, {
+        this.currentFlag = L.marker(midPoint, {
             icon: L.divIcon({
-                className: 'metric-flag-wrapper',
-                html: iconHtml,
+                className: 'metrics-flag-restored',
+                html: flagHtml,
                 iconSize: [0, 0]
             }),
-            zIndexOffset: 1000 // Ensure it sits above the road line
-        }).addTo(this._map);
+            zIndexOffset: 1500 // Forces it above route lines and town labels
+        }).addTo(map);
     }
 };
-
-// Auto-bridge on script load
-if (window.map) RouteEngine._map = window.map;
-window.addEventListener('map-ready', (e) => { RouteEngine._map = e.detail.map; });
