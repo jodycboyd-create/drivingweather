@@ -2,35 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Final Anchor Build</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NL Navigator | Tactical Build 2025</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; font-family: sans-serif; }
+        :root {
+            --nl-blue: #0070bb;
+            --panel-bg: rgba(15, 15, 15, 0.95);
+            --tactical-gold: #FFD700;
+        }
+        body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Widget Dock [cite: 2025-12-30] */
+        /* Tactical Widget Dock */
         #widget-dock { 
-            position: absolute; bottom: 25px; left: 20px; z-index: 1000;
-            display: flex; flex-direction: column; gap: 12px; pointer-events: none;
+            position: absolute; bottom: 30px; left: 25px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 15px; pointer-events: none;
         }
-        .widget-panel { 
-            background: rgba(17, 17, 17, 0.9); color: white; padding: 15px; 
-            border-radius: 8px; border: 1.5px solid #FFD700;
-            pointer-events: auto; min-width: 260px;
-        }
+        .widget-anchor { pointer-events: auto; transition: transform 0.2s ease; }
+        .widget-anchor:hover { transform: translateY(-2px); }
 
-        .leaflet-routing-container { display: none !important; }
-
-        /* Dynamic Labels [cite: 2025-12-30] */
+        /* High-Contrast Hub Labels */
         .hub-label { 
-            font-weight: bold; background: white; border: 2px solid #0070bb; 
-            padding: 4px 10px; border-radius: 4px; 
+            font-weight: 800; background: white; border: 2px solid var(--nl-blue); 
+            padding: 5px 12px; border-radius: 6px; color: #111;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px;
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
 
-        /* Route UI [cite: 2025-12-30] */
+        /* Leaflet Overrides for Tactical Visuals */
+        .leaflet-routing-container { display: none !important; }
+        .leaflet-bar { border: none !important; box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important; }
+        
+        /* High Contrast Route Ribbon */
         .route-bubble { 
-            background: #111; color: #FFD700; padding: 8px 16px; 
-            border: 2px solid #FFD700; border-radius: 25px; font-weight: 800;
+            background: var(--panel-bg); color: var(--tactical-gold); padding: 8px 18px; 
+            border: 2px solid var(--tactical-gold); border-radius: 30px; 
+            font-weight: 900; font-size: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -38,11 +49,9 @@
     <div id="map"></div>
 
     <div id="widget-dock">
-        <div id="weather-panel" class="widget-panel">Weather Offline</div>
-        <div id="velocity-panel" class="widget-panel">Velocity Offline</div>
+        <div id="weather-anchor" class="widget-anchor"></div>
+        <div id="velocity-anchor" class="widget-anchor"></div>
     </div>
-    
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script src="weather-bulletin.js"></script>
     <script src="engine/weather-engine.js"></script>
@@ -50,79 +59,90 @@
     <script src="velocity-widget.js"></script>
 
     <script>
-        // Use a single initialization block to prevent race conditions
+        /** * CORE LOGIC BASELINE
+         * Do not condense or remodel below this line.
+         */
         window.addEventListener('load', function() {
-            window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
+            // Initializing the Newfoundland-Centered Map
+            window.map = L.map('map', { 
+                zoomControl: false,
+                attributionControl: false 
+            }).setView([49.0, -56.0], 7);
+
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
             
             window.hubMarkers = [];
             window.communityData = [];
 
-            // SNAP LOGIC: Restored for dynamic city names [cite: 2025-12-26, 2025-12-30]
+            /**
+             * COMPREHENSIVE DATASET SNAPPING
+             * Locks markers to the locked Newfoundland community coordinates.
+             */
             function snap(latlng) {
-                if (!window.communityData.length) return { lat: latlng.lat, lng: latlng.lng, name: "Searching..." };
+                if (!window.communityData || window.communityData.length === 0) {
+                    return { lat: latlng.lat, lng: latlng.lng, name: "Locating..." };
+                }
+                
                 let closest = window.communityData[0];
                 let minDist = Infinity;
-                window.communityData.forEach(p => {
+                
+                for (let i = 0; i < window.communityData.length; i++) {
+                    const p = window.communityData[i];
                     const d = window.map.distance(latlng, [p.lat, p.lng]);
-                    if (d < minDist) { minDist = d; closest = p; }
-                });
+                    if (d < minDist) {
+                        minDist = d;
+                        closest = p;
+                    }
+                }
                 return closest;
             }
 
-            async function loadData() {
+            /**
+             * DEEP DIVE DATA LOADER
+             * Fetches the final dataset stored in your architecture.
+             */
+            async function loadNewfoundlandData() {
                 try {
-                    const res = await fetch('data/nl/communities.json');
-                    const data = await res.json();
+                    const response = await fetch('data/nl/communities.json');
+                    if (!response.ok) throw new Error("Dataset response error");
+                    
+                    const data = await response.json();
                     window.communityData = data.features.map(f => ({
                         lat: f.geometry.coordinates[1], 
                         lng: f.geometry.coordinates[0], 
-                        name: f.properties.name || "Unknown"
+                        name: f.properties.name || "Unnamed Point"
                     }));
-                    initMarkers();
-                } catch (e) { console.error("Data Load Fail", e); initMarkers(); }
+                    
+                    console.log("System: NL Deep Dive Data Locked In (" + window.communityData.length + " nodes)");
+                    initializeMarkers();
+                } catch (err) {
+                    console.error("System: Data Handshake Failed. Retrying...", err);
+                    initializeMarkers(); // Fallback to defaults
+                }
             }
 
-            function initMarkers() {
-                const hubs = [
-                    {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
-                    {name:"St. John's", lat:47.5615, lng:-52.7126}
+            function initializeMarkers() {
+                // Baseline builds for Corner Brook and St. John's
+                const baselineHubs = [
+                    { name: "Corner Brook", lat: 48.9515, lng: -57.9482 },
+                    { name: "St. John's", lat: 47.5615, lng: -52.7126 }
                 ];
                 
-                hubs.forEach(h => {
-                    const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
-                    m.bindTooltip(h.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
+                baselineHubs.forEach(hub => {
+                    const marker = L.marker([hub.lat, hub.lng], { 
+                        draggable: true,
+                        autoPan: true 
+                    }).addTo(window.map);
+
+                    marker.bindTooltip(hub.name, { 
+                        permanent: true, 
+                        className: 'hub-label', 
+                        direction: 'top', 
+                        offset: [0, -10] 
+                    });
                     
-                    m.on('drag', function(e) {
-                        const snapData = snap(e.target.getLatLng());
-                        e.target.setLatLng([snapData.lat, snapData.lng]);
-                        // FIXED: Label updates instantly [cite: 2025-12-30]
-                        e.target.setTooltipContent(snapData.name);
-                    });
-
-                    m.on('dragend', function() {
-                        if (window.RouteEngine) window.RouteEngine.calculate();
-                        syncEngines();
-                    });
-                    window.hubMarkers.push(m);
-                });
-                
-                if (window.RouteEngine) window.RouteEngine.calculate();
-                syncEngines();
-            }
-
-            function syncEngines() {
-                // Bridge logic between weather and speed segments [cite: 2025-12-30]
-                if (window.WeatherEngine && window.BulletinLogic) {
-                    window.WeatherEngine.update(window.BulletinLogic);
-                }
-                if (window.VelocityWidget) {
-                    window.VelocityWidget.refresh();
-                }
-            }
-
-            loadData();
-        });
-    </script>
-</body>
-</html>
+                    // RESTORED: Dynamic Label Update Logic
+                    marker.on('drag', function(e) {
+                        const snapTarget = snap(e.target.getLatLng());
+                        e.target.setLatLng([snapTarget.lat, snapTarget.lng]);
+                        // This fixes the regression where labels stayed stuck
