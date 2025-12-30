@@ -1,93 +1,67 @@
-/**
- * ROUTE-ENGINE.JS | ISLAND-SCALE DASH BUILD
- * Fixes: Missing dashes at zoom level 7.
- * Features: Adaptive width, Proportional dashes, 100/80/50 Speeds.
- * [cite: 2025-12-30]
- */
-window.RouteEngine = {
-    _layers: L.layerGroup(),
-    _flag: null,
-    _abortController: null,
+/** [weong-route] Core Routing Engine - Folder Locked Build **/
 
-    calculate: function() {
-        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) return;
+let currentRouteLayer = null;
 
-        if (this._abortController) this._abortController.abort();
-        this._abortController = new AbortController();
+// Tactical Route Logic [cite: 2025-12-23, 2025-12-30]
+async function calculateRoute() {
+    if (!window.hubMarkers || window.hubMarkers.length < 2) return;
 
-        const pts = window.hubMarkers.map(m => m.getLatLng());
-        const url = `https://router.project-osrm.org/route/v1/driving/${pts[0].lng},${pts[0].lat};${pts[1].lng},${pts[1].lat}?overview=full&geometries=geojson&steps=false`;
+    const start = window.hubMarkers[0].getLatLng();
+    const end = window.hubMarkers[1].getLatLng();
 
-        fetch(url, { signal: this._abortController.signal })
-            .then(res => res.json())
-            .then(data => {
-                if (!data.routes || data.routes.length === 0) return;
+    // OSRM Service Call
+    const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
 
-                this._layers.clearLayers();
-                if (this._flag) window.map.removeLayer(this._flag);
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
 
-                const route = data.routes[0];
-                const coordinates = route.geometry.coordinates.map(c => [c[1], c[0]]);
-                const distanceKm = route.distance / 1000;
-
-                // Speed Math: 100/80/50 km/h (No Moose Logic)
-                const totalHrs = ((distanceKm * 0.75) / 100) + ((distanceKm * 0.20) / 80) + ((distanceKm * 0.05) / 50);
-                const hours = Math.floor(totalHrs);
-                const mins = Math.round((totalHrs - hours) * 60);
-
-                /**
-                 * DYNAMIC SCALING
-                 * Ensures visibility without "bulk" at zoom 7.
-                 */
-                const z = window.map.getZoom();
-                const baseWeight = z > 10 ? 8 : (z > 7 ? 5 : 3);
-                const borderWeight = baseWeight + 2.5;
-                
-                // Scale dash length so it doesn't look like a solid line at distance
-                const dashPattern = z > 7 ? '10, 20' : '5, 10';
-
-                // 1. SHARP OUTER BORDER
-                L.polyline(coordinates, { 
-                    color: '#444444', weight: borderWeight, opacity: 1, lineCap: 'round' 
-                }).addTo(this._layers);
-
-                // 2. MAIN GREY RIBBON
-                L.polyline(coordinates, { 
-                    color: '#777777', weight: baseWeight, opacity: 1, lineCap: 'round' 
-                }).addTo(this._layers);
-
-                // 3. YELLOW CENTER DASH (Always active now)
-                L.polyline(coordinates, { 
-                    color: '#FFD700', 
-                    weight: Math.max(1, baseWeight * 0.25), 
-                    dashArray: dashPattern, 
-                    opacity: 1 
-                }).addTo(this._layers);
-
-                this._layers.addTo(window.map);
-
-                const midIndex = Math.floor(coordinates.length / 2);
-                this._flag = L.marker(coordinates[midIndex], {
-                    icon: L.divIcon({
-                        className: 'route-flag-container',
-                        html: `<div class="route-bubble">${distanceKm.toFixed(1)} km | ${hours}h ${mins}m</div>`,
-                        iconSize: [160, 30],
-                        iconAnchor: [80, 15]
-                    })
-                }).addTo(window.map);
-            })
-            .catch(err => {
-                if (err.name !== 'AbortError') console.error("Sync Error", err);
-            });
+        if (data.routes && data.routes[0]) {
+            const route = data.routes[0];
+            drawRoute(route);
+            
+            // Handshake: Tell the Velocity Widget we have a new route
+            window.dispatchEvent(new CustomEvent('weong:routeUpdated', { 
+                detail: {
+                    summary: route.summary,
+                    coordinates: route.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] })),
+                    totalDistance: route.distance
+                } 
+            }));
+        }
+    } catch (error) {
+        console.error("Routing Engine: Transmission Failed", error);
     }
-};
+}
 
-window.addEventListener('shell-live', () => {
-    window.hubMarkers.forEach(m => {
-        m.off('dragend'); 
-        m.on('dragend', () => window.RouteEngine.calculate());
-    });
-    // Re-render on zoom to apply new dynamic weights/dashes
-    window.map.on('zoomend', () => window.RouteEngine.calculate());
-    window.RouteEngine.calculate();
+function drawRoute(route) {
+    if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
+
+    currentRouteLayer = L.geoJSON(route.geometry, {
+        style: {
+            color: '#0070bb', // Standard NL Blue
+            weight: 6,
+            opacity: 0.8,
+            lineJoin: 'round'
+        }
+    }).addTo(window.map);
+
+    // Zoom to fit if it's the first load
+    if (!window.routeInitialized) {
+        window.map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
+        window.routeInitialized = true;
+    }
+}
+
+// Global System Listeners
+window.addEventListener('weong:ready', () => {
+    console.log("Routing Engine: Tactical Handshake Complete.");
+    calculateRoute();
 });
+
+window.addEventListener('weong:update', () => {
+    calculateRoute();
+});
+
+// Export for manifest loader
+export { calculateRoute };
