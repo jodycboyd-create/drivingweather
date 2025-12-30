@@ -1,5 +1,5 @@
 /** [weong-route] Tactical Velocity & Time Module **/
-/** Locked: Dec 30, 2025 Baseline - Module Fixed **/
+/** Locked: Dec 30, 2025 Baseline - Direct Link Build **/
 
 let speedOffset = 0; 
 let lastRoute = null;
@@ -38,7 +38,7 @@ container.innerHTML = `
         <div class="v-section">
             <div class="v-label">DEPARTURE WINDOW</div>
             <div class="scrubber-container" id="time-scrubber">
-                <div id="v-time-display">LOADING...</div>
+                <div id="v-time-display">00:00 AM</div>
             </div>
             <div class="scrubber-hint">← SLIDE TO ADJUST TIME →</div>
         </div>
@@ -56,7 +56,7 @@ container.innerHTML = `
     </div>
 `;
 
-// Scrubber Interaction Logic
+// Scrubber Logic
 let isDragging = false;
 let startX;
 const scrubber = document.getElementById('time-scrubber');
@@ -70,23 +70,16 @@ const handleMove = (e) => {
     startX = x;
     update();
 };
-const handleEnd = () => { isDragging = false; };
-
 scrubber.addEventListener('mousedown', handleStart);
 window.addEventListener('mousemove', handleMove);
-window.addEventListener('mouseup', handleEnd);
-scrubber.addEventListener('touchstart', handleStart);
-window.addEventListener('touchmove', handleMove);
-window.addEventListener('touchend', handleEnd);
+window.addEventListener('mouseup', () => isDragging = false);
 
 function getBaseSpeed(route) {
     const dist = route.totalDistance / 1000;
     const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
     let speed = 80;
     if (dist > 40 && mid.lat > 48.8) speed = 100;
-    const inGrosMorne = (mid.lat > 49.3 && mid.lng < -57.5);
-    const inTerraNova = (mid.lat > 48.3 && mid.lat < 48.7 && mid.lng > -54.3);
-    if (inGrosMorne || inTerraNova) speed = 90;
+    if (mid.lat > 49.3 && mid.lng < -57.5) speed = 90; // Gros Morne
     if (dist < 8) speed = 50;
     return speed;
 }
@@ -103,13 +96,8 @@ function update() {
 
     const offsetEl = document.getElementById('v-offset');
     const labelEl = document.getElementById('v-label');
-    if (speedOffset === 0) {
-        offsetEl.innerText = "";
-        labelEl.innerText = "POSTED";
-    } else {
-        offsetEl.innerText = (speedOffset > 0 ? "+" : "") + speedOffset + " km/h";
-        labelEl.innerText = "LIMIT";
-    }
+    offsetEl.innerText = speedOffset === 0 ? "" : (speedOffset > 0 ? "+" : "") + speedOffset + " km/h";
+    labelEl.innerText = speedOffset === 0 ? "POSTED" : "LIMIT";
 
     const distKm = lastRoute.totalDistance / 1000;
     const totalMins = (distKm / actualSpeed) * 60;
@@ -123,18 +111,11 @@ function update() {
         speed: actualSpeed
     };
 
-    window.dispatchEvent(new CustomEvent('weong:speedCalculated', { detail: metrics }));
-
-    // Forced direct call to the route-engine [cite: 2025-12-30]
-    if (window.updateMetricFlag) {
-        window.updateMetricFlag(metrics);
-    }
+    // Force Flag Update
+    if (window.updateMetricFlag) window.updateMetricFlag(metrics);
 }
 
-window.addEventListener('weong:routeUpdated', (e) => { 
-    lastRoute = e.detail; 
-    update(); 
-});
-
-document.getElementById('v-up').onclick = () => { speedOffset += 5; update(); };
-document.getElementById('v-down').onclick = () => { speedOffset -= 5; update(); };
+// Global hook for route-engine to push data
+window.syncVelocity = (routeData) => {
+    lastRoute = routeData;
+    update();
