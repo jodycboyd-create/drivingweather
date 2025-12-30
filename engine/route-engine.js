@@ -1,6 +1,6 @@
 /**
- * ROUTE-ENGINE.JS | SEGMENT-AWARE BUILD
- * Updates: Lighter Grey Ribbon, Text-only Metrics, Segmented Speed Logic.
+ * ROUTE-ENGINE.JS | CORRECTED SPEED BUILD
+ * Updates: Medium Grey Ribbon, No Icons, Fixed Segmented Speeds (100/80/50).
  * [cite: 2025-12-30]
  */
 window.RouteEngine = {
@@ -30,24 +30,25 @@ window.RouteEngine = {
                 const distanceKm = route.distance / 1000;
 
                 /**
-                 * 1. SEGMENTED SPEED CALCULATION
-                 * Logic: TCH (100) = 75%, Branch (80) = 20%, Local (50) = 5%
-                 * This follows the typical NL route profile from Hub to Destination.
+                 * SEGMENTED SPEED CALCULATION [Corrected]
+                 * TCH: 100 km/h (75% of route)
+                 * Branch: 80 km/h (20% of route)
+                 * Local: 50 km/h (5% of route)
                  */
-                const tchDist = distanceKm * 0.75;
-                const branchDist = distanceKm * 0.20;
-                const localDist = distanceKm * 0.05;
-                
-                const travelTimeHrs = (tchDist / 100) + (branchDist / 80) + (localDist / 50);
+                const travelTimeHrs = 
+                    ((distanceKm * 0.75) / 100) + 
+                    ((distanceKm * 0.20) / 80) + 
+                    ((distanceKm * 0.05) / 50);
+
                 const hours = Math.floor(travelTimeHrs);
                 const mins = Math.round((travelTimeHrs - hours) * 60);
 
                 /**
-                 * 2. LIGHTER ROAD RIBBON
-                 * Changed from #222 to #666666 for better visibility.
+                 * LIGHTER GREY RIBBON
+                 * #888888 for a distinct grey road feel.
                  */
                 L.polyline(coordinates, { 
-                    color: '#666666', 
+                    color: '#888888', 
                     weight: 9, 
                     opacity: 0.85,
                     lineCap: 'round' 
@@ -63,8 +64,7 @@ window.RouteEngine = {
                 this._layers.addTo(window.map);
 
                 /**
-                 * 3. METRICS FLAG (No Icon)
-                 * Removed 🏁 icon as per instructions.
+                 * METRICS FLAG (Text Only)
                  */
                 const midIndex = Math.floor(coordinates.length / 2);
                 this._flag = L.marker(coordinates[midIndex], {
