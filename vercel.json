@@ -1,22 +1,18 @@
 {
   "version": 2,
   "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
   "headers": [
     {
-      "source": "/(.*).(jpg|png|gif|svg|css|js)",
+      "source": "/(.*).js",
       "headers": [
         {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
+          "key": "Content-Type",
+          "value": "application/javascript"
         }
       ]
     }
+  ],
+  "rewrites": [
+    { "source": "/engine/(.*)", "destination": "/engine/$1" }
   ]
 }
