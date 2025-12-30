@@ -1,9 +1,8 @@
-/**
- * weather-bulletin.js
- * Project: [weong-bulletin]
+/** * [weong-bulletin] Project Logic
+ * Locked: Dec 30, 2025 Baseline [cite: 2025-12-30]
  */
 
-export const BulletinLogic = {
+window.BulletinLogic = {
     formatPOP(popValue) {
         if (popValue === null || popValue === undefined) return null;
         // Rule: Report to the nearest 10%
@@ -12,9 +11,12 @@ export const BulletinLogic = {
         return roundedPop >= 30 ? `${roundedPop}%` : null;
     },
 
+    /**
+     * Exception Trigger Logic
+     * Primary trigger: Level 3 for all elements [cite: 2023-12-23]
+     */
     checkException(levels) {
         if (!levels) return false;
-        // Primary exception trigger: Level 3 for all elements
         return Object.values(levels).some(level => level >= 3);
     },
 
