@@ -1,70 +1,24 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>NL Navigator | Permanent Anchor</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
-        #map { height: 100vh; width: 100vw; z-index: 1; }
-        #widget-dock { position: absolute; bottom: 30px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 15px; pointer-events: none; }
-        .widget-anchor { pointer-events: auto; }
-        /* Tactical Pins restored */
-        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-size: 14px; color: #000; }
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    <div id="widget-dock">
-        <div id="weather-anchor" class="widget-anchor"></div>
-        <div id="velocity-anchor" class="widget-anchor"></div>
-    </div>
+/** THE SYSTEM MANIFEST **/
+const modules = [
+    'weather-bulletin.js',
+    'engine/weather-engine.js',
+    'engine/route-engine.js',
+    'velocity-widget.js'
+];
 
-    <script src="manifest.js"></script>
-
-    <script>
-        /** PERMANENT LOGIC - DO NOT ALTER [cite: 2025-12-30] **/
-        (async function boot() {
-            window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
-            window.communityData = [];
-            window.hubMarkers = [];
-
-            // NL Deep Dive Dataset [cite: 2025-12-26]
-            try {
-                const res = await fetch('data/nl/communities.json');
-                const data = await res.json();
-                window.communityData = data.features.map(f => ({
-                    lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: f.properties.name
-                }));
-                console.log("System: NL Data Locked (285 nodes)");
-            } catch (e) { console.warn("Using baseline hub locations."); }
-
-            // Pin Controller
-            const hubs = [{name:"Corner Brook", lat:48.9515, lng:-57.9482}, {name:"St. John's", lat:47.5615, lng:-52.7126}];
-            hubs.forEach(h => {
-                const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
-                m.bindTooltip(h.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
-                
-                m.on('drag', (e) => {
-                    let closest = window.communityData[0] || h;
-                    let minDist = Infinity;
-                    window.communityData.forEach(p => {
-                        const d = window.map.distance(e.target.getLatLng(), [p.lat, p.lng]);
-                        if (d < minDist) { minDist = d; closest = p; }
-                    });
-                    e.target.setLatLng([closest.lat, closest.lng]);
-                    e.target.setTooltipContent(closest.name);
-                });
-
-                m.on('dragend', () => window.dispatchEvent(new Event('weong:update')));
-                window.hubMarkers.push(m);
-            });
-            
-            // Signal to external modules that Map & Pins are ready
-            window.dispatchEvent(new Event('weong:ready'));
-        })();
-    </script>
-</body>
-</html>
+modules.forEach(path => {
+    const s = document.createElement('script');
+    // Remove the leading slash so it is relative to index.html
+    s.src = path.startsWith('/') ? path.substring(1) : path;
+    s.async = false;
+    
+    s.onerror = () => console.error(`Failed to load module: ${path}. Check if file exists in folder.`);
+    
+    s.onload = () => {
+        // As each logic engine lands, force a UI refresh
+        if (window.RouteEngine || path.includes('velocity')) {
+            window.dispatchEvent(new Event('weong:update'));
+        }
+    };
+    document.body.appendChild(s);
+});
