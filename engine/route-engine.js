@@ -1,79 +1,77 @@
 /**
- * ROUTE-ENGINE.JS | v.2025.12.29.11
- * Locked Core: Adding Travel Metrics without altering index.html Anchor Build.
+ * ROUTE-ENGINE.JS | v.2025.12.29.12
+ * Final Logic Lock: Metrics Flag Injection
  */
 const RouteEngine = {
-    control: null,
-    metricsFlag: null,
-    map: null,
+    _map: null,
+    _control: null,
+    _popup: null,
 
     calculateRoute: function(start, end) {
-        if (!this.map) return;
+        if (!this._map) {
+            console.error("[RouteEngine] Map not bridged.");
+            return;
+        }
 
-        // Cleanup existing route and popup
-        if (this.control) this.map.removeControl(this.control);
-        if (this.metricsFlag) this.map.removeLayer(this.metricsFlag);
+        // 1. Cleanup old instances
+        if (this._control) { this._map.removeControl(this._control); }
+        if (this._popup) { this._map.removeLayer(this._popup); }
 
-        this.control = L.Routing.control({
+        // 2. Initialize Routing Control
+        this._control = L.Routing.control({
             waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-            createMarker: () => null, // Maintain Build 10: No extra markers
+            createMarker: () => null, // Build 10 Lock: No engine markers
             addWaypoints: false,
             routeWhileDragging: false,
-            lineOptions: { 
-                styles: [{ color: '#0070bb', weight: 6, opacity: 0.8 }] 
-            }
-        }).addTo(this.map);
+            show: false, // Keep directions panel hidden
+            lineOptions: { styles: [{ color: '#0070bb', weight: 6 }] }
+        }).addTo(this._map);
 
-        this.control.on('routesfound', (e) => {
+        // 3. Listen for result and inject Metric Flag
+        this._control.on('routesfound', (e) => {
             const route = e.routes[0];
-            const totalKm = route.summary.totalDistance / 1000;
+            const distKm = route.summary.totalDistance / 1000;
             
             /**
-             * WEIGHTED SPEED CALCULATION
-             * Applying user-defined limits: 100km/h (TCH), 80km/h (Branch), 50km/h (Local)
-             * Average weighted speed for NL transit: 91 km/h
+             * TIERED SPEED CALCULATION
+             * 100km/h (TCH), 80km/h (Connector), 50km/h (Local)
+             * We use a weighted average (approx 92km/h) for the transit time.
              */
-            const weightedSpeed = (100 * 0.75) + (80 * 0.15) + (50 * 0.10); 
-            const totalHours = totalKm / weightedSpeed;
-            
-            const hours = Math.floor(totalHours);
-            const minutes = Math.round((totalHours - hours) * 60);
+            const weightSpeed = (100 * 0.8) + (80 * 0.15) + (50 * 0.05); 
+            const totalHours = distKm / weightSpeed;
+            const h = Math.floor(totalHours);
+            const m = Math.round((totalHours - h) * 60);
 
-            this.createMetricsFlag(route.coordinates, totalKm, hours, minutes);
+            this.injectFlag(route.coordinates, distKm, h, m);
         });
     },
 
-    createMetricsFlag: function(coords, dist, h, m) {
-        // Find the geographical midpoint of the route path
-        const midIndex = Math.floor(coords.length / 2);
-        const midPoint = coords[midIndex];
-        const timeDisplay = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    injectFlag: function(coords, dist, h, m) {
+        const midPoint = coords[Math.floor(coords.length * 0.45)]; // Slightly offset for visibility
+        const timeText = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
-        const content = `
-            <div style="background:rgba(40, 40, 40, 0.95); color:white; padding:10px; border-radius:8px; border:1px solid #0070bb; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-width:120px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
-                <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#aaa; margin-bottom:4px;">Est. Travel Time</div>
-                <div style="font-size:20px; font-weight:bold; color:#fff;">${timeDisplay}</div>
-                <div style="font-size:12px; margin-top:6px; padding-top:6px; border-top:1px solid #555; display:flex; justify-content:space-between;">
-                    <span>DISTANCE:</span>
-                    <span style="font-weight:bold; color:#0070bb;">${dist.toFixed(1)} km</span>
-                </div>
+        const html = `
+            <div style="background:#1a1a1a; color:#fff; border:2px solid #0070bb; padding:8px 12px; border-radius:4px; font-family:monospace; min-width:100px;">
+                <b style="color:#0070bb; font-size:14px;">DRIVE TIME</b><br>
+                <span style="font-size:18px;">${timeText}</span><br>
+                <small style="opacity:0.7;">DIST: ${dist.toFixed(1)} KM</small>
             </div>
         `;
 
-        this.metricsFlag = L.popup({
+        this._popup = L.popup({
             closeButton: false,
             autoClose: false,
-            closeOnClick: false,
-            className: 'custom-metrics-popup',
-            offset: [0, -10]
+            className: 'metrics-flag-popup',
+            offset: [0, -15]
         })
         .setLatLng(midPoint)
-        .setContent(content)
-        .addTo(this.map);
+        .setContent(html)
+        .addTo(this._map);
     }
 };
 
-// Map Handshake [cite: 2025-12-27]
+// Map Bridging
 window.addEventListener('map-ready', (e) => {
-    RouteEngine.map = e.detail.map;
+    RouteEngine._map = e.detail.map;
+    console.log("[RouteEngine] Bridge Established.");
 });
