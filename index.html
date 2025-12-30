@@ -24,11 +24,11 @@
     </style>
 </head>
 <body>
-    <div id="build-tag">Build: v.2025.12.29.14</div>
+    <div id="build-tag">Build: v.2025.12.29.15</div>
     <div id="map"></div>
 
     <script>
-        // GLOBAL SCOPE FOR ENGINE ACCESS
+        // CORE INITIALIZATION
         window.map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
 
@@ -37,7 +37,6 @@
 
         async function loadNLData() {
             try {
-                // Ensuring data path is correct relative to root
                 const response = await fetch('data/nl/communities.json');
                 const data = await response.json();
                 window.communityPoints = data.features.map(f => ({
@@ -46,7 +45,7 @@
                     name: f.properties.name || "Road Point"
                 }));
                 initApp();
-            } catch (e) { console.error("Data Load Error:", e); }
+            } catch (e) { console.error("Data Path Error:", e); }
         }
 
         function initApp() {
@@ -64,17 +63,16 @@
                     marker.setLatLng([nearest.lat, nearest.lng]); 
                     marker.getTooltip().setContent(nearest.name);
                     
-                    // CALL ENGINE FOR LIVE UPDATES
-                    if(window.RouteEngine && typeof window.RouteEngine.calculate === 'function') {
-                        window.RouteEngine.calculate();
-                    }
+                    // Trigger the engine in /engine/
+                    if(window.RouteEngine) window.RouteEngine.sync();
                 });
 
-                marker.on('dragend', () => { 
-                    if(window.RouteEngine) window.RouteEngine.calculate(); 
-                });
+                marker.on('dragend', () => { if(window.RouteEngine) window.RouteEngine.sync(); });
                 window.hubMarkers.push(marker);
             });
+            
+            // Final handshake check
+            window.dispatchEvent(new Event('app-ready'));
         }
 
         function findNearest(target) {
@@ -89,6 +87,7 @@
         }
         loadNLData();
     </script>
+
     <script src="engine/route-engine.js"></script>
 </body>
 </html>
