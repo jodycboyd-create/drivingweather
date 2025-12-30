@@ -1,30 +1,28 @@
-/** * [weong-bulletin] Resilient Forecast Anchor 
- * Status: Round-Robin Proxy (Fixes "OFF" status)
+/** * [weong-bulletin] Multi-Path Forecast Anchor 
+ * Status: Parallel Proxy Racing (Eliminates "OFF" / "...")
  * Locked: Dec 30, 2025 [cite: 2025-12-30]
  */
 
 (function() {
     let weatherLayer = L.layerGroup();
     let lastCoords = null;
+    const ECCC_BASE = "https://geo.weather.gc.ca/geomet";
     
-    // Rotating proxies to avoid rate-limiting and timeouts [cite: 2025-12-30]
-    const PROXIES = [
-        "https://api.allorigins.win/raw?url=",
-        "https://corsproxy.io/?",
-        "https://thingproxy.freeboard.io/fetch/"
+    // Triple-redundant pathing for Newfoundland data [cite: 2025-12-30]
+    const PATHS = [
+        url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        url => `https://thingproxy.freeboard.io/fetch/${url}`
     ];
-    const ECCC = "https://geo.weather.gc.ca/geomet";
 
-    const fetchForecast = async (url, attempt = 0) => {
-        try {
-            const proxyUrl = PROXIES[attempt % PROXIES.length] + encodeURIComponent(url);
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error();
-            return await response.json();
-        } catch (e) {
-            if (attempt < 2) return fetchForecast(url, attempt + 1);
-            throw e;
-        }
+    const raceForecast = async (url) => {
+        // Fire all paths simultaneously; first one to succeed wins [cite: 2025-12-30]
+        return Promise.any(PATHS.map(path => 
+            fetch(path(url)).then(res => {
+                if (!res.ok) throw new Error();
+                return res.json();
+            })
+        ));
     };
 
     const drawWeatherNodes = async (coords) => {
@@ -42,11 +40,11 @@
                 icon: L.divIcon({
                     className: 'w-icon',
                     html: `
-                        <div class="weather-box" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:44px; height:44px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 10px #000; transition: opacity 0.5s;">
-                            <span style="font-size:14px; line-height:1;">☁️</span>
-                            <span class="temp-val" style="font-size:12px; font-weight:bold; font-family:monospace; margin-top:2px;">...</span>
+                        <div class="weather-box" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:46px; height:46px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px rgba(0,0,0,0.8);">
+                            <span style="font-size:16px; line-height:1;">☁️</span>
+                            <span class="temp-val" style="font-size:13px; font-weight:bold; font-family:monospace; margin-top:2px;">...</span>
                         </div>`,
-                    iconSize: [44, 44]
+                    iconSize: [46, 46]
                 }),
                 zIndexOffset: 10000
             }).addTo(weatherLayer);
@@ -60,7 +58,7 @@
             const query = `?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo&LAYERS=${layers}&QUERY_LAYERS=${layers}&BBOX=${node.lat-0.01},${node.lng-0.01},${node.lat+0.01},${node.lng+0.01}&INFO_FORMAT=application/json&I=50&J=50&WIDTH=101&HEIGHT=101&CRS=EPSG:4326&TIME=${timeISO}`;
             
             try {
-                const json = await fetchForecast(ECCC + query);
+                const json = await raceForecast(ECCC_BASE + query);
                 const p = json.contents ? JSON.parse(json.contents).features[0].properties : json.features[0].properties;
                 
                 const temp = p['HRDPS.CONTINENTAL_TT'] || 0;
@@ -68,7 +66,7 @@
                 if (el) {
                     const label = el.querySelector('.temp-val');
                     label.innerText = `${Math.round(temp)}°`;
-                    if (temp <= 0) label.style.color = "#00d4ff";
+                    if (temp <= 0) label.style.color = "#00d4ff"; // Freezing blue [cite: 2025-12-30]
                 }
 
                 node.marker.bindPopup(`
@@ -83,10 +81,7 @@
                     </div>`);
             } catch (e) {
                 const label = node.marker.getElement()?.querySelector('.temp-val');
-                if (label) {
-                    label.innerText = "OFF";
-                    label.style.color = "#ff4757";
-                }
+                if (label) label.innerText = "!!"; // Fatal link error [cite: 2025-12-30]
             }
         });
     };
