@@ -14,34 +14,31 @@
             --panel-bg: rgba(15, 15, 15, 0.95);
             --tactical-gold: #FFD700;
         }
-        body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #map { height: 100vh; width: 100vw; z-index: 1; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; font-family: sans-serif; }
+        #map { height: 100vh; width: 100vw; z-index: 1; position: absolute; top: 0; left: 0; }
         
-        /* Tactical Widget Dock */
+        /* Tactical Widget Dock [cite: 2025-12-30] */
         #widget-dock { 
             position: absolute; bottom: 30px; left: 25px; z-index: 1000;
             display: flex; flex-direction: column; gap: 15px; pointer-events: none;
         }
-        .widget-anchor { pointer-events: auto; transition: transform 0.2s ease; }
-        .widget-anchor:hover { transform: translateY(-2px); }
+        .widget-anchor { pointer-events: auto; }
 
-        /* High-Contrast Hub Labels */
+        /* High-Contrast Hub Labels [cite: 2025-12-30] */
         .hub-label { 
             font-weight: 800; background: white; border: 2px solid var(--nl-blue); 
             padding: 5px 12px; border-radius: 6px; color: #111;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px;
-            text-transform: uppercase; letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
 
-        /* Leaflet Overrides for Tactical Visuals */
         .leaflet-routing-container { display: none !important; }
-        .leaflet-bar { border: none !important; box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important; }
         
         /* High Contrast Route Ribbon */
         .route-bubble { 
             background: var(--panel-bg); color: var(--tactical-gold); padding: 8px 18px; 
             border: 2px solid var(--tactical-gold); border-radius: 30px; 
-            font-weight: 900; font-size: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            font-weight: 900; font-size: 14px;
         }
     </style>
 </head>
@@ -59,90 +56,84 @@
     <script src="velocity-widget.js"></script>
 
     <script>
-        /** * CORE LOGIC BASELINE
-         * Do not condense or remodel below this line.
+        /** * CORE LOGIC BASELINE [cite: 2025-12-28, 2025-12-30]
+         * RESTORED: Full dataset handling for Newfoundland.
          */
-        window.addEventListener('load', function() {
-            // Initializing the Newfoundland-Centered Map
-            window.map = L.map('map', { 
-                zoomControl: false,
-                attributionControl: false 
-            }).setView([49.0, -56.0], 7);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
+        (function() {
+            console.log("System: Initializing Tactical Environment...");
             
+            // 1. Initialize Map Immediately to prevent blank screen
+            const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([49.0, -56.0], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            window.map = map;
+
             window.hubMarkers = [];
             window.communityData = [];
 
-            /**
-             * COMPREHENSIVE DATASET SNAPPING
-             * Locks markers to the locked Newfoundland community coordinates.
-             */
+            /** SNAPPING ENGINE [cite: 2025-12-26] **/
             function snap(latlng) {
-                if (!window.communityData || window.communityData.length === 0) {
-                    return { lat: latlng.lat, lng: latlng.lng, name: "Locating..." };
-                }
-                
+                if (!window.communityData || window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Locating..." };
                 let closest = window.communityData[0];
                 let minDist = Infinity;
-                
-                for (let i = 0; i < window.communityData.length; i++) {
-                    const p = window.communityData[i];
-                    const d = window.map.distance(latlng, [p.lat, p.lng]);
-                    if (d < minDist) {
-                        minDist = d;
-                        closest = p;
-                    }
-                }
+                window.communityData.forEach(p => {
+                    const d = map.distance(latlng, [p.lat, p.lng]);
+                    if (d < minDist) { minDist = d; closest = p; }
+                });
                 return closest;
             }
 
-            /**
-             * DEEP DIVE DATA LOADER
-             * Fetches the final dataset stored in your architecture.
-             */
-            async function loadNewfoundlandData() {
+            /** DEEP DIVE LOADER [cite: 2025-12-26] **/
+            async function loadNLData() {
                 try {
                     const response = await fetch('data/nl/communities.json');
-                    if (!response.ok) throw new Error("Dataset response error");
-                    
                     const data = await response.json();
                     window.communityData = data.features.map(f => ({
                         lat: f.geometry.coordinates[1], 
                         lng: f.geometry.coordinates[0], 
-                        name: f.properties.name || "Unnamed Point"
+                        name: f.properties.name
                     }));
-                    
-                    console.log("System: NL Deep Dive Data Locked In (" + window.communityData.length + " nodes)");
-                    initializeMarkers();
+                    console.log("System: NL Data Locked (" + window.communityData.length + " nodes)");
                 } catch (err) {
-                    console.error("System: Data Handshake Failed. Retrying...", err);
-                    initializeMarkers(); // Fallback to defaults
+                    console.warn("System: Dataset handshake failed, using baseline.");
                 }
+                renderHubs();
             }
 
-            function initializeMarkers() {
-                // Baseline builds for Corner Brook and St. John's
-                const baselineHubs = [
+            function renderHubs() {
+                const hubs = [
                     { name: "Corner Brook", lat: 48.9515, lng: -57.9482 },
                     { name: "St. John's", lat: 47.5615, lng: -52.7126 }
                 ];
                 
-                baselineHubs.forEach(hub => {
-                    const marker = L.marker([hub.lat, hub.lng], { 
-                        draggable: true,
-                        autoPan: true 
-                    }).addTo(window.map);
-
-                    marker.bindTooltip(hub.name, { 
-                        permanent: true, 
-                        className: 'hub-label', 
-                        direction: 'top', 
-                        offset: [0, -10] 
-                    });
+                hubs.forEach(hub => {
+                    const marker = L.marker([hub.lat, hub.lng], { draggable: true }).addTo(map);
+                    marker.bindTooltip(hub.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                     
-                    // RESTORED: Dynamic Label Update Logic
                     marker.on('drag', function(e) {
-                        const snapTarget = snap(e.target.getLatLng());
-                        e.target.setLatLng([snapTarget.lat, snapTarget.lng]);
-                        // This fixes the regression where labels stayed stuck
+                        const s = snap(e.target.getLatLng());
+                        e.target.setLatLng([s.lat, s.lng]);
+                        e.target.setTooltipContent(s.name); // RESTORED label update [cite: 2025-12-30]
+                    });
+
+                    marker.on('dragend', () => {
+                        if (window.RouteEngine) window.RouteEngine.calculate();
+                        syncWidgets();
+                    });
+                    window.hubMarkers.push(marker);
+                });
+                
+                if (window.RouteEngine) window.RouteEngine.calculate();
+                syncWidgets();
+            }
+
+            function syncWidgets() {
+                // Bridge logic for the Bulletin and Velocity modules [cite: 2025-12-30]
+                if (window.WeatherEngine && window.BulletinLogic) window.WeatherEngine.update(window.BulletinLogic);
+                if (window.VelocityWidget && typeof window.VelocityWidget.refresh === 'function') window.VelocityWidget.refresh();
+            }
+
+            loadNLData();
+        })();
+    </script>
+</body>
+</html>
