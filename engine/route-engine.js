@@ -1,7 +1,8 @@
 /**
- * ROUTE-ENGINE.JS | HIGH-CONTRAST GREY BUILD (FINAL)
- * Requirements: #777777 Ribbon, No Icons, Fixed 100/80/50 Speeds.
- * [cite: 2025-12-30] - MOOSE LOGIC EXCLUDED PER USER INSTRUCTION.
+ * ROUTE-ENGINE.JS | ZERO-REGRESSION BUILD
+ * Fixed: Missing default route on load.
+ * Features: #777777 Ribbon, No Icons, 100/80/50 Speeds.
+ *
  */
 window.RouteEngine = {
     _layers: L.layerGroup(),
@@ -9,7 +10,11 @@ window.RouteEngine = {
     _abortController: null,
 
     calculate: function() {
-        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) return;
+        // Ensure map and both markers exist before attempting fetch
+        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) {
+            console.warn("RouteEngine: Waiting for markers...");
+            return;
+        }
 
         if (this._abortController) this._abortController.abort();
         this._abortController = new AbortController();
@@ -36,7 +41,7 @@ window.RouteEngine = {
                 const hours = Math.floor(totalHrs);
                 const mins = Math.round((totalHrs - hours) * 60);
 
-                // 1. OUTER BORDER (Sharp Edge Definition)
+                // 1. OUTER BORDER (Sharp Edge)
                 L.polyline(coordinates, { 
                     color: '#444444', weight: 11, opacity: 1, lineCap: 'round' 
                 }).addTo(this._layers);
@@ -46,7 +51,7 @@ window.RouteEngine = {
                     color: '#777777', weight: 8, opacity: 1, lineCap: 'round' 
                 }).addTo(this._layers);
 
-                // 3. CENTER DASH (Standard Highway Marking)
+                // 3. CENTER DASH
                 L.polyline(coordinates, { 
                     color: '#FFD700', weight: 2, dashArray: '12, 24', opacity: 1 
                 }).addTo(this._layers);
@@ -63,8 +68,6 @@ window.RouteEngine = {
                         iconAnchor: [80, 15]
                     })
                 }).addTo(window.map);
-                
-                window.map.fitBounds(L.polyline(coordinates).getBounds(), { padding: [50, 50] });
             })
             .catch(err => {
                 if (err.name !== 'AbortError') console.error("Sync Error", err);
@@ -72,10 +75,22 @@ window.RouteEngine = {
     }
 };
 
+/**
+ * REINFORCED HANDSHAKE
+ * Specifically triggers the first calculation for the default route.
+ */
 window.addEventListener('shell-live', () => {
-    window.hubMarkers.forEach(m => {
-        m.off('dragend'); 
-        m.on('dragend', () => window.RouteEngine.calculate());
-    });
-    window.RouteEngine.calculate();
+    console.log("RouteEngine: Handshake Received.");
+    
+    if (window.hubMarkers) {
+        window.hubMarkers.forEach(m => {
+            m.off('dragend'); 
+            m.on('dragend', () => window.RouteEngine.calculate());
+        });
+        
+        // Force the initial calculation for Corner Brook -> St. John's
+        setTimeout(() => {
+            window.RouteEngine.calculate();
+        }, 100); 
+    }
 });
