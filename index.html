@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NL Navigator | ANCHOR POINT</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        /* SMOKE TEST: If the map background is dark, the cache is cleared */
+        #map { height: 100vh; width: 100vw; background: #222 !important; }
+        #build-tag { 
+            position: absolute; bottom: 20px; left: 10px; z-index: 1000; 
+            background: #ff4500; color: white; padding: 10px; 
+            font-family: monospace; font-weight: bold; border: 2px solid white;
+        }
+        .hub-label { font-weight: bold; background: white; border: 2px solid #ff4500; padding: 4px; }
+    </style>
+</head>
+<body>
+    <div id="build-tag">LOCKED ANCHOR: 1735525234</div>
+    <div id="map"></div>
+
+    <script>
+        // SHELL: NO ROUTING ALLOWED HERE [cite: 2025-12-30]
+        window.map = L.map('map').setView([49.0, -56.0], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
+        window.hubMarkers = [];
+
+        function init() {
+            const hubs = [
+                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
+                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
+            ];
+
+            hubs.forEach(h => {
+                const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
+                m.bindTooltip(h.name, { permanent: true, className: 'hub-label' });
+                
+                // Signal the engine in the subfolder
+                m.on('drag dragend', () => {
+                    if (window.RouteEngine) window.RouteEngine.calculate();
+                });
+                window.hubMarkers.push(m);
+            });
+            window.dispatchEvent(new Event('anchor-live'));
+        }
+        init();
+    </script>
+
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="engine/route-engine.js"></script>
+</body>
+</html>
