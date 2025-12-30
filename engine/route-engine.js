@@ -1,64 +1,51 @@
 /**
- * ROUTE-ENGINE.JS | SILENT PERFORMANCE BUILD
- * Optimized for real-time magnetism without UI lag.
- * [cite: 2025-12-30]
+ * ROUTE-ENGINE.JS | FINAL SILENT BUILD
+ * Purpose: Instant road-snapping without the directions panel.
  */
 window.RouteEngine = {
     _control: null,
 
     calculate: function() {
-        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) return;
+        // Ensure markers exist before attempting math
+        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) {
+            console.log("Engine: Waiting for markers...");
+            return;
+        }
         
         const pts = window.hubMarkers.map(m => m.getLatLng());
 
-        // 1. PERFORMANCE: If the line exists, just update its waypoints.
-        // This is the fastest method and prevents the "Darn Panel" from flashing [cite: 2025-12-30].
+        // PERFORMANCE: Update existing line instead of rebuilding [cite: 2025-12-30]
         if (this._control) {
             this._control.setWaypoints(pts);
             return;
         }
 
-        // 2. INITIALIZATION: Build the "Silent" Router
+        // INITIALIZE SILENT ROUTER
         this._control = L.Routing.control({
             waypoints: pts,
             router: L.Routing.osrmv1({ 
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'driving'
+                serviceUrl: 'https://router.project-osrm.org/route/v1' 
             }),
-            
-            // KILL THE PANEL: Forces the itinerary to stay empty and hidden [cite: 2025-12-30]
-            show: false,
+            lineOptions: {
+                styles: [{ color: '#0070bb', weight: 8, opacity: 0.7 }]
+            },
+            show: false,              // Kills the text panel [cite: 2025-12-30]
             addWaypoints: false,
             draggableWaypoints: false,
-            fitSelectedRoutes: false, 
-            
-            // Marker bypass: Shell owns the markers, Engine stays invisible
-            createMarker: function() { return null; }, 
-
-            lineOptions: {
-                styles: [{ 
-                    color: '#0070bb', 
-                    weight: 8, 
-                    opacity: 0.7 
-                }],
-                addWaypoints: false
-            }
+            fitSelectedRoutes: false,
+            createMarker: () => null  // Uses Shell markers only
         }).addTo(window.map);
 
-        // 3. FINAL LOCK: Physically hide the container in case the library ignores 'show: false'
+        // UI KILL-SWITCH: Physically remove the panel container if it appears
         const container = this._control.getContainer();
         if (container) {
             container.style.display = 'none';
-            container.style.visibility = 'hidden';
-            container.style.pointerEvents = 'none';
         }
     }
 };
 
-/**
- * Handshake listener: Wait for the shell to finish its first build [cite: 2025-12-30].
- */
+// HANDSHAKE: Listen for the 'shell-live' event from index.html [cite: 2025-12-30]
 window.addEventListener('shell-live', () => {
-    console.log("Engine: Silent Handshake Confirmed.");
+    console.log("Engine: Handshake Confirmed.");
     setTimeout(() => window.RouteEngine.calculate(), 500);
 });
