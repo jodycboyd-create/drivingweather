@@ -1,5 +1,5 @@
-/** [weong-route] Core Routing Engine - Restoration Build **/
-/** Locked: Dec 30, 2025 - Re-stabilized Route & Sleek HUD **/
+/** [weong-route] Core Routing Engine - Capsule HUD Build **/
+/** Locked: Dec 30, 2025 - Restored Ribbon & Minimalist Capsule **/
 
 let currentRouteLayer = null;
 let metricFlagMarker = null;
@@ -19,14 +19,21 @@ function renderStandaloneFlag(route) {
     const totalMinutes = (distKm / avgSpeed) * 60;
     const timeStr = `${Math.floor(totalMinutes / 60)}h ${Math.round(totalMinutes % 60)}m`;
 
+    // Capsule Style: Single line, uniform font, tactical separator [cite: 2025-12-30]
     const flagHtml = `
-        <div style="background: rgba(10,10,10,0.9); border-left: 3px solid #FFD700; color: #fff; padding: 6px 12px; border-radius: 2px; font-family: monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.5); pointer-events: none; white-space: nowrap;">
-            <div style="font-size: 16px; font-weight: bold;">${distKm.toFixed(1)}km</div>
-            <div style="font-size: 13px; color: #00FF00; margin-top: -2px;">${timeStr}</div>
+        <div style="background: rgba(10,10,10,0.95); border: 1px solid rgba(255, 215, 0, 0.4); color: #fff; padding: 4px 14px; border-radius: 20px; font-family: 'Courier New', monospace; box-shadow: 0 4px 15px rgba(0,0,0,0.6); pointer-events: none; white-space: nowrap; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 14px; font-weight: bold; letter-spacing: 0.5px;">${distKm.toFixed(1)}km</span>
+            <span style="color: #FFD700; font-weight: bold; opacity: 0.8;">|</span>
+            <span style="font-size: 14px; font-weight: bold; color: #00FF00; letter-spacing: 0.5px;">${timeStr}</span>
         </div>`;
 
     metricFlagMarker = L.marker([midPoint[1], midPoint[0]], {
-        icon: L.divIcon({ html: flagHtml, className: 'sleek-hud', iconSize: [100, 45], iconAnchor: [50, 50] }),
+        icon: L.divIcon({ 
+            html: flagHtml, 
+            className: 'capsule-hud', 
+            iconSize: [160, 30], 
+            iconAnchor: [80, 15] 
+        }),
         interactive: false
     }).addTo(window.map);
 }
@@ -35,7 +42,7 @@ function drawTacticalRoute(routeData) {
     if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
     currentRouteLayer = L.layerGroup().addTo(window.map);
 
-    // RESTORED: Ribbon Style [cite: 2025-12-27]
+    // RESTORED: Tactical Ribbon [cite: 2025-12-27]
     L.geoJSON(routeData.geometry, { style: { color: '#000', weight: 6, opacity: 0.3 } }).addTo(currentRouteLayer);
     L.geoJSON(routeData.geometry, { style: { color: '#2d2d2d', weight: 3, opacity: 1 } }).addTo(currentRouteLayer);
     L.geoJSON(routeData.geometry, { style: { color: '#FFD700', weight: 1, opacity: 1, dashArray: '6, 12' } }).addTo(currentRouteLayer);
@@ -58,7 +65,7 @@ export async function calculateRoute() {
                 renderStandaloneFlag(data.routes[0]);
             }
         } catch (e) {
-            console.warn("System: Nav link severed."); // Re-logged for consistency
+            console.warn("System: Nav link severed.");
         }
     }, 40);
 }
