@@ -1,4 +1,4 @@
-/** [weong-route] Core Routing Engine - High-Fidelity Integrated Build **/
+/** [weong-route] Core Routing Engine - Integrated Metrics Build **/
 /** Locked: Dec 30, 2025 Baseline [cite: 2025-12-30] **/
 
 let currentRouteLayer = null;
@@ -6,29 +6,28 @@ let metricFlag = null;
 
 /**
  * Tactical Ribbon Style: 
- * Triple-layered for maximum crispness and map definition.
+ * Triple-layered for crisp definition on the NL map.
  */
 function drawTacticalRoute(routeData) {
     if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
 
     currentRouteLayer = L.layerGroup().addTo(window.map);
 
-    // 1. Shadow/Shoulder: Gives the ribbon depth without a heavy border
+    // 1. Shadow/Shoulder (Depth)
     L.geoJSON(routeData.geometry, {
         style: { color: '#000000', weight: 6, opacity: 0.3, lineJoin: 'round' }
     }).addTo(currentRouteLayer);
 
-    // 2. Core Asphalt: The crisp, thin road ribbon
+    // 2. Core Asphalt (Sharpness)
     L.geoJSON(routeData.geometry, {
         style: { color: '#2d2d2d', weight: 3, opacity: 1, lineJoin: 'round' }
     }).addTo(currentRouteLayer);
 
-    // 3. Precision Centerline: Ultra-thin tactical markings
+    // 3. Precision Centerline (Detail)
     L.geoJSON(routeData.geometry, {
-        style: { color: '#FFD700', weight: 1, opacity: 1, dashArray: '6, 10', lineJoin: 'round' }
+        style: { color: '#FFD700', weight: 1, opacity: 1, dashArray: '6, 12', lineJoin: 'round' }
     }).addTo(currentRouteLayer);
 
-    // Adjust view on initial load [cite: 2025-12-26]
     if (!window.routeInitialized) {
         window.map.fitBounds(currentRouteLayer.getBounds(), { padding: [80, 80] });
         window.routeInitialized = true;
@@ -36,8 +35,8 @@ function drawTacticalRoute(routeData) {
 }
 
 /**
- * Metric Flag: High-contrast data overlay at Route Midpoint
- * This renders the "Target Box" containing Dist, Time, and Pace.
+ * Metric Flag: High-Contrast Data Overlay
+ * Rendered at the midpoint of the calculated route.
  */
 function updateMetricFlag(detail) {
     const { h, m, dist, speed, mid } = detail;
@@ -47,19 +46,21 @@ function updateMetricFlag(detail) {
 
     const flagHtml = `
         <div style="
-            background: rgba(10, 10, 10, 0.9); 
+            background: rgba(10, 10, 10, 0.95); 
             border: 1px solid #FFD700; 
             color: #FFFFFF; 
-            padding: 8px 12px; 
-            border-radius: 2px; 
+            padding: 10px; 
+            border-radius: 4px; 
             font-family: 'Courier New', monospace; 
-            min-width: 130px; 
-            box-shadow: 0 0 15px rgba(0,0,0,0.8);
+            width: 140px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
             pointer-events: none;
-            backdrop-filter: blur(3px);
+            backdrop-filter: blur(4px);
         ">
-            <div style="font-size: 9px; color: #FFD700; border-bottom: 1px solid #444; margin-bottom: 6px; letter-spacing: 1px; font-weight: bold;">NAV SPECS</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px;">
+            <div style="font-size: 9px; color: #FFD700; border-bottom: 1px solid #333; margin-bottom: 6px; letter-spacing: 2px; text-transform: uppercase; font-weight: bold;">
+                Sector Stats
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; line-height: 1.4;">
                 <span style="color: #888;">DIST:</span><span style="text-align: right;">${dist}km</span>
                 <span style="color: #888;">TIME:</span><span style="text-align: right;">${h}h ${m}m</span>
                 <span style="color: #888;">PACE:</span><span style="color: #00FF00; text-align: right; font-weight: bold;">${speed}</span>
@@ -71,19 +72,21 @@ function updateMetricFlag(detail) {
         icon: L.divIcon({
             html: flagHtml,
             className: 'tactical-flag',
-            iconSize: [140, 65],
-            iconAnchor: [70, 75]
+            iconSize: [150, 70],
+            iconAnchor: [75, 80] 
         }),
         interactive: false
     }).addTo(window.map);
 }
 
 /**
- * Core Routing Logic
+ * Main OSRM Calculation
  */
 async function calculateRoute() {
-    // Only proceed if markers are present
-    if (!window.hubMarkers || window.hubMarkers.length < 2) return;
+    if (!window.hubMarkers || window.hubMarkers.length < 2) {
+        console.warn("System: Markers not ready for routing.");
+        return;
+    }
 
     const start = window.hubMarkers[0].getLatLng();
     const end = window.hubMarkers[1].getLatLng();
@@ -91,13 +94,13 @@ async function calculateRoute() {
 
     try {
         const response = await fetch(url);
+        if (!response.ok) throw new Error("OSRM Offline");
         const data = await response.json();
 
         if (data.routes && data.routes[0]) {
             const route = data.routes[0];
             drawTacticalRoute(route);
             
-            // Send route data to the Velocity Widget for metric calculation
             window.dispatchEvent(new CustomEvent('weong:routeUpdated', { 
                 detail: {
                     summary: route.summary,
@@ -107,18 +110,18 @@ async function calculateRoute() {
             }));
         }
     } catch (error) {
-        console.error("System: Nav link severed.");
+        console.error("System: Nav link severed. Retrying...");
+        setTimeout(calculateRoute, 3000); // Auto-recovery logic
     }
 }
 
-// Event Listeners for System Lifecycle
+// Global Event Subscriptions
 window.addEventListener('weong:ready', () => calculateRoute());
 window.addEventListener('weong:update', () => calculateRoute());
 
-// This listener catches the result from velocity-widget.js to draw the flag
+// This ensures the flag appears when the Velocity Widget completes its math
 window.addEventListener('weong:speedCalculated', (e) => {
     updateMetricFlag(e.detail);
 });
 
-// Export for manifest.js (type="module") compatibility
 export { calculateRoute };
