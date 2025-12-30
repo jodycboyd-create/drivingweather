@@ -3,76 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Handshake Shell</title>
+    <title>NL Navigator | Final Shell</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
         .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: Arial, sans-serif; }
-        #build-tag { position: absolute; bottom: 20px; left: 10px; z-index: 1000; background: white; padding: 5px 12px; border: 2px solid #333; font-family: monospace; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="build-tag">Build: v.2025.12.29.16-FINAL-SHELL</div>
     <div id="map"></div>
 
     <script>
-        // GLOBAL STATE
+        // INITIALIZE MAP & GLOBALS
         window.map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
-
-        window.communityPoints = [];
         window.hubMarkers = [];
 
-        async function loadNLData() {
-            try {
-                const response = await fetch('data/nl/communities.json');
-                const data = await response.json();
-                window.communityPoints = data.features.map(f => ({
-                    lat: f.geometry.coordinates[1],
-                    lng: f.geometry.coordinates[0],
-                    name: f.properties.name || "Road Point"
-                }));
-                initApp();
-            } catch (e) { console.error("Data Path Error:", e); }
-        }
-
         function initApp() {
-            const hubs = [{ name: "St. John's", lat: 47.5615, lng: -52.7126 }, { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }];
+            const hubs = [
+                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
+                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
+            ];
 
             hubs.forEach(h => {
                 const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
-                marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label', offset: [0, -10] });
+                marker.bindTooltip(h.name, { permanent: true, className: 'hub-label' });
                 
-                marker.on('drag', function(e) {
-                    const nearest = findNearest(e.target.getLatLng());
-                    marker.setLatLng([nearest.lat, nearest.lng]); 
-                    marker.getTooltip().setContent(nearest.name);
-                    
-                    // HANDOFF: index.html tells the engine to recalculate
-                    if(window.RouteEngine) window.RouteEngine.calculate();
+                // TRIGGER EXTERNAL ENGINE
+                marker.on('drag dragend', () => {
+                    if (window.RouteEngine) window.RouteEngine.calculate();
                 });
-
-                marker.on('dragend', () => { if(window.RouteEngine) window.RouteEngine.calculate(); });
                 window.hubMarkers.push(marker);
             });
             
-            // Send signal that the UI is ready for the engine
-            window.dispatchEvent(new Event('engine-init'));
+            // SIGNAL TO ENGINE
+            window.dispatchEvent(new Event('shell-ready'));
         }
-
-        function findNearest(target) {
-            let closest = window.communityPoints[0];
-            let minDist = Infinity;
-            for (let i = 0; i < window.communityPoints.length; i++) {
-                const p = window.communityPoints[i];
-                const d = Math.sqrt(Math.pow(p.lat - target.lat, 2) + Math.pow(p.lng - target.lng, 2));
-                if (d < minDist) { minDist = d; closest = p; }
-            }
-            return closest;
-        }
-        loadNLData();
+        initApp();
     </script>
 
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
