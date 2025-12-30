@@ -1,66 +1,55 @@
-/** * [weong-bulletin] Hardware-Level Force Build
- * Purpose: Absolute rendering of Red Circles regardless of event timing.
- * Locked: Dec 30, 2025 [cite: 2025-12-30]
+/** * [weong-bulletin] Visual Verification Engine
+ * Status: Watchdog Active - Dec 30, 2025 [cite: 2025-12-30]
  */
 
 (function() {
+    // Persistent Layer Group for all weather nodes
     window.weatherMarkers = L.layerGroup();
-    let lastRenderedRoute = null;
+    let lastProcessedRoute = null;
 
-    // 1. IMMEDIATE ATTACHMENT
-    function ensureLayerOnMap() {
+    const runBulletinDiagnostics = () => {
+        // 1. Ensure the layer is on the map instance
         if (window.map && !window.map.hasLayer(window.weatherMarkers)) {
             window.weatherMarkers.addTo(window.map);
-            console.log("Bulletin: Layer forced onto map instance.");
-        }
-    }
-
-    // 2. THE RED CIRCLE ENGINE
-    window.renderWeatherNodes = function(routeData) {
-        const route = routeData || window.currentRouteData;
-        if (!route || !route.geometry) {
-            console.warn("Bulletin: No route data found in global anchor.");
-            return;
+            console.log("Bulletin: Layer attached to map.");
         }
 
-        ensureLayerOnMap();
+        // 2. Check for the Global Anchor provided by route-engine [cite: 2025-12-30]
+        const route = window.currentRouteData;
+        if (!route || route === lastProcessedRoute) return;
+
+        console.log("Bulletin: Global Anchor detected. Rendering nodes...");
         window.weatherMarkers.clearLayers();
         
         const coords = route.geometry.coordinates;
-        // Sampling 6 high-contrast nodes across the island [cite: 2025-12-30]
-        [0.1, 0.25, 0.45, 0.65, 0.85, 0.98].forEach(pct => {
+        // Sample 5 high-visibility Red Circles along the Newfoundland path [cite: 2025-12-30]
+        [0.2, 0.4, 0.6, 0.8, 0.95].forEach(pct => {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
 
-            // Using L.circle for absolute coordinate persistence
-            L.circle([lat, lng], {
-                radius: 2500, // 2.5km radius for visibility at island-scale
-                color: '#ff0000',
-                fillColor: '#ff0000',
-                fillOpacity: 0.8,
-                weight: 5,
-                pane: 'markerPane' // Force into the top-most Leaflet pane
-            })
-            .bindPopup(`<b>TEST NODE</b><br>LAT: ${lat.toFixed(3)}<br>LNG: ${lng.toFixed(3)}`)
-            .addTo(window.weatherMarkers);
+            L.circleMarker([lat, lng], {
+                radius: 12,
+                fillColor: "#ff4757", // Red
+                color: "#ffffff",     // White Border
+                weight: 3,
+                fillOpacity: 1,
+                pane: 'markerPane',   // Ensure it stays above the route line
+                zIndexOffset: 10000
+            }).addTo(window.weatherMarkers);
         });
 
-        console.log("Bulletin: 6 Red Circles rendered to map.");
-        lastRenderedRoute = route;
+        lastProcessedRoute = route;
+        console.log("Bulletin: Red Circles Rendered.");
     };
 
-    // 3. PERSISTENT WATCHER [cite: 2025-12-30]
-    // If the route engine updates window.currentRouteData, this will catch it.
-    setInterval(() => {
-        if (window.currentRouteData && window.currentRouteData !== lastRenderedRoute) {
-            window.renderWeatherNodes(window.currentRouteData);
-        }
-    }, 1000);
+    // Continuous Watchdog: Checks for route updates every second [cite: 2025-12-30]
+    setInterval(runBulletinDiagnostics, 1000);
 
-    // 4. EVENT OVERRIDE
+    // Event-based trigger for snappier UI response [cite: 2025-12-30]
     window.addEventListener('weong:routeUpdated', (e) => {
-        window.renderWeatherNodes(e.detail);
+        window.currentRouteData = e.detail;
+        runBulletinDiagnostics();
     });
 
-    console.log("Bulletin: Force-Render Engine active.");
+    console.log("System: /engine/weather-bulletin.js initialized.");
 })();
