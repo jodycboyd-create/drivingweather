@@ -1,7 +1,7 @@
 /**
- * ROUTE-ENGINE.JS | HIGH-CONTRAST GREY BUILD
- * Updates: Sharper #777777 ribbon, No "fuzzy" edges, 100/80/50 Speeds.
- * [cite: 2025-12-30]
+ * ROUTE-ENGINE.JS | HIGH-CONTRAST GREY BUILD (FINAL)
+ * Requirements: #777777 Ribbon, No Icons, Fixed 100/80/50 Speeds.
+ * [cite: 2025-12-30] - MOOSE LOGIC EXCLUDED PER USER INSTRUCTION.
  */
 window.RouteEngine = {
     _layers: L.layerGroup(),
@@ -29,24 +29,24 @@ window.RouteEngine = {
                 const coordinates = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 const distanceKm = route.distance / 1000;
 
-                /** * SPEED MATH [Locked]
-                 * TCH: 100 | Branch: 80 | Local: 50
+                /** * SPEED MATH [LOCKED]
+                 * 100 km/h (TCH), 80 km/h (Branch), 50 km/h (Local)
                  */
                 const totalHrs = ((distanceKm * 0.75) / 100) + ((distanceKm * 0.20) / 80) + ((distanceKm * 0.05) / 50);
                 const hours = Math.floor(totalHrs);
                 const mins = Math.round((totalHrs - hours) * 60);
 
-                // 1. SHARP OUTER BORDER (Prevents "fuzziness")
+                // 1. OUTER BORDER (Sharp Edge Definition)
                 L.polyline(coordinates, { 
                     color: '#444444', weight: 11, opacity: 1, lineCap: 'round' 
                 }).addTo(this._layers);
 
-                // 2. MAIN GREY RIBBON (Slightly darker grey for definition)
+                // 2. MAIN GREY RIBBON (#777777)
                 L.polyline(coordinates, { 
                     color: '#777777', weight: 8, opacity: 1, lineCap: 'round' 
                 }).addTo(this._layers);
 
-                // 3. CENTER DASH
+                // 3. CENTER DASH (Standard Highway Marking)
                 L.polyline(coordinates, { 
                     color: '#FFD700', weight: 2, dashArray: '12, 24', opacity: 1 
                 }).addTo(this._layers);
