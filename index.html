@@ -2,36 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Locked Anchor Build</title>
+    <title>NL Navigator | Full Handshake Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
-        
-        /* NUCLEAR PANEL KILLER */
-        .leaflet-routing-container, .leaflet-routing-error, .hidden-panel {
-            display: none !important;
-            visibility: hidden !important;
-        }
-
-        .hub-label { 
-            font-weight: bold; background: white; border: 2px solid #0070bb; 
-            padding: 4px 10px; border-radius: 4px; font-family: sans-serif;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        .route-bubble {
-            background: rgba(17, 17, 17, 0.9);
-            backdrop-filter: blur(4px);
-            color: #FFD700;
-            padding: 6px 14px;
-            border: 1.5px solid rgba(255, 215, 0, 0.6);
-            border-radius: 20px;
-            font-weight: 700;
-            white-space: nowrap;
-            font-family: sans-serif;
-            font-size: 13px;
-        }
+        .leaflet-routing-container, .hidden-panel { display: none !important; }
+        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: sans-serif; }
+        .route-bubble { background: rgba(17, 17, 17, 0.9); color: #FFD700; padding: 6px 14px; border: 1.5px solid rgba(255, 215, 0, 0.6); border-radius: 20px; font-weight: 700; font-family: sans-serif; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -41,6 +19,7 @@
     <script src="engine/route-engine.js"></script>
 
     <script>
+        console.log("System: Initializing Leaflet Map...");
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         
@@ -60,6 +39,7 @@
 
         async function loadNL() {
             try {
+                console.log("System: Fetching community dataset...");
                 const res = await fetch('data/nl/communities.json');
                 const data = await res.json();
                 window.communityData = data.features.map(f => ({
@@ -68,7 +48,7 @@
                     name: f.properties.name || "Unnamed Point"
                 }));
                 init();
-            } catch (e) { init(); }
+            } catch (e) { console.error("Data Load Failed:", e); init(); }
         }
 
         function init() {
@@ -88,40 +68,44 @@
                 });
 
                 m.on('dragend', () => {
-                    // Trigger Route Engine (Standard Global)
+                    console.log("Marker: Drag End. Triggering engines...");
                     if (window.RouteEngine) window.RouteEngine.calculate();
-                    
-                    // Trigger Module-based engines via custom event
                     window.dispatchEvent(new CustomEvent('engine-update'));
                 });
 
                 window.hubMarkers.push(m);
             });
             
-            // Initial render
-            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); }, 500);
+            setTimeout(() => { 
+                console.log("System: Running first-load route calculation...");
+                if (window.RouteEngine) window.RouteEngine.calculate(); 
+            }, 500);
         }
         
         loadNL();
     </script>
     
     <script type="module">
-        import { BulletinLogic } from './weather-bulletin.js';
-        import { WeatherEngine } from './engine/weather-engine.js';
-        import { VelocityWidget } from './velocity-widget.js';
+        console.log("Modules: Attempting imports...");
+        
+        try {
+            const { BulletinLogic } = await import('./weather-bulletin.js');
+            const { WeatherEngine } = await import('./engine/weather-engine.js');
+            const { VelocityWidget } = await import('./velocity-widget.js');
 
-        // Listen for the custom event from the markers
-        window.addEventListener('engine-update', () => {
-            console.log("Modules: Received Update Signal");
-            WeatherEngine.update(BulletinLogic);
-            VelocityWidget.refresh();
-        });
+            console.log("Modules: Successfully imported Bulletin, Weather, and Velocity.");
 
-        // Initial handshake on load
-        window.addEventListener('load', () => {
-            console.log("Modules: Handshake Active");
-            WeatherEngine.update(BulletinLogic);
-        });
+            window.addEventListener('engine-update', () => {
+                WeatherEngine.update(BulletinLogic);
+                VelocityWidget.refresh();
+            });
+
+            // Trigger weather on load
+            window.addEventListener('load', () => WeatherEngine.update(BulletinLogic));
+
+        } catch (err) {
+            console.error("Modules: One or more files failed to load. Check file paths!", err);
+        }
     </script>
 </body>
 </html>
