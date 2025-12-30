@@ -26,18 +26,23 @@
     <div id="map"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script src="weather-bulletin.js"></script>
+    <script src="engine/weather-engine.js"></script>
     <script src="engine/route-engine.js"></script>
+    <script src="velocity-widget.js"></script>
 
     <script>
+        // Baseline Setup [cite: 2025-12-28, 2025-12-30]
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         
         window.hubMarkers = [];
         window.communityData = [];
 
-        // SNAPPING LOGIC: Returns full object to fix label freezing [cite: 2025-12-26, 2025-12-30]
+        // RESTORED: Snap returns full object for label updates [cite: 2025-12-26, 2025-12-30]
         function snap(latlng) {
-            if (window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Loading..." };
+            if (window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Searching..." };
             let closest = window.communityData[0];
             let minDist = Infinity;
             window.communityData.forEach(p => {
@@ -73,52 +78,33 @@
                 m.on('drag', (e) => {
                     const snapData = snap(e.target.getLatLng());
                     e.target.setLatLng([snapData.lat, snapData.lng]);
-                    // FIXED: Immediate label update during drag [cite: 2025-12-30]
+                    // FIXED: Immediate label update [cite: 2025-12-30]
                     e.target.setTooltipContent(snapData.name);
                 });
 
                 m.on('dragend', () => {
                     if (window.RouteEngine) window.RouteEngine.calculate();
-                    window.dispatchEvent(new CustomEvent('engine-sync'));
+                    // Sync the weather and velocity logic via the handshake
+                    syncEngines();
                 });
 
                 window.hubMarkers.push(m);
             });
             
-            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); }, 500);
+            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); syncEngines(); }, 500);
         }
-        loadNL();
-    </script>
-    
-    <script type="module">
-        async function connect() {
-            console.log("Modules: Attempting Hardened Handshake...");
-            const v = Date.now(); // Cache-buster to bypass Vercel 404 cache
-            
-            try {
-                // Explicit root-relative paths to satisfy module resolution
-                const bulletin = await import(`/weather-bulletin.js?v=${v}`);
-                const weather = await import(`/engine/weather-engine.js?v=${v}`);
-                const velocity = await import(`/velocity-widget.js?v=${v}`);
 
-                window.BulletinLogic = bulletin.BulletinLogic;
-                window.WeatherEngine = weather.WeatherEngine;
-                window.VelocityWidget = velocity.VelocityWidget;
-
-                window.addEventListener('engine-sync', () => {
-                    window.WeatherEngine.update(window.BulletinLogic);
-                    window.VelocityWidget.refresh();
-                });
-
-                // Run initial engine update
+        function syncEngines() {
+            // Check if global scripts are loaded [cite: 2025-12-30]
+            if (window.WeatherEngine && window.BulletinLogic) {
                 window.WeatherEngine.update(window.BulletinLogic);
-                console.log("Handshake: SUCCESS. All logic engines mapped.");
-
-            } catch (err) {
-                console.error("Handshake: FATAL. Module resolution blocked by server.", err);
+            }
+            if (window.VelocityWidget) {
+                window.VelocityWidget.refresh();
             }
         }
-        connect();
+
+        loadNL();
     </script>
 </body>
 </html>
