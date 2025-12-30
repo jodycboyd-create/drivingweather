@@ -3,71 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Magnetic Handshake</title>
+    <title>NL Navigator | Silent Magnetic Build</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; background: #aad3df; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
+        #map { height: 100vh; width: 100vw; }
+
+        /* PROFESSIONAL TOOLTIP STYLE [cite: 2025-12-30] */
         .hub-label { 
             font-weight: bold; 
             background: white; 
             border: 2px solid #0070bb; 
             padding: 5px 12px; 
             border-radius: 6px; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            font-family: sans-serif;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             pointer-events: none;
         }
+
+        /* KILL THE ROUTING PANEL TO STOP LAG [cite: 2025-12-30] */
+        .leaflet-routing-container, 
+        .leaflet-routing-error,
+        .leaflet-routing-alt,
+        .hidden-panel {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            width: 0 !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
         #build-tag { 
-            position: absolute; 
-            bottom: 20px; 
-            left: 20px; 
-            z-index: 1000; 
-            background: rgba(255, 255, 255, 0.9); 
-            padding: 8px 12px; 
-            border: 1px solid #333; 
-            border-radius: 4px;
-            font-family: monospace; 
-            font-size: 11px; 
+            position: absolute; bottom: 10px; left: 10px; z-index: 1000; 
+            background: rgba(255,255,255,0.8); padding: 5px; font-family: monospace; 
+            font-size: 10px; border: 1px solid #999; border-radius: 3px;
         }
     </style>
 </head>
 <body>
 
-    <div id="build-tag">LOCKED_ANCHOR: 1735534800</div>
+    <div id="build-tag">LOCKED_ANCHOR: 1735539318</div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // GLOBAL STATE [cite: 2025-12-30]
+        // CORE INITIALIZATION [cite: 2025-12-27, 2025-12-30]
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         
         window.hubMarkers = [];
         window.communityData = [];
 
-        // 1. DATA LOAD (Newfoundland Final Dataset) [cite: 2025-12-26]
-        async function loadNewfoundlandData() {
+        // LOAD NEWFOUNDLAND COMPREHENSIVE DATASET [cite: 2025-12-26]
+        async function loadNLData() {
             try {
                 const response = await fetch('data/nl/communities.json');
                 const data = await response.json();
                 window.communityData = data.features.map(f => ({
                     lat: f.geometry.coordinates[1],
                     lng: f.geometry.coordinates[0],
-                    name: f.properties.name || "Unnamed Point"
+                    name: f.properties.name || "Road Point"
                 }));
-                console.log("Database Locked: " + window.communityData.length + " points loaded.");
                 initApp();
             } catch (err) {
-                console.error("Critical Data Load Failure:", err);
-                initApp(); // Fallback to basic coordinates
+                console.error("Data Load Error:", err);
+                initApp(); // Fallback to ensure markers appear
             }
         }
 
-        // 2. MAGNETIC SNAPPING LOGIC [cite: 2025-12-30]
-        function getMagneticPoint(latlng) {
+        // SNAPPING ENGINE: Finds nearest community point [cite: 2025-12-30]
+        function getSnappedPoint(latlng) {
             if (window.communityData.length === 0) return { ...latlng, name: "Searching..." };
             
             let closest = window.communityData[0];
@@ -84,48 +94,44 @@
             return { lat: closest.lat, lng: closest.lng, name: closest.name };
         }
 
-        // 3. INITIALIZE INTERACTIVE ELEMENTS
         function initApp() {
-            const startHubs = [
+            const hubs = [
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
                 { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
             ];
 
-            startHubs.forEach(h => {
-                const marker = L.marker([h.lat, h.lng], { 
-                    draggable: true,
-                    autoPan: true 
-                }).addTo(window.map);
-
+            hubs.forEach(h => {
+                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
+                
                 marker.bindTooltip(h.name, { 
                     permanent: true, 
-                    className: 'hub-label',
-                    direction: 'top',
-                    offset: [0, -15]
+                    className: 'hub-label', 
+                    direction: 'top', 
+                    offset: [0, -15] 
                 });
 
-                // THE MAGNETIC HANDSHAKE TRIGGER [cite: 2025-12-30]
+                // REAL-TIME MAGNETIC HANDSHAKE [cite: 2025-12-30]
                 marker.on('drag', function(e) {
-                    const snapped = getMagneticPoint(e.target.getLatLng());
+                    const snapped = getSnappedPoint(e.target.getLatLng());
                     
-                    // Apply Magnetism: Marker jumps to nearest town
+                    // 1. Visually snap marker to community
                     e.target.setLatLng([snapped.lat, snapped.lng]);
                     
-                    // Dynamic Labeling: Tooltip updates while dragging
+                    // 2. Dynamic label update
                     e.target.setTooltipContent(snapped.name);
                     
-                    // Engine Call: Redraw route on the fly
+                    // 3. Silent call to Route Engine (engine/route-engine.js)
                     if (window.RouteEngine) window.RouteEngine.calculate();
                 });
 
                 window.hubMarkers.push(marker);
             });
 
-            // Signal to RouteEngine that the shell is ready [cite: 2025-12-30]
+            // Let the Route Engine know the shell is live [cite: 2025-12-30]
             window.dispatchEvent(new Event('shell-live'));
         }
 
-        loadNewfoundlandData();
+        loadNLData();
     </script>
 
     <script src="engine/route-engine.js"></script>
