@@ -124,6 +124,22 @@
 
     <script type="module" src="engine/weather-engine.js"></script>
     <script type="module" src="velocity-widget.js"></script>
+<script src="engine/route-engine.js"></script>
 
+    <script type="module">
+        // Import logic from root with error handling
+        import { BulletinLogic } from './weather-bulletin.js';
+        window.BulletinLogic = BulletinLogic;
+        console.log("BulletinLogic Handshake: SUCCESS");
+
+        // Dynamically load engines to ensure sequence
+        import('./engine/weather-engine.js')
+            .then(() => console.log("WeatherEngine Handshake: SUCCESS"))
+            .catch(err => console.error("WeatherEngine Handshake: FAILED", err));
+
+        import('./velocity-widget.js')
+            .then(() => console.log("VelocityWidget Handshake: SUCCESS"))
+            .catch(err => console.error("VelocityWidget Handshake: FAILED", err));
+    </script>
 </body>
 </html>
