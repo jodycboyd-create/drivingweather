@@ -1,84 +1,94 @@
-/** * [weong-bulletin] Dynamic Sync Forecast Anchor 
- * Status: Coupled Engine (Fixes Route Decoupling)
- * Locked: Dec 30, 2025 [cite: 2025-12-30]
+/** * [weong-bulletin] Time-Aware HRDPS Engine 
+ * Status: Velocity-Widget Synced [cite: 2025-12-30]
+ * Logic: Real-time Newfoundland HRDPS Final Dataset [cite: 2025-12-26]
  */
 
 (function() {
     let weatherLayer = L.layerGroup();
-    let lastRouteID = null;
+    let lastAnchor = null;
 
-    // Direct data link from the internal [weong-bulletin] logic [cite: 2025-12-30]
-    const getInternalForecast = (lat, lng) => {
-        // Pulling from the comprehensive Newfoundland final dataset [cite: 2025-12-26]
-        return {
-            temp: window.weongData?.temp || -2, 
-            wind: window.weongData?.wind || 45,
-            vis: window.weongData?.vis || 10,
-            snow: window.weongData?.snow || 0
-        };
+    const ECCC_BASE = "https://geo.weather.gc.ca/geomet";
+    const PROXY = "https://api.allorigins.win/raw?url=";
+
+    const fetchPointWeather = async (lat, lng, timeISO) => {
+        const layers = "HRDPS.CONTINENTAL_TT,HRDPS.CONTINENTAL_SDE,HRDPS.CONTINENTAL_VIS,HRDPS.CONTINENTAL_UU";
+        const query = `?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo&LAYERS=${layers}&QUERY_LAYERS=${layers}` +
+                      `&BBOX=${lat-0.01},${lng-0.01},${lat+0.01},${lng+0.01}&INFO_FORMAT=application/json` +
+                      `&I=50&J=50&WIDTH=101&HEIGHT=101&CRS=EPSG:4326&TIME=${timeISO}`;
+        try {
+            const response = await fetch(PROXY + encodeURIComponent(ECCC_BASE + query));
+            const json = await response.json();
+            const p = json.contents ? JSON.parse(json.contents).features[0].properties : json.features[0].properties;
+            return p;
+        } catch (e) { 
+            return null; 
+        }
     };
 
-    const syncWeatherToRoute = () => {
+    const updateWeatherNodes = async () => {
         if (!window.map) return;
-        
-        // Find the active route layer [cite: 2025-12-30]
+
+        // 1. Grab Current Route & Departure Time [cite: 2025-12-30]
         let activeRoute = null;
         window.map.eachLayer(layer => {
-            if (layer.feature?.geometry?.type === "LineString") {
-                activeRoute = layer;
-            }
+            if (layer.feature?.geometry?.type === "LineString") activeRoute = layer;
         });
 
-        if (!activeRoute) {
-            console.warn("Bulletin: No route data found in global anchor."); //
-            return;
-        }
+        const depTime = window.currentDepartureTime || new Date(); // Link to Velocity Widget [cite: 2025-12-30]
+        const coords = activeRoute?.feature?.geometry?.coordinates;
+        
+        if (!coords) return;
 
-        const coords = activeRoute.feature.geometry.coordinates;
-        const currentID = JSON.stringify(coords[0]) + coords.length;
+        // Unique anchor: Route Geometry + Departure Hour [cite: 2025-12-30]
+        const currentAnchor = JSON.stringify(coords[0]) + coords.length + depTime.getHours();
+        if (currentAnchor === lastAnchor) return;
+        lastAnchor = currentAnchor;
 
-        // Only redraw if the route geometry has actually shifted [cite: 2025-12-30]
-        if (currentID === lastRouteID) return;
-        lastRouteID = currentID;
-
-        if (!window.map.hasLayer(weatherLayer)) weatherLayer.addTo(window.map);
         weatherLayer.clearLayers();
-
         const pcts = [0.15, 0.45, 0.75, 0.92];
-        pcts.forEach(pct => {
+
+        pcts.forEach(async (pct) => {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
-            const data = getInternalForecast(lat, lng);
-            const isFreezing = data.temp <= 0;
+            
+            // Calculate time offset based on route progress [cite: 2025-12-30]
+            const travelHours = (idx / coords.length) * 6; // Est. based on average NL transit
+            const forecastTime = new Date(depTime.getTime() + travelHours * 3600000);
+            const timeISO = forecastTime.toISOString().substring(0, 13) + ":00:00Z";
 
             const marker = L.marker([lat, lng], {
                 icon: L.divIcon({
                     className: 'w-icon',
-                    html: `
-                        <div style="background:#000; border:2px solid #FFD700; border-radius:4px; width:48px; height:48px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px rgba(0,0,0,0.9);">
-                            <span style="font-size:16px; line-height:1;">☁️</span>
-                            <span style="font-size:14px; font-weight:bold; font-family:monospace; margin-top:2px; color: ${isFreezing ? '#00d4ff' : '#FFD700'};">
-                                ${Math.round(data.temp)}°
-                            </span>
-                        </div>`,
+                    html: `<div class="w-box" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:48px; height:48px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000;">
+                            <span style="font-size:14px;">☁️</span>
+                            <span class="t-val" style="font-size:13px; font-weight:bold; font-family:monospace;">...</span>
+                           </div>`,
                     iconSize: [48, 48]
-                }),
-                zIndexOffset: 15000 // Force visibility above the route line [cite: 2025-12-30]
+                })
             }).addTo(weatherLayer);
 
-            marker.bindPopup(`
-                <div style="font-family:'Courier New',monospace; font-size:12px; background:#0a0a0a; color:#fff; padding:12px; border-left:4px solid #FFD700; min-width:190px;">
-                    <div style="color:#FFD700; font-weight:bold; margin-bottom:8px; border-bottom:1px solid #333; padding-bottom:4px; letter-spacing:1px;">WEONG FORECAST</div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                        <span style="color:#888;">TEMP</span><span style="text-align:right;">${data.temp.toFixed(1)}°C</span>
-                        <span style="color:#888;">WIND</span><span style="text-align:right;">${data.wind} km/h</span>
-                        <span style="color:#888;">VIS</span><span style="text-align:right;">${data.vis} km</span>
-                        <span style="color:#888;">SNOW</span><span style="text-align:right;">${data.snow} cm</span>
-                    </div>
-                </div>`);
+            // Fetch Real HRDPS Data (Replacing the -2 hardcode) [cite: 2025-12-30]
+            const p = await fetchPointWeather(lat, lng, timeISO);
+            if (p) {
+                const temp = p['HRDPS.CONTINENTAL_TT'] || 0;
+                const el = marker.getElement();
+                if (el) {
+                    const label = el.querySelector('.t-val');
+                    label.innerText = `${Math.round(temp)}°`;
+                    label.style.color = temp <= 0 ? "#00d4ff" : "#FFD700";
+                }
+                
+                marker.bindPopup(`
+                    <div style="font-family:monospace; font-size:11px; background:#111; color:#fff; padding:10px; border-left:3px solid #FFD700;">
+                        <b style="color:#FFD700;">HRDPS @ ${forecastTime.getHours()}:00</b><br>
+                        TEMP: ${temp.toFixed(1)}°C<br>
+                        WIND: ${(p['HRDPS.CONTINENTAL_UU'] || 0).toFixed(1)} km/h<br>
+                        VIS: ${(p['HRDPS.CONTINENTAL_VIS'] || 10).toFixed(1)} km
+                    </div>`);
+            }
         });
     };
 
-    // Use a high-frequency polling rate to eliminate lag during pin dragging [cite: 2025-12-30]
-    setInterval(syncWeatherToRoute, 200); 
+    if (!window.map.hasLayer(weatherLayer)) weatherLayer.addTo(window.map);
+    setInterval(updateWeatherNodes, 500); // Frequent poll to catch Widget updates [cite: 2025-12-30]
 })();
