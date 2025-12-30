@@ -1,41 +1,36 @@
-/** [weong-route] Core Routing Engine - Tactical Build **/
-/** Locked: Dec 30, 2025 Baseline **/
+/** [weong-route] Core Routing Engine - Triple-Layer Tactical Build **/
+/** Locked: Dec 30, 2025 Baseline [cite: 2025-12-30] **/
 
 let currentRouteLayer = null;
 let metricFlag = null;
 
 /**
- * Tactical Route Style: Grey base with dashed yellow centerline
- * [cite: 2025-12-27]
+ * Tactical Road Style: 
+ * Layer 1: Thick Black Border (Shoulders)
+ * Layer 2: Inner Grey Roadway
+ * Layer 3: Dashed Yellow Centerline
  */
 function drawTacticalRoute(routeData) {
     if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
 
-    // Create a Layer Group to stack the asphalt and the dashes
     currentRouteLayer = L.layerGroup().addTo(window.map);
 
-    // 1. The Asphalt Base
+    // 1. The Black Border (The "Shoulders")
     L.geoJSON(routeData.geometry, {
-        style: {
-            color: '#333333',
-            weight: 10,
-            opacity: 0.9,
-            lineJoin: 'round'
-        }
+        style: { color: '#000000', weight: 14, opacity: 0.8, lineJoin: 'round' }
     }).addTo(currentRouteLayer);
 
-    // 2. The Yellow Centerline Dashes
+    // 2. The Inner Grey Roadway
     L.geoJSON(routeData.geometry, {
-        style: {
-            color: '#FFD700',
-            weight: 2,
-            opacity: 1,
-            dashArray: '12, 18',
-            lineJoin: 'round'
-        }
+        style: { color: '#4d4d4d', weight: 8, opacity: 1, lineJoin: 'round' }
     }).addTo(currentRouteLayer);
 
-    // Zoom to fit if this is the initial boot
+    // 3. The Yellow Centerline Dashes
+    L.geoJSON(routeData.geometry, {
+        style: { color: '#FFD700', weight: 1.5, opacity: 1, dashArray: '10, 20', lineJoin: 'round' }
+    }).addTo(currentRouteLayer);
+
+    // Auto-fit bounds on initial session [cite: 2025-12-26]
     if (!window.routeInitialized) {
         window.map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
         window.routeInitialized = true;
@@ -43,8 +38,7 @@ function drawTacticalRoute(routeData) {
 }
 
 /**
- * Metric Flag: High-contrast data overlay at midpoint
- * [cite: 2025-12-27, 2025-12-30]
+ * Metric Flag: Tactical UI at Route Midpoint
  */
 function updateMetricFlag(detail) {
     const { h, m, dist, speed, mid } = detail;
@@ -74,9 +68,6 @@ function updateMetricFlag(detail) {
     }).addTo(window.map);
 }
 
-/**
- * Core Logic Fetcher
- */
 async function calculateRoute() {
     if (!window.hubMarkers || window.hubMarkers.length < 2) return;
 
@@ -92,7 +83,7 @@ async function calculateRoute() {
             const route = data.routes[0];
             drawTacticalRoute(route);
             
-            // Dispatch to Velocity Widget
+            // Dispatch details for the Velocity Widget [cite: 2025-12-30]
             window.dispatchEvent(new CustomEvent('weong:routeUpdated', { 
                 detail: {
                     summary: route.summary,
@@ -102,26 +93,14 @@ async function calculateRoute() {
             }));
         }
     } catch (error) {
-        console.error("Route Engine: Calculation Error", error);
+        console.error("Route Engine: Link Failure", error);
     }
 }
 
-/**
- * Global Handshakes
- *
- */
-window.addEventListener('weong:ready', () => {
-    console.log("System: Route Engine tactical handshake confirmed.");
-    calculateRoute();
-});
-
+// Global System Event Listeners
+window.addEventListener('weong:ready', () => calculateRoute());
 window.addEventListener('weong:update', () => calculateRoute());
+window.addEventListener('weong:speedCalculated', (e) => updateMetricFlag(e.detail));
 
-// Listen for the velocity widget's calculation to draw the flag
-window.addEventListener('weong:speedCalculated', (e) => {
-    updateMetricFlag(e.detail);
-});
-
-// Explicit Export for manifest.js (type="module") compatibility
-//
+// Export for manifest module compatibility
 export { calculateRoute };
