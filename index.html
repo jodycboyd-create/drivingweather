@@ -2,49 +2,60 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Silent Build</title>
+    <title>NL Navigator | Locked Anchor Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* KILL THE PANEL: Force any injected itinerary to disappear */
-        .leaflet-routing-container, .leaflet-routing-error {
+        /* NUCLEAR PANEL KILLER: Prevents performance-draining UI from rendering [cite: 2025-12-30] */
+        .leaflet-routing-container, .leaflet-routing-error, .hidden-panel {
             display: none !important;
             visibility: hidden !important;
             width: 0 !important;
             height: 0 !important;
+            pointer-events: none !important;
         }
 
         .hub-label { 
             font-weight: bold; background: white; border: 2px solid #0070bb; 
-            padding: 4px 10px; border-radius: 4px; font-family: sans-serif; 
+            padding: 4px 10px; border-radius: 4px; font-family: sans-serif;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
+        // Baseline Build [cite: 2025-12-28]
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         
         window.hubMarkers = [];
         window.communityData = [];
 
+        // LOAD DATA: Final Newfoundland Dataset [cite: 2025-12-26]
         async function loadNL() {
             try {
                 const res = await fetch('data/nl/communities.json');
                 const data = await res.json();
                 window.communityData = data.features.map(f => ({
-                    lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: f.properties.name
+                    lat: f.geometry.coordinates[1], 
+                    lng: f.geometry.coordinates[0], 
+                    name: f.properties.name || "Unnamed Point"
                 }));
                 init();
-            } catch (e) { init(); }
+            } catch (e) { 
+                console.error("Data Load Error", e); 
+                init(); 
+            }
         }
 
+        // SNAPPING LOGIC: Real-time road magnetism [cite: 2025-12-30]
         function snap(latlng) {
             if (window.communityData.length === 0) return latlng;
             let closest = window.communityData[0];
@@ -57,24 +68,34 @@
         }
 
         function init() {
-            const starts = [{name:"Corner Brook", lat:48.95}, {name:"St. John's", lat:47.56, lng:-52.71}];
+            const starts = [
+                {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
+                {name:"St. John's", lat:47.5615, lng:-52.7126}
+            ];
+
             starts.forEach(s => {
-                const m = L.marker([s.lat, s.lng || -57.94], { draggable: true }).addTo(window.map);
-                m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top' });
+                const m = L.marker([s.lat, s.lng], { draggable: true }).addTo(window.map);
+                m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                 
-                // TRIGGER: Continuous calculation while dragging
+                // TRIGGER: Continuous calculation while dragging for "Magnetic" feel [cite: 2025-12-30]
                 m.on('drag', function(e) {
                     const p = snap(e.target.getLatLng());
                     e.target.setLatLng([p.lat, p.lng]);
                     e.target.setTooltipContent(p.name);
+                    
+                    // HANDSHAKE: Signal the logic engine
                     if (window.RouteEngine) window.RouteEngine.calculate();
                 });
                 window.hubMarkers.push(m);
             });
+
+            // Dispatch Handshake Event [cite: 2025-12-30]
             window.dispatchEvent(new Event('shell-live'));
         }
+        
         loadNL();
     </script>
+    
     <script src="engine/route-engine.js"></script>
 </body>
 </html>
