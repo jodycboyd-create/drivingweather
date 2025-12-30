@@ -1,27 +1,20 @@
 /**
- * ROUTE-ENGINE.JS | BUILD 1735525234
- * Location: /engine/
+ * ROUTE-ENGINE.JS | NEON OVERRIDE
  */
 window.RouteEngine = {
     _control: null,
     calculate: function() {
-        const map = window.map;
-        const pts = window.hubMarkers.map(m => m.getLatLng());
-
-        if (this._control) map.removeControl(this._control);
+        if (!window.map || window.hubMarkers.length < 2) return;
+        if (this._control) window.map.removeControl(this._control);
 
         this._control = L.Routing.control({
-            waypoints: pts,
+            waypoints: window.hubMarkers.map(m => m.getLatLng()),
             createMarker: () => null,
-            addWaypoints: false,
-            show: false,
-            lineOptions: { 
-                styles: [{ color: '#ff4500', weight: 10, opacity: 0.9 }] 
-            }
-        }).addTo(map);
+            lineOptions: { styles: [{ color: '#00FF00', weight: 12, opacity: 1.0 }] }
+        }).addTo(window.map);
     }
 };
 
-window.addEventListener('anchor-live', () => {
-    setTimeout(() => window.RouteEngine.calculate(), 500);
+window.addEventListener('engine-fire', () => {
+    setTimeout(() => window.RouteEngine.calculate(), 600);
 });
