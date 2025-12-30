@@ -7,23 +7,42 @@
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
-        .leaflet-routing-container, .hidden-panel { display: none !important; }
+        
+        /* Dashboard Container for Widgets [cite: 2025-12-30] */
+        #widget-dock { 
+            position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+        }
+        .widget-panel { 
+            background: rgba(17, 17, 17, 0.9); color: white; padding: 15px; 
+            border-radius: 8px; border: 1.5px solid rgba(255, 215, 0, 0.4);
+            pointer-events: auto; min-width: 250px; font-family: sans-serif;
+        }
+
+        .leaflet-routing-container { display: none !important; }
+
         /* High Contrast Hub Labels [cite: 2025-12-30] */
         .hub-label { 
             font-weight: bold; background: white; border: 2px solid #0070bb; 
             padding: 4px 10px; border-radius: 4px; font-family: sans-serif;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
+
         /* High Contrast Route Bubble [cite: 2025-12-30] */
         .route-bubble { 
-            background: rgba(17, 17, 17, 0.9); color: #FFD700; padding: 6px 14px; 
-            border: 1.5px solid rgba(255, 215, 0, 0.6); border-radius: 20px; 
-            font-weight: 700; font-family: sans-serif; font-size: 13px; 
+            background: #111; color: #FFD700; padding: 6px 14px; 
+            border: 1.5px solid #FFD700; border-radius: 20px; 
+            font-weight: 700; font-size: 13px; 
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
+
+    <div id="widget-dock">
+        <div id="weather-panel" class="widget-panel">Loading Weather...</div>
+        <div id="velocity-panel" class="widget-panel">Initializing Velocity...</div>
+    </div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
@@ -33,14 +52,14 @@
     <script src="velocity-widget.js"></script>
 
     <script>
-        // Baseline Setup [cite: 2025-12-28, 2025-12-30]
+        // System Core [cite: 2025-12-28, 2025-12-30]
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         
         window.hubMarkers = [];
         window.communityData = [];
 
-        // RESTORED: Snap returns full object for label updates [cite: 2025-12-26, 2025-12-30]
+        // RESTORED: Full object return for dynamic labels [cite: 2025-12-26, 2025-12-30]
         function snap(latlng) {
             if (window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Searching..." };
             let closest = window.communityData[0];
@@ -59,43 +78,36 @@
                 window.communityData = data.features.map(f => ({
                     lat: f.geometry.coordinates[1], 
                     lng: f.geometry.coordinates[0], 
-                    name: f.properties.name || "Unnamed Point"
+                    name: f.properties.name || "Unnamed"
                 }));
                 init();
-            } catch (e) { console.error("Dataset Load Fail:", e); init(); }
+            } catch (e) { console.error("Data Fail", e); init(); }
         }
 
         function init() {
-            const starts = [
-                {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
-                {name:"St. John's", lat:47.5615, lng:-52.7126}
-            ];
-
+            const starts = [{name:"Corner Brook", lat:48.9515, lng:-57.9482}, {name:"St. John's", lat:47.5615, lng:-52.7126}];
             starts.forEach(s => {
                 const m = L.marker([s.lat, s.lng], { draggable: true }).addTo(window.map);
                 m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                 
                 m.on('drag', (e) => {
-                    const snapData = snap(e.target.getLatLng());
-                    e.target.setLatLng([snapData.lat, snapData.lng]);
+                    const data = snap(e.target.getLatLng());
+                    e.target.setLatLng([data.lat, data.lng]);
                     // FIXED: Immediate label update [cite: 2025-12-30]
-                    e.target.setTooltipContent(snapData.name);
+                    e.target.setTooltipContent(data.name);
                 });
 
                 m.on('dragend', () => {
                     if (window.RouteEngine) window.RouteEngine.calculate();
-                    // Sync the weather and velocity logic via the handshake
-                    syncEngines();
+                    sync();
                 });
-
                 window.hubMarkers.push(m);
             });
-            
-            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); syncEngines(); }, 500);
+            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); sync(); }, 500);
         }
 
-        function syncEngines() {
-            // Check if global scripts are loaded [cite: 2025-12-30]
+        function sync() {
+            // HANDSHAKE: Update all engines safely [cite: 2025-12-30]
             if (window.WeatherEngine && window.BulletinLogic) {
                 window.WeatherEngine.update(window.BulletinLogic);
             }
