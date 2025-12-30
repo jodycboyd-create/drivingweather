@@ -2,39 +2,59 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | CACHE BREAKER</title>
+    <title>NL Navigator | Handshake Confirmed</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        /* If the map is PURPLE, the new HTML is live */
-        #map { height: 100vh; width: 100vw; background: #4B0082 !important; }
-        #build-tag { 
-            position: absolute; top: 10px; right: 10px; z-index: 1000; 
-            background: #00FF00; color: black; padding: 15px; 
-            font-family: 'Courier New', monospace; font-weight: bold; font-size: 16px;
-            border: 4px solid white; box-shadow: 10px 10px 0px black;
-        }
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100vw; background: #aad3df; }
+        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: sans-serif; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        #build-tag { position: absolute; bottom: 10px; left: 10px; z-index: 1000; background: white; padding: 5px; font-family: monospace; font-size: 10px; border: 1px solid #333; }
     </style>
 </head>
 <body>
-    <div id="build-tag">STATUS: CACHE_BROKEN_1735527000</div>
+    <div id="build-tag">PRODUCTION_READY_1735531000</div>
     <div id="map"></div>
+
     <script>
-        // SHELL: ZERO ROUTING CODE [cite: 2025-12-30]
         window.map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         window.hubMarkers = [];
+        window.communityPoints = [];
 
-        function init() {
-            const hubs = [{ name: "St. John's", lat: 47.5615, lng: -52.7126 }, { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }];
-            hubs.forEach(h => {
-                const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
-                m.on('drag dragend', () => { if(window.RouteEngine) window.RouteEngine.calculate(); });
-                window.hubMarkers.push(m);
-            });
-            window.dispatchEvent(new Event('engine-fire'));
+        async function loadData() {
+            try {
+                // Ensure this path matches your repo exactly
+                const response = await fetch('data/nl/communities.json');
+                const data = await response.json();
+                window.communityPoints = data.features.map(f => ({
+                    lat: f.geometry.coordinates[1],
+                    lng: f.geometry.coordinates[0],
+                    name: f.properties.name || "Road Point"
+                }));
+                initApp();
+            } catch (e) { console.error("Data Load Failed:", e); initApp(); }
         }
-        init();
+
+        function initApp() {
+            const hubs = [
+                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
+                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
+            ];
+
+            hubs.forEach(h => {
+                const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
+                marker.bindTooltip(h.name, { permanent: true, className: 'hub-label' });
+                
+                marker.on('drag dragend', () => {
+                    if (window.RouteEngine) window.RouteEngine.calculate();
+                });
+                window.hubMarkers.push(marker);
+            });
+            window.dispatchEvent(new Event('shell-live'));
+        }
+
+        loadData();
     </script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script src="engine/route-engine.js"></script>
