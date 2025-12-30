@@ -1,6 +1,6 @@
 /**
- * ROUTE-ENGINE.JS | LEVEL 3 LOCKED BUILD
- * Features: #999999 Ribbon, Text-only Metrics, Corrected 100/80/50 Speeds.
+ * ROUTE-ENGINE.JS | HIGH-CONTRAST GREY BUILD
+ * Updates: Sharper #777777 ribbon, No "fuzzy" edges, 100/80/50 Speeds.
  * [cite: 2025-12-30]
  */
 window.RouteEngine = {
@@ -29,30 +29,31 @@ window.RouteEngine = {
                 const coordinates = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 const distanceKm = route.distance / 1000;
 
-                /**
-                 * SPEED CALCULATION: 100 -> 80 -> 50 km/h
-                 * This calculates the time as a weighted average of your requested speeds.
+                /** * SPEED MATH [Locked]
+                 * TCH: 100 | Branch: 80 | Local: 50
                  */
-                const time100 = (distanceKm * 0.70) / 100; // TCH
-                const time80 = (distanceKm * 0.20) / 80;   // Branch
-                const time50 = (distanceKm * 0.10) / 50;   // Local
-                
-                const totalHrs = time100 + time80 + time50;
+                const totalHrs = ((distanceKm * 0.75) / 100) + ((distanceKm * 0.20) / 80) + ((distanceKm * 0.05) / 50);
                 const hours = Math.floor(totalHrs);
                 const mins = Math.round((totalHrs - hours) * 60);
 
-                // ROAD RIBBON: Lighter Grey (#999999)
+                // 1. SHARP OUTER BORDER (Prevents "fuzziness")
                 L.polyline(coordinates, { 
-                    color: '#999999', weight: 9, opacity: 0.85, lineCap: 'round' 
+                    color: '#444444', weight: 11, opacity: 1, lineCap: 'round' 
                 }).addTo(this._layers);
 
+                // 2. MAIN GREY RIBBON (Slightly darker grey for definition)
                 L.polyline(coordinates, { 
-                    color: '#FFD700', weight: 2, dashArray: '10, 20' 
+                    color: '#777777', weight: 8, opacity: 1, lineCap: 'round' 
+                }).addTo(this._layers);
+
+                // 3. CENTER DASH
+                L.polyline(coordinates, { 
+                    color: '#FFD700', weight: 2, dashArray: '12, 24', opacity: 1 
                 }).addTo(this._layers);
 
                 this._layers.addTo(window.map);
 
-                // METRICS FLAG: Removed checkered icon
+                // TEXT-ONLY METRICS
                 const midIndex = Math.floor(coordinates.length / 2);
                 this._flag = L.marker(coordinates[midIndex], {
                     icon: L.divIcon({
@@ -63,10 +64,18 @@ window.RouteEngine = {
                     })
                 }).addTo(window.map);
                 
-                window.map.fitBounds(L.polyline(coordinates).getBounds(), { padding: [40, 40] });
+                window.map.fitBounds(L.polyline(coordinates).getBounds(), { padding: [50, 50] });
             })
             .catch(err => {
                 if (err.name !== 'AbortError') console.error("Sync Error", err);
             });
     }
 };
+
+window.addEventListener('shell-live', () => {
+    window.hubMarkers.forEach(m => {
+        m.off('dragend'); 
+        m.on('dragend', () => window.RouteEngine.calculate());
+    });
+    window.RouteEngine.calculate();
+});
