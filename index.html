@@ -8,26 +8,26 @@
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; font-family: sans-serif; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Widget Dock: Ensures velocity-widget.js has a home */
+        /* Widget Dock [cite: 2025-12-30] */
         #widget-dock { 
             position: absolute; bottom: 25px; left: 20px; z-index: 1000;
             display: flex; flex-direction: column; gap: 12px; pointer-events: none;
         }
         .widget-panel { 
             background: rgba(17, 17, 17, 0.9); color: white; padding: 15px; 
-            border-radius: 8px; border: 1.5px solid rgba(255, 215, 0, 0.5);
-            pointer-events: auto; min-width: 260px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border-radius: 8px; border: 1.5px solid #FFD700;
+            pointer-events: auto; min-width: 260px;
         }
 
         .leaflet-routing-container { display: none !important; }
 
-        /* Label Restoration */
+        /* Dynamic Labels [cite: 2025-12-30] */
         .hub-label { 
             font-weight: bold; background: white; border: 2px solid #0070bb; 
-            padding: 4px 10px; border-radius: 4px; color: #333;
+            padding: 4px 10px; border-radius: 4px; 
         }
 
-        /* Route UI Bubble */
+        /* Route UI [cite: 2025-12-30] */
         .route-bubble { 
             background: #111; color: #FFD700; padding: 8px 16px; 
             border: 2px solid #FFD700; border-radius: 25px; font-weight: 800;
@@ -38,8 +38,8 @@
     <div id="map"></div>
 
     <div id="widget-dock">
-        <div id="weather-panel" class="widget-panel">Weather Syncing...</div>
-        <div id="velocity-panel" class="widget-panel">Velocity Syncing...</div>
+        <div id="weather-panel" class="widget-panel">Weather Offline</div>
+        <div id="velocity-panel" class="widget-panel">Velocity Offline</div>
     </div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -50,74 +50,79 @@
     <script src="velocity-widget.js"></script>
 
     <script>
-        // System Initialize
-        window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
-        
-        window.hubMarkers = [];
-        window.communityData = [];
-
-        // Dynamic Snap: Restored to update labels in real-time
-        function snap(latlng) {
-            if (window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Locating..." };
-            let closest = window.communityData[0];
-            let minDist = Infinity;
-            window.communityData.forEach(p => {
-                const d = window.map.distance(latlng, [p.lat, p.lng]);
-                if (d < minDist) { minDist = d; closest = p; }
-            });
-            return closest;
-        }
-
-        async function loadNL() {
-            try {
-                const res = await fetch('data/nl/communities.json');
-                const data = await res.json();
-                window.communityData = data.features.map(f => ({
-                    lat: f.geometry.coordinates[1], 
-                    lng: f.geometry.coordinates[0], 
-                    name: f.properties.name || "Unknown Point"
-                }));
-                init();
-            } catch (e) { console.error("Dataset Load Error", e); init(); }
-        }
-
-        function init() {
-            const hubs = [{name:"Corner Brook", lat:48.9515, lng:-57.9482}, {name:"St. John's", lat:47.5615, lng:-52.7126}];
+        // Use a single initialization block to prevent race conditions
+        window.addEventListener('load', function() {
+            window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
             
-            hubs.forEach(h => {
-                const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
-                m.bindTooltip(h.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
+            window.hubMarkers = [];
+            window.communityData = [];
+
+            // SNAP LOGIC: Restored for dynamic city names [cite: 2025-12-26, 2025-12-30]
+            function snap(latlng) {
+                if (!window.communityData.length) return { lat: latlng.lat, lng: latlng.lng, name: "Searching..." };
+                let closest = window.communityData[0];
+                let minDist = Infinity;
+                window.communityData.forEach(p => {
+                    const d = window.map.distance(latlng, [p.lat, p.lng]);
+                    if (d < minDist) { minDist = d; closest = p; }
+                });
+                return closest;
+            }
+
+            async function loadData() {
+                try {
+                    const res = await fetch('data/nl/communities.json');
+                    const data = await res.json();
+                    window.communityData = data.features.map(f => ({
+                        lat: f.geometry.coordinates[1], 
+                        lng: f.geometry.coordinates[0], 
+                        name: f.properties.name || "Unknown"
+                    }));
+                    initMarkers();
+                } catch (e) { console.error("Data Load Fail", e); initMarkers(); }
+            }
+
+            function initMarkers() {
+                const hubs = [
+                    {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
+                    {name:"St. John's", lat:47.5615, lng:-52.7126}
+                ];
                 
-                m.on('drag', (e) => {
-                    const snapData = snap(e.target.getLatLng());
-                    e.target.setLatLng([snapData.lat, snapData.lng]);
-                    // FIXED: Dynamic label updates
-                    e.target.setTooltipContent(snapData.name);
+                hubs.forEach(h => {
+                    const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
+                    m.bindTooltip(h.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
+                    
+                    m.on('drag', function(e) {
+                        const snapData = snap(e.target.getLatLng());
+                        e.target.setLatLng([snapData.lat, snapData.lng]);
+                        // FIXED: Label updates instantly [cite: 2025-12-30]
+                        e.target.setTooltipContent(snapData.name);
+                    });
+
+                    m.on('dragend', function() {
+                        if (window.RouteEngine) window.RouteEngine.calculate();
+                        syncEngines();
+                    });
+                    window.hubMarkers.push(m);
                 });
-
-                m.on('dragend', () => {
-                    if (window.RouteEngine) window.RouteEngine.calculate();
-                    handshake();
-                });
-                window.hubMarkers.push(m);
-            });
-            
-            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); handshake(); }, 500);
-        }
-
-        function handshake() {
-            // Logic handshake to bridge weather and velocity
-            if (window.WeatherEngine && window.BulletinLogic) {
-                window.WeatherEngine.update(window.BulletinLogic);
+                
+                if (window.RouteEngine) window.RouteEngine.calculate();
+                syncEngines();
             }
-            if (window.VelocityWidget) {
-                window.VelocityWidget.refresh();
-            }
-        }
 
-        // Wait for DOM to be ready before firing loadNL
-        window.addEventListener('DOMContentLoaded', loadNL);
+            function syncEngines() {
+                // Bridge logic between weather and speed segments [cite: 2025-12-30]
+                if (window.WeatherEngine && window.BulletinLogic) {
+                    window.WeatherEngine.update(window.BulletinLogic);
+                }
+                if (window.VelocityWidget) {
+                    window.VelocityWidget.refresh();
+                }
+            }
+
+            loadData();
+        });
     </script>
 </body>
 </html>
