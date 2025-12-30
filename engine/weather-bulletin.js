@@ -1,6 +1,6 @@
 /** * [weong-bulletin] Clean HRDPS Diagnostic Engine 
  * Status: Uniform Reporting (Level 3 Triggers Disabled) 
- * Locked: Dec 30, 2025
+ * Locked: Dec 30, 2025 [cite: 2025-12-30]
  */
 
 (function() {
@@ -59,7 +59,7 @@
         const depTime = window.currentDepartureTime || new Date();
         const speed = (window.currentSpeedOffset || 0) + 90;
         
-        // Sampling points across the route
+        // Sampling points across the route [cite: 2025-12-30]
         const pcts = [0.15, 0.45, 0.75, 0.95];
         const fetchPromises = pcts.map(pct => {
             const idx = Math.floor((routeCoords.length - 1) * pct);
@@ -69,4 +69,24 @@
             return BulletinLogic.fetchECCCPoint(lat, lng, timeISO);
         });
 
-        const results = await Promise.all(fetch
+        const results = await Promise.all(fetchPromises);
+
+        results.forEach(data => {
+            // Uniform Tactical Icon (Boxed Cloud)
+            const iconHtml = `
+                <div style="background: #000; border: 2px solid #FFD700; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: #FFD700; box-shadow: 0 0 10px #000;">
+                    ☁️
+                </div>`;
+
+            L.marker([data.lat, data.lng], {
+                icon: L.divIcon({ html: iconHtml, className: 'w-icon', iconSize: [28, 28] }),
+                zIndexOffset: 10000 
+            })
+            .bindPopup(BulletinLogic.generateTableHTML(data), { maxWidth: 250 })
+            .addTo(weatherLayer);
+        });
+    };
+
+    setInterval(findAndSyncWeather, 2000); 
+    window.addEventListener('weong:update', findAndSyncWeather);
+})();
