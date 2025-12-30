@@ -1,8 +1,10 @@
 /** [weong-route] Tactical Velocity & Time Module **/
+/** Locked: Dec 30, 2025 Baseline - Integrated Flag Fix **/
+
 (function() {
     let speedOffset = 0; 
     let lastRoute = null;
-    let departureOffsetMins = 0; // Minutes from "Now"
+    let departureOffsetMins = 0; 
 
     const style = document.createElement('style');
     style.innerHTML = `
@@ -15,13 +17,9 @@
         }
         .v-section { margin-bottom: 20px; }
         .v-label { font-size: 10px; color: #555; letter-spacing: 2px; margin-bottom: 12px; font-weight: bold; }
-        
-        /* Time Scrubber Styling */
         .scrubber-container { position: relative; width: 100%; height: 40px; overflow: hidden; background: #000; border-radius: 8px; border: 1px solid #222; margin-bottom: 5px; cursor: ew-resize; }
         #v-time-display { font-size: 22px; font-weight: bold; line-height: 40px; color: #00ff00; text-shadow: 0 0 10px #00ff0066; }
         .scrubber-hint { font-size: 8px; color: #444; text-transform: uppercase; margin-top: 4px; }
-
-        /* Speed Controls */
         .v-controls { display: flex; align-items: center; justify-content: space-around; background: #000; border-radius: 12px; padding: 10px; border: 1px solid #222; }
         .v-btn { 
             background: #1a1a1a; color: #00ff00; border: 1px solid #333; 
@@ -45,7 +43,6 @@
                 </div>
                 <div class="scrubber-hint">← SLIDE TO ADJUST TIME →</div>
             </div>
-
             <div class="v-section" style="margin-bottom:0">
                 <div class="v-label">CRUISING PACE</div>
                 <div class="v-controls">
@@ -60,7 +57,7 @@
         </div>
     `;
 
-    // Time Scrubber Logic (Mouse & Touch) [cite: 2025-12-27]
+    // Scrubber Logic
     let isDragging = false;
     let startX;
     const scrubber = document.getElementById('time-scrubber');
@@ -69,8 +66,8 @@
     const handleMove = (e) => {
         if (!isDragging) return;
         const x = (e.pageX || e.touches[0].pageX);
-        const walk = (x - startX) * 2; // Sensitivity
-        departureOffsetMins += (walk > 0 ? 5 : -5); // Snap to 5 min increments
+        const walk = (x - startX) * 2; 
+        departureOffsetMins += (walk > 0 ? 5 : -5);
         startX = x;
         update();
     };
@@ -84,7 +81,7 @@
     window.addEventListener('touchend', handleEnd);
 
     function getBaseSpeed(route) {
-        const dist = route.summary.totalDistance / 1000;
+        const dist = route.totalDistance / 1000;
         const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
         let speed = 80;
         if (dist > 40 && mid.lat > 48.8) speed = 100;
@@ -101,12 +98,10 @@
         const base = getBaseSpeed(lastRoute);
         const actualSpeed = base + speedOffset;
         
-        // Update Time Display
         const depDate = new Date();
         depDate.setMinutes(depDate.getMinutes() + departureOffsetMins);
         document.getElementById('v-time-display').innerText = depDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-        // Update Speed UI
         const offsetEl = document.getElementById('v-offset');
         const labelEl = document.getElementById('v-label');
         if (speedOffset === 0) {
@@ -117,22 +112,12 @@
             labelEl.innerText = "LIMIT";
         }
 
-        const distKm = lastRoute.summary.totalDistance / 1000;
+        const distKm = lastRoute.totalDistance / 1000;
         const totalMins = (distKm / actualSpeed) * 60;
         
-        window.dispatchEvent(new CustomEvent('weong:speedCalculated', { 
-            detail: { 
-                h: Math.floor(totalMins / 60), 
-                m: Math.round(totalMins % 60), 
-                dist: distKm.toFixed(1), 
-                mid: lastRoute.coordinates[Math.floor(lastRoute.coordinates.length / 2)],
-                departureTime: depDate,
-                speed: actualSpeed
-            } 
-        }));
-    }
-
-    window.addEventListener('weong:routeUpdated', (e) => { lastRoute = e.detail; update(); });
-    document.getElementById('v-up').onclick = () => { speedOffset += 5; update(); };
-    document.getElementById('v-down').onclick = () => { speedOffset -= 5; update(); };
-})();
+        const metrics = { 
+            h: Math.floor(totalMins / 60), 
+            m: Math.round(totalMins % 60), 
+            dist: distKm.toFixed(1), 
+            mid: lastRoute.coordinates[Math.floor(lastRoute.coordinates.length / 2)],
+            departureTime
