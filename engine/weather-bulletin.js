@@ -1,66 +1,66 @@
-/** * [weong-bulletin] Visual Verification Build
- * Purpose: Force-render red circles to verify display logic.
+/** * [weong-bulletin] Hardware-Level Force Build
+ * Purpose: Absolute rendering of Red Circles regardless of event timing.
  * Locked: Dec 30, 2025 [cite: 2025-12-30]
  */
 
 (function() {
-    let lastRoute = null;
-    let weatherMarkers = L.layerGroup();
+    window.weatherMarkers = L.layerGroup();
+    let lastRenderedRoute = null;
 
-    // 1. FORCE ATTACH TO MAP
-    const initMapCheck = setInterval(() => {
-        if (window.map) {
-            weatherMarkers.addTo(window.map);
-            console.log("Bulletin: Map layer attached.");
-            
-            // Retro-check for existing route data [cite: 2025-12-30]
-            if (window.currentRouteData) {
-                renderRedCircles(window.currentRouteData);
-            }
-            clearInterval(initMapCheck);
+    // 1. IMMEDIATE ATTACHMENT
+    function ensureLayerOnMap() {
+        if (window.map && !window.map.hasLayer(window.weatherMarkers)) {
+            window.weatherMarkers.addTo(window.map);
+            console.log("Bulletin: Layer forced onto map instance.");
         }
-    }, 100);
+    }
 
-    // 2. RENDER LOGIC: RED CIRCLE TEST
-    function renderRedCircles(route) {
-        if (!window.map || !route) return;
-        weatherMarkers.clearLayers();
+    // 2. THE RED CIRCLE ENGINE
+    window.renderWeatherNodes = function(routeData) {
+        const route = routeData || window.currentRouteData;
+        if (!route || !route.geometry) {
+            console.warn("Bulletin: No route data found in global anchor.");
+            return;
+        }
+
+        ensureLayerOnMap();
+        window.weatherMarkers.clearLayers();
         
         const coords = route.geometry.coordinates;
-        console.log("Bulletin: Rendering circles on " + coords.length + " coordinates.");
-
-        // Sample 5 points along the route ribbon [cite: 2025-12-30]
-        [0.1, 0.3, 0.5, 0.7, 0.9].forEach(pct => {
+        // Sampling 6 high-contrast nodes across the island [cite: 2025-12-30]
+        [0.1, 0.25, 0.45, 0.65, 0.85, 0.98].forEach(pct => {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
 
-            // Force high-visibility Red Circle [cite: 2025-12-30]
-            L.circleMarker([lat, lng], {
-                radius: 12,
-                fillColor: "#ff0000",
-                color: "#ffffff",
-                weight: 3,
-                opacity: 1,
-                fillOpacity: 0.9,
-                zIndexOffset: 5000 // Highest priority [cite: 2025-12-30]
+            // Using L.circle for absolute coordinate persistence
+            L.circle([lat, lng], {
+                radius: 2500, // 2.5km radius for visibility at island-scale
+                color: '#ff0000',
+                fillColor: '#ff0000',
+                fillOpacity: 0.8,
+                weight: 5,
+                pane: 'markerPane' // Force into the top-most Leaflet pane
             })
-            .bindPopup(`<div style="color:#000; font-weight:bold;">Visual Verification: Level 3 Anchor</div>`)
-            .addTo(weatherMarkers);
+            .bindPopup(`<b>TEST NODE</b><br>LAT: ${lat.toFixed(3)}<br>LNG: ${lng.toFixed(3)}`)
+            .addTo(window.weatherMarkers);
         });
-        
-        lastRoute = route;
-    }
 
-    // 3. EVENT BINDINGS [cite: 2025-12-30]
-    window.addEventListener('weong:routeUpdated', (e) => {
-        console.log("Bulletin: Route update received.");
-        renderRedCircles(e.detail);
-    });
+        console.log("Bulletin: 6 Red Circles rendered to map.");
+        lastRenderedRoute = route;
+    };
 
-    // Handle speed/time updates from velocity widget [cite: 2025-12-30]
-    window.addEventListener('weong:update', () => {
-        if (window.currentRouteData) {
-            renderRedCircles(window.currentRouteData);
+    // 3. PERSISTENT WATCHER [cite: 2025-12-30]
+    // If the route engine updates window.currentRouteData, this will catch it.
+    setInterval(() => {
+        if (window.currentRouteData && window.currentRouteData !== lastRenderedRoute) {
+            window.renderWeatherNodes(window.currentRouteData);
         }
+    }, 1000);
+
+    // 4. EVENT OVERRIDE
+    window.addEventListener('weong:routeUpdated', (e) => {
+        window.renderWeatherNodes(e.detail);
     });
+
+    console.log("Bulletin: Force-Render Engine active.");
 })();
