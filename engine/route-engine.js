@@ -1,8 +1,7 @@
 /**
- * ROUTE-ENGINE.JS | ZERO-REGRESSION BUILD
- * Fixed: Missing default route on load.
- * Features: #777777 Ribbon, No Icons, 100/80/50 Speeds.
- *
+ * ROUTE-ENGINE.JS | DYNAMIC ZOOM & NO-REGRESSION BUILD
+ * Requirements: Sharp #777777, No Icons, 100/80/50 Speeds, Zoom-Adaptive Width.
+ * [cite: 2025-12-30]
  */
 window.RouteEngine = {
     _layers: L.layerGroup(),
@@ -10,11 +9,7 @@ window.RouteEngine = {
     _abortController: null,
 
     calculate: function() {
-        // Ensure map and both markers exist before attempting fetch
-        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) {
-            console.warn("RouteEngine: Waiting for markers...");
-            return;
-        }
+        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) return;
 
         if (this._abortController) this._abortController.abort();
         this._abortController = new AbortController();
@@ -34,31 +29,32 @@ window.RouteEngine = {
                 const coordinates = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 const distanceKm = route.distance / 1000;
 
-                /** * SPEED MATH [LOCKED]
-                 * 100 km/h (TCH), 80 km/h (Branch), 50 km/h (Local)
-                 */
+                // Speed Math: 100/80/50 km/h
                 const totalHrs = ((distanceKm * 0.75) / 100) + ((distanceKm * 0.20) / 80) + ((distanceKm * 0.05) / 50);
                 const hours = Math.floor(totalHrs);
                 const mins = Math.round((totalHrs - hours) * 60);
 
-                // 1. OUTER BORDER (Sharp Edge)
-                L.polyline(coordinates, { 
-                    color: '#444444', weight: 11, opacity: 1, lineCap: 'round' 
-                }).addTo(this._layers);
+                /**
+                 * DYNAMIC ZOOM LOGIC: Adjusts width based on current zoom level
+                 * High zoom (12+) = Thick road | Low zoom (7) = Sleek line
+                 */
+                const z = window.map.getZoom();
+                const baseWeight = z > 10 ? 9 : (z > 7 ? 6 : 4);
+                const borderWeight = baseWeight + 3;
 
-                // 2. MAIN GREY RIBBON (#777777)
-                L.polyline(coordinates, { 
-                    color: '#777777', weight: 8, opacity: 1, lineCap: 'round' 
-                }).addTo(this._layers);
+                // 1. SHARP OUTER BORDER
+                L.polyline(coordinates, { color: '#444444', weight: borderWeight, opacity: 1, lineCap: 'round' }).addTo(this._layers);
 
-                // 3. CENTER DASH
-                L.polyline(coordinates, { 
-                    color: '#FFD700', weight: 2, dashArray: '12, 24', opacity: 1 
-                }).addTo(this._layers);
+                // 2. MAIN GREY RIBBON
+                L.polyline(coordinates, { color: '#777777', weight: baseWeight, opacity: 1, lineCap: 'round' }).addTo(this._layers);
+
+                // 3. CENTER DASH (Hidden at low zoom for clarity)
+                if (z > 7) {
+                    L.polyline(coordinates, { color: '#FFD700', weight: 1.5, dashArray: '10, 20', opacity: 1 }).addTo(this._layers);
+                }
 
                 this._layers.addTo(window.map);
 
-                // TEXT-ONLY METRICS
                 const midIndex = Math.floor(coordinates.length / 2);
                 this._flag = L.marker(coordinates[midIndex], {
                     icon: L.divIcon({
@@ -75,22 +71,12 @@ window.RouteEngine = {
     }
 };
 
-/**
- * REINFORCED HANDSHAKE
- * Specifically triggers the first calculation for the default route.
- */
 window.addEventListener('shell-live', () => {
-    console.log("RouteEngine: Handshake Received.");
-    
-    if (window.hubMarkers) {
-        window.hubMarkers.forEach(m => {
-            m.off('dragend'); 
-            m.on('dragend', () => window.RouteEngine.calculate());
-        });
-        
-        // Force the initial calculation for Corner Brook -> St. John's
-        setTimeout(() => {
-            window.RouteEngine.calculate();
-        }, 100); 
-    }
+    window.hubMarkers.forEach(m => {
+        m.off('dragend'); 
+        m.on('dragend', () => window.RouteEngine.calculate());
+    });
+    // RE-CALCULATE ON ZOOM: Updates ribbon thickness dynamically
+    window.map.on('zoomend', () => window.RouteEngine.calculate());
+    window.RouteEngine.calculate();
 });
