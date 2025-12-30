@@ -11,8 +11,5 @@
         }
       ]
     }
-  ],
-  "rewrites": [
-    { "source": "/engine/(.*)", "destination": "/engine/$1" }
   ]
 }
