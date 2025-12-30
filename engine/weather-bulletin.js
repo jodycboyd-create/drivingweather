@@ -1,22 +1,29 @@
-/** * [weong-bulletin] Final Forecast Anchor 
- * Status: High-Fidelity HRDPS Data Injection
+/** * [weong-bulletin] Resilient Forecast Anchor 
+ * Status: Round-Robin Proxy (Fixes "OFF" status)
  * Locked: Dec 30, 2025 [cite: 2025-12-30]
  */
 
 (function() {
     let weatherLayer = L.layerGroup();
     let lastCoords = null;
-    const PROXY = "https://api.allorigins.win/raw?url=";
+    
+    // Rotating proxies to avoid rate-limiting and timeouts [cite: 2025-12-30]
+    const PROXIES = [
+        "https://api.allorigins.win/raw?url=",
+        "https://corsproxy.io/?",
+        "https://thingproxy.freeboard.io/fetch/"
+    ];
     const ECCC = "https://geo.weather.gc.ca/geomet";
 
-    const fetchWithRetry = async (url, retries = 2) => {
-        for (let i = 0; i < retries; i++) {
-            try {
-                const response = await fetch(PROXY + encodeURIComponent(url));
-                if (response.ok) return await response.json();
-            } catch (e) {
-                if (i === retries - 1) throw e;
-            }
+    const fetchForecast = async (url, attempt = 0) => {
+        try {
+            const proxyUrl = PROXIES[attempt % PROXIES.length] + encodeURIComponent(url);
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error();
+            return await response.json();
+        } catch (e) {
+            if (attempt < 2) return fetchForecast(url, attempt + 1);
+            throw e;
         }
     };
 
@@ -35,11 +42,11 @@
                 icon: L.divIcon({
                     className: 'w-icon',
                     html: `
-                        <div class="weather-box" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:42px; height:42px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 10px #000; opacity:0.6;">
+                        <div class="weather-box" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:44px; height:44px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 10px #000; transition: opacity 0.5s;">
                             <span style="font-size:14px; line-height:1;">☁️</span>
-                            <span class="temp-val" style="font-size:11px; font-weight:bold; font-family:monospace; margin-top:2px;">...</span>
+                            <span class="temp-val" style="font-size:12px; font-weight:bold; font-family:monospace; margin-top:2px;">...</span>
                         </div>`,
-                    iconSize: [42, 42]
+                    iconSize: [44, 44]
                 }),
                 zIndexOffset: 10000
             }).addTo(weatherLayer);
@@ -48,23 +55,20 @@
         });
 
         nodes.forEach(async (node) => {
-            // Using HRDPS for the comprehensive Newfoundland dataset [cite: 2025-12-26]
             const timeISO = new Date().toISOString().substring(0, 13) + ":00:00Z";
             const layers = "HRDPS.CONTINENTAL_TT,HRDPS.CONTINENTAL_SDE,HRDPS.CONTINENTAL_VIS,HRDPS.CONTINENTAL_UU";
             const query = `?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo&LAYERS=${layers}&QUERY_LAYERS=${layers}&BBOX=${node.lat-0.01},${node.lng-0.01},${node.lat+0.01},${node.lng+0.01}&INFO_FORMAT=application/json&I=50&J=50&WIDTH=101&HEIGHT=101&CRS=EPSG:4326&TIME=${timeISO}`;
             
             try {
-                const json = await fetchWithRetry(ECCC + query);
+                const json = await fetchForecast(ECCC + query);
                 const p = json.contents ? JSON.parse(json.contents).features[0].properties : json.features[0].properties;
                 
                 const temp = p['HRDPS.CONTINENTAL_TT'] || 0;
                 const el = node.marker.getElement();
                 if (el) {
-                    const box = el.querySelector('.weather-box');
                     const label = el.querySelector('.temp-val');
-                    box.style.opacity = "1";
                     label.innerText = `${Math.round(temp)}°`;
-                    if (temp <= 0) label.style.color = "#00d4ff"; 
+                    if (temp <= 0) label.style.color = "#00d4ff";
                 }
 
                 node.marker.bindPopup(`
@@ -80,7 +84,7 @@
             } catch (e) {
                 const label = node.marker.getElement()?.querySelector('.temp-val');
                 if (label) {
-                    label.innerText = "OFF"; // Indicates data link severed but system active [cite: 2025-12-30]
+                    label.innerText = "OFF";
                     label.style.color = "#ff4757";
                 }
             }
