@@ -1,48 +1,41 @@
 /**
- * ROUTE-ENGINE.JS | v.2025.12.29.20
- * FORCE-OVERWRITE BUILD: Verifying File Path & Execution
+ * ROUTE-ENGINE.JS | v.2025.12.29.11
+ * Functionality Check: Red Block + Travel Metrics
  */
-window.RouteEngine = {
-    _control: null,
-    _box: null,
-
-    calculateRoute: function(start, end) {
-        const map = window.map; 
-        if (!map) return;
-
-        // Cleanup previous layers
-        if (this._control) map.removeControl(this._control);
-        if (this._box) map.removeLayer(this._box);
-
-        // 1. FORCE ROUTE COLOR TO RED [Confirmation Step]
-        this._control = L.Routing.control({
-            waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-            createMarker: () => null,
-            addWaypoints: false,
-            show: false,
-            lineOptions: { 
-                styles: [{ color: '#FF0000', weight: 10, opacity: 1 }] 
-            }
-        }).addTo(map);
-
-        this._control.on('routesfound', (e) => {
-            const route = e.routes[0];
+(function() {
+    window.map.on('route-updated', function(e) {
+        const control = e.control;
+        
+        control.on('routesfound', function(r) {
+            const route = r.routes[0];
+            const dist = route.summary.totalDistance / 1000;
             const mid = route.coordinates[Math.floor(route.coordinates.length / 2)];
+
+            // Weighted speed: 70% TCH, 20% Branch, 10% Local
+            const v = (100 * 0.7) + (80 * 0.2) + (50 * 0.1); 
+            const time = dist / v;
+            const h = Math.floor(time);
+            const m = Math.round((time - h) * 60);
+
+            // RENDER RED BLOCK (Functionality Check)
+            if (window.metricsBlock) window.map.removeLayer(window.metricsBlock);
             
-            // 2. FORCE A LARGE BLUE RECTANGLE AT MIDPOINT
-            const bounds = [
-                [mid.lat - 0.05, mid.lng - 0.05], 
-                [mid.lat + 0.05, mid.lng + 0.05]
-            ];
+            const flagHtml = `
+                <div style="background:#1a1a1a; color:white; border:2px solid red; padding:8px; border-radius:4px; font-family:monospace;">
+                    <b style="color:red">DRIVE TIME</b><br>
+                    <span style="font-size:16px;">${h}h ${m}m</span><br>
+                    <small>${dist.toFixed(1)} KM</small>
+                </div>
+            `;
 
-            this._box = L.rectangle(bounds, {
-                color: "#0000FF",
-                fillColor: "#0000FF",
-                fillOpacity: 1,
-                weight: 5
-            }).addTo(map);
-
-            console.log("CRITICAL: Route Red / Box Blue. If not seen, file path is wrong.");
+            window.metricsBlock = L.marker(mid, {
+                icon: L.divIcon({
+                    className: 'fn-check',
+                    html: flagHtml,
+                    iconSize: [120, 60],
+                    iconAnchor: [60, 30]
+                })
+            }).addTo(window.map);
         });
-    }
-};
+    });
+})();
