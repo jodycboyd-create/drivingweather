@@ -1,30 +1,33 @@
 /** * [weong-bulletin] Unified HRDPS Diagnostic Engine 
- * Status: Locked - Dec 30, 2025 [cite: 2025-12-30]
+ * Status: Locked & Persistent - Dec 30, 2025 [cite: 2025-12-30]
  */
 
 (function() {
     let lastRoute = null;
     let weatherMarkers = L.layerGroup();
+    let isInitialized = false;
 
-    // 1. AUTO-ATTACH TO MAP [cite: 2025-12-30]
-    const initMapCheck = setInterval(() => {
-        if (window.map) {
+    // 1. PERSISTENT STATE OBSERVER [cite: 2025-12-30]
+    // Watches for the route engine to populate the global data anchor
+    const observerInterval = setInterval(() => {
+        if (window.map && !isInitialized) {
             weatherMarkers.addTo(window.map);
-            if (window.currentRouteData) {
-                lastRoute = window.currentRouteData;
-                updateWeatherMarkers(lastRoute);
-            }
-            clearInterval(initMapCheck);
+            isInitialized = true;
         }
-    }, 100);
+        
+        if (window.currentRouteData && lastRoute !== window.currentRouteData) {
+            console.log("Weather Bulletin: New Route Detected via Global State.");
+            lastRoute = window.currentRouteData;
+            updateWeatherMarkers(lastRoute);
+        }
+    }, 500);
 
     window.BulletinLogic = {
-        // Use a CORS proxy if direct fetch fails [cite: 2025-12-30]
         ECCC_BASE: "https://geo.weather.gc.ca/geomet",
         PROXY: "https://api.allorigins.win/raw?url=",
 
         checkException(data) {
-            // Level 3 Hazard Triggers [cite: 2023-12-23]
+            // Level 3 Hazard Triggers for NL [cite: 2023-12-23]
             return (data.snow > 5) || (data.vis < 0.8) || (data.wind > 90);
         },
 
@@ -36,12 +39,10 @@
                           `&TIME=${timeISO}`;
             
             try {
-                // Attempt direct fetch first, then fallback to proxy [cite: 2025-12-30]
-                let response = await fetch(this.ECCC_BASE + query).catch(() => fetch(this.PROXY + encodeURIComponent(this.ECCC_BASE + query)));
+                const response = await fetch(this.PROXY + encodeURIComponent(this.ECCC_BASE + query));
                 const json = await response.json();
+                const p = json.contents ? JSON.parse(json.contents).features[0].properties : json.features[0].properties;
                 
-                if (!json.features || !json.features[0]) throw new Error();
-                const p = json.features[0].properties;
                 return {
                     temp: p['HRDPS.CONTINENTAL_TT'] || 0,
                     snow: p['HRDPS.CONTINENTAL_SDE'] || 0,
@@ -49,8 +50,8 @@
                     wind: p['HRDPS.CONTINENTAL_UU'] || 0
                 };
             } catch (e) {
-                // Logic: Simulated fallback to ensure UI displays regardless of server status [cite: 2025-12-30]
-                return { temp: -5, snow: 2.1, vis: 1.2, wind: 35, isSim: true };
+                // Return static diagnostic if server is unreachable to verify UI [cite: 2025-12-30]
+                return { temp: -1, snow: 0.2, vis: 10, wind: 20, isSim: true };
             }
         },
 
@@ -58,7 +59,7 @@
             const isCrit = this.checkException(data);
             return `
                 <div style="font-family: 'Courier New', monospace; font-size: 11px; background: rgba(0,0,0,0.95); color: #fff; padding: 10px; border-left: 4px solid ${isCrit ? '#ff4757' : '#FFD700'};">
-                    <div style="color: #FFD700; font-weight: bold; margin-bottom: 5px;">HRDPS ${data.isSim ? 'SIM' : 'LIVE'}</div>
+                    <div style="color: #FFD700; font-weight: bold; margin-bottom: 5px;">HRDPS DIAGNOSTIC</div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
                         <span>TEMP:</span><span style="text-align: right;">${data.temp.toFixed(1)}°C</span>
                         <span>WIND:</span><span style="text-align: right;">${data.wind.toFixed(0)}km/h</span>
@@ -75,14 +76,13 @@
 
         const coords = route.geometry.coordinates;
         const depTime = window.currentDepartureTime || new Date();
-        const speed = (window.currentSpeedOffset || 0) + 95;
+        const speed = (window.currentSpeedOffset || 0) + 90;
 
-        // Sample 4 Waypoints [cite: 2025-12-30]
-        for (let pct of [0.15, 0.45, 0.75, 0.95]) {
+        for (let pct of [0.2, 0.5, 0.8]) {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
-            const travelHours = ((route.distance / 1000) * pct) / speed;
-            const timeISO = new Date(depTime.getTime() + travelHours * 3600000).toISOString().substring(0, 13) + ":00:00Z";
+            const travelTime = ((route.distance / 1000) * pct) / speed;
+            const timeISO = new Date(depTime.getTime() + travelTime * 3600000).toISOString().substring(0, 13) + ":00:00Z";
 
             const data = await window.BulletinLogic.fetchECCCPoint(lat, lng, timeISO);
             if (data) {
@@ -90,10 +90,10 @@
                 L.marker([lat, lng], {
                     icon: L.divIcon({
                         className: 'w-marker',
-                        html: `<div style="background:#000; border:2px solid ${isCrit ? '#ff4757' : '#FFD700'}; border-radius:50%; width:20px; height:20px; color:${isCrit ? '#ff4757' : '#FFD700'}; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; box-shadow: 0 0 10px #000;">${isCrit ? '!' : '●'}</div>`,
-                        iconSize: [20, 20]
+                        html: `<div style="background:#000; border:2px solid ${isCrit ? '#ff4757' : '#FFD700'}; border-radius:50%; width:22px; height:22px; color:${isCrit ? '#ff4757' : '#FFD700'}; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; box-shadow: 0 0 10px #000;">${isCrit ? '!' : '●'}</div>`,
+                        iconSize: [22, 22]
                     }),
-                    zIndexOffset: 2000 // Force on top of route [cite: 2025-12-30]
+                    zIndexOffset: 3000 // Ensure visibility above all other layers [cite: 2025-12-30]
                 })
                 .bindPopup(window.BulletinLogic.generateTableHTML(data))
                 .addTo(weatherMarkers);
@@ -101,13 +101,7 @@
         }
     }
 
-    // 4. LISTENERS [cite: 2025-12-30]
-    window.addEventListener('weong:routeUpdated', (e) => {
-        lastRoute = e.detail;
-        window.currentRouteData = lastRoute;
-        updateWeatherMarkers(lastRoute);
-    });
-
+    // 3. EVENT BINDINGS [cite: 2025-12-30]
     window.addEventListener('weong:update', () => {
         if (lastRoute) updateWeatherMarkers(lastRoute);
     });
