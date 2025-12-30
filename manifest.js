@@ -1,4 +1,4 @@
-/** THE SYSTEM MANIFEST - ROOT-FOLDER OPTIMIZED **/
+/** THE SYSTEM MANIFEST - MODULE COMPATIBLE **/
 const modulePaths = [
     '/engine/weather-bulletin.js',
     '/engine/weather-engine.js',
@@ -9,17 +9,16 @@ const modulePaths = [
 modulePaths.forEach(path => {
     const s = document.createElement('script');
     s.src = path; 
-    s.type = 'application/javascript';
+    s.type = 'module'; // FIX: Resolves Unexpected token 'export'
     s.async = false;
     
     s.onload = () => {
         console.log(`System: ${path} active.`);
-        // Force a route redraw as each logic piece arrives
         window.dispatchEvent(new Event('weong:update'));
     };
 
     s.onerror = () => {
-        console.error(`CRITICAL: Could not find ${path}. Check Vercel deployment logs.`);
+        console.error(`CRITICAL: Could not find ${path}. Check /engine/ folder.`);
     };
     
     document.body.appendChild(s);
