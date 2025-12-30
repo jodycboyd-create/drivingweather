@@ -3,32 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NL Navigator | Engine Handshake</title>
+    <title>NL Navigator | Handshake Shell</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100vw; background: #aad3df; }
-        .hub-label { 
-            font-weight: bold; background: white; border: 2px solid #0070bb; 
-            padding: 4px 10px; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            font-family: Arial, sans-serif; pointer-events: none;
-        }
-        #build-tag { 
-            position: absolute; bottom: 20px; left: 10px; z-index: 1000; 
-            background: white; padding: 5px 12px; border: 2px solid #333;
-            font-family: monospace; font-weight: bold;
-        }
-        .leaflet-routing-container { display: none !important; }
+        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: Arial, sans-serif; }
+        #build-tag { position: absolute; bottom: 20px; left: 10px; z-index: 1000; background: white; padding: 5px 12px; border: 2px solid #333; font-family: monospace; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="build-tag">Build: v.2025.12.29.15</div>
+    <div id="build-tag">Build: v.2025.12.29.16-FINAL-SHELL</div>
     <div id="map"></div>
 
     <script>
-        // CORE INITIALIZATION
+        // GLOBAL STATE
         window.map = L.map('map').setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
 
@@ -49,10 +39,7 @@
         }
 
         function initApp() {
-            const hubs = [
-                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
-                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
-            ];
+            const hubs = [{ name: "St. John's", lat: 47.5615, lng: -52.7126 }, { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }];
 
             hubs.forEach(h => {
                 const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
@@ -63,16 +50,16 @@
                     marker.setLatLng([nearest.lat, nearest.lng]); 
                     marker.getTooltip().setContent(nearest.name);
                     
-                    // Trigger the engine in /engine/
-                    if(window.RouteEngine) window.RouteEngine.sync();
+                    // HANDOFF: index.html tells the engine to recalculate
+                    if(window.RouteEngine) window.RouteEngine.calculate();
                 });
 
-                marker.on('dragend', () => { if(window.RouteEngine) window.RouteEngine.sync(); });
+                marker.on('dragend', () => { if(window.RouteEngine) window.RouteEngine.calculate(); });
                 window.hubMarkers.push(marker);
             });
             
-            // Final handshake check
-            window.dispatchEvent(new Event('app-ready'));
+            // Send signal that the UI is ready for the engine
+            window.dispatchEvent(new Event('engine-init'));
         }
 
         function findNearest(target) {
@@ -88,6 +75,7 @@
         loadNLData();
     </script>
 
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script src="engine/route-engine.js"></script>
 </body>
 </html>
