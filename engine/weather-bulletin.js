@@ -1,91 +1,104 @@
-/** * [weong-bulletin] Final Sync Engine 
- * Status: Coupled + Time-Aware + Visual Feedback [cite: 2025-12-30]
- * Data: Dynamic HRDPS Newfoundland Dataset [cite: 2025-12-26]
+/** * Project: [weong-bulletin]
+ * Methodology: [weong-route] Level 3 Exception Triggering
+ * Status: Final Locked Build [cite: 2025-12-30]
  */
 
-(function() {
-    let weatherLayer = L.layerGroup();
-    let lastStateKey = null;
-
-    const ECCC_BASE = "https://geo.weather.gc.ca/geomet";
-    const PROXY = "https://api.allorigins.win/raw?url=";
-
-    const fetchHRDPS = async (lat, lng, timeISO) => {
-        const layers = "HRDPS.CONTINENTAL_TT,HRDPS.CONTINENTAL_SDE,HRDPS.CONTINENTAL_VIS,HRDPS.CONTINENTAL_UU";
-        const query = `?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo&LAYERS=${layers}&QUERY_LAYERS=${layers}` +
-                      `&BBOX=${lat-0.01},${lng-0.01},${lat+0.01},${lng+0.01}&INFO_FORMAT=application/json` +
-                      `&I=50&J=50&WIDTH=101&HEIGHT=101&CRS=EPSG:4326&TIME=${timeISO}`;
-        try {
-            const response = await fetch(PROXY + encodeURIComponent(ECCC_BASE + query));
-            const json = await response.json();
-            return json.contents ? JSON.parse(json.contents).features[0].properties : json.features[0].properties;
-        } catch (e) { return null; }
+const WeatherBulletin = (function() {
+    // Core State Store [cite: 2025-12-27]
+    const state = {
+        weatherLayer: L.layerGroup(),
+        lastRouteID: null,
+        lastTimeID: null,
+        isProcessing: false,
+        config: {
+            proxy: "https://api.allorigins.win/raw?url=",
+            eccc: "https://geo.weather.gc.ca/geomet",
+            intervals: [0.15, 0.45, 0.75, 0.92] // Level 3 Waypoint Distribution
+        }
     };
 
-    const syncWeather = async () => {
-        if (!window.map) return;
+    // Level 3 Data Fetcher [cite: 2025-12-26]
+    async function fetchDiagnostic(lat, lng, timeISO) {
+        const layers = "HRDPS.CONTINENTAL_TT,HRDPS.CONTINENTAL_SDE,HRDPS.CONTINENTAL_VIS,HRDPS.CONTINENTAL_UU";
+        const query = `?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo&LAYERS=${layers}&QUERY_LAYERS=${layers}&BBOX=${lat-0.01},${lng-0.01},${lat+0.01},${lng+0.01}&INFO_FORMAT=application/json&I=50&J=50&WIDTH=101&HEIGHT=101&CRS=EPSG:4326&TIME=${timeISO}`;
+        
+        try {
+            const res = await fetch(state.config.proxy + encodeURIComponent(state.config.eccc + query));
+            const json = await res.json();
+            return json.contents ? JSON.parse(json.contents).features[0].properties : json.features[0].properties;
+        } catch (e) { return null; }
+    }
 
-        let routeLayer = null;
-        window.map.eachLayer(l => { if (l.feature?.geometry?.type === "LineString") routeLayer = l; });
+    // Trigger Methodology: Only executes on Level 3 state delta [cite: 2023-12-23]
+    async function evaluateState() {
+        if (state.isProcessing || !window.map) return;
+
+        const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
         const depTime = window.currentDepartureTime || new Date();
-        const coords = routeLayer?.feature?.geometry?.coordinates;
+        
+        if (!route) return;
 
-        if (!coords) return;
+        const routeID = JSON.stringify(route.feature.geometry.coordinates[0]) + route.feature.geometry.coordinates.length;
+        const timeID = depTime.getHours();
 
-        // Anchor Check: Geometry + Time in Hours [cite: 2025-12-30]
-        const stateKey = JSON.stringify(coords[0]) + coords.length + depTime.getHours();
-        if (stateKey === lastStateKey) return;
-        lastStateKey = stateKey;
+        // Exception Trigger: If geometry or time hasn't changed, halt [cite: 2025-12-30]
+        if (routeID === state.lastRouteID && timeID === state.lastTimeID) return;
+        
+        state.isProcessing = true;
+        state.lastRouteID = routeID;
+        state.lastTimeID = timeID;
 
-        if (!window.map.hasLayer(weatherLayer)) weatherLayer.addTo(window.map);
-        weatherLayer.clearLayers();
+        if (!window.map.hasLayer(state.weatherLayer)) state.weatherLayer.addTo(window.map);
+        state.weatherLayer.clearLayers();
 
-        const pcts = [0.15, 0.45, 0.75, 0.92];
-        pcts.forEach(async (pct) => {
+        const coords = route.feature.geometry.coordinates;
+        
+        for (const pct of state.config.intervals) {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
             
-            const travelHours = (idx / coords.length) * 6; 
-            const forecastTime = new Date(depTime.getTime() + travelHours * 3600000);
+            // Temporal Offset Logic [cite: 2025-12-30]
+            const forecastTime = new Date(depTime.getTime() + (idx / coords.length * 6) * 3600000);
             const timeISO = forecastTime.toISOString().substring(0, 13) + ":00:00Z";
 
             const marker = L.marker([lat, lng], {
                 icon: L.divIcon({
-                    className: 'w-icon',
+                    className: 'weong-bulletin-node',
                     html: `<div class="sync-glow" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:48px; height:48px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000; animation: pulse 2s infinite;">
                             <span style="font-size:14px;">☁️</span>
                             <span class="t-val" style="font-size:13px; font-weight:bold; font-family:monospace;">...</span>
                            </div>`,
                     iconSize: [48, 48]
                 }),
-                zIndexOffset: 15000 
-            }).addTo(weatherLayer);
+                zIndexOffset: 15000
+            }).addTo(state.weatherLayer);
 
-            const p = await fetchHRDPS(lat, lng, timeISO);
-            if (p) {
+            // Execute Parallel Hydration [cite: 2025-12-30]
+            fetchDiagnostic(lat, lng, timeISO).then(p => {
+                if (!p) return;
                 const temp = p['HRDPS.CONTINENTAL_TT'] || 0;
                 const el = marker.getElement();
                 if (el) {
-                    const box = el.querySelector('.sync-glow');
+                    el.querySelector('.sync-glow').style.animation = "none";
                     const label = el.querySelector('.t-val');
-                    box.style.animation = "none"; // Stop glowing once data arrives [cite: 2025-12-30]
                     label.innerText = `${Math.round(temp)}°`;
                     label.style.color = temp <= 0 ? "#00d4ff" : "#FFD700";
                 }
-                marker.bindPopup(`<div style="font-family:monospace; font-size:11px; color:#fff; background:#111; padding:8px; border-left:3px solid #FFD700;">
-                    <b>${forecastTime.getHours()}:00 FORECAST</b><br>
-                    TEMP: ${temp.toFixed(1)}°C<br>
-                    WIND: ${(p['HRDPS.CONTINENTAL_UU'] || 0).toFixed(0)} km/h<br>
-                    VIS: ${(p['HRDPS.CONTINENTAL_VIS'] || 10).toFixed(1)} km
-                </div>`);
-            }
-        });
-    };
+                marker.bindPopup(`
+                    <div style="font-family:monospace; font-size:11px; color:#fff; background:#111; padding:10px; border-left:4px solid #FFD700;">
+                        <b style="color:#FFD700;">[WEONG-BULLETIN] LEVEL 3</b><br>
+                        TIME: ${forecastTime.getHours()}:00<br>
+                        TEMP: ${temp.toFixed(1)}°C<br>
+                        WIND: ${(p['HRDPS.CONTINENTAL_UU'] || 0).toFixed(0)} km/h<br>
+                        VIS: ${(p['HRDPS.CONTINENTAL_VIS'] || 10).toFixed(1)} km
+                    </div>`);
+            });
+        }
+        state.isProcessing = false;
+    }
 
-    // Inject required animation style [cite: 2025-12-30]
-    const style = document.createElement('style');
-    style.innerHTML = `@keyframes pulse { 0% { box-shadow: 0 0 5px #FFD700; } 50% { box-shadow: 0 0 20px #FFD700; } 100% { box-shadow: 0 0 5px #FFD700; } }`;
-    document.head.appendChild(style);
+    // Initialize Global Watcher [cite: 2025-12-30]
+    setInterval(evaluateState, 400);
 
-    setInterval(syncWeather, 400); 
+    return { refresh: () => { state.lastRouteID = null; evaluateState(); } };
 })();
