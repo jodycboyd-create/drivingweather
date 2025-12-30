@@ -8,6 +8,7 @@
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
+        /* NUCLEAR PANEL KILLER */
         .leaflet-routing-container, .leaflet-routing-error, .hidden-panel {
             display: none !important;
             visibility: hidden !important;
@@ -80,26 +81,25 @@
                 const m = L.marker([s.lat, s.lng], { draggable: true }).addTo(window.map);
                 m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                 
-                m.on('drag', function(e) {
+                m.on('drag', (e) => {
                     const p = snap(e.target.getLatLng());
                     e.target.setLatLng([p.lat, p.lng]);
                     e.target.setTooltipContent(p.name);
                 });
 
-                m.on('dragend', function() {
-                    // Trigger engines
+                m.on('dragend', () => {
+                    // Trigger Route Engine (Standard Global)
                     if (window.RouteEngine) window.RouteEngine.calculate();
-                    if (window.WeatherEngine) window.WeatherEngine.update();
-                    if (window.VelocityWidget) window.VelocityWidget.refresh();
+                    
+                    // Trigger Module-based engines via custom event
+                    window.dispatchEvent(new CustomEvent('engine-update'));
                 });
 
                 window.hubMarkers.push(m);
             });
-
-            // Initial Draw Trigger
-            setTimeout(() => {
-                if (window.RouteEngine) window.RouteEngine.calculate();
-            }, 500);
+            
+            // Initial render
+            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); }, 500);
         }
         
         loadNL();
@@ -110,13 +110,17 @@
         import { WeatherEngine } from './engine/weather-engine.js';
         import { VelocityWidget } from './velocity-widget.js';
 
-        window.BulletinLogic = BulletinLogic;
-        window.WeatherEngine = WeatherEngine;
-        window.VelocityWidget = VelocityWidget;
-        
-        // Final fallback to ensure default route appears if timing was tight
+        // Listen for the custom event from the markers
+        window.addEventListener('engine-update', () => {
+            console.log("Modules: Received Update Signal");
+            WeatherEngine.update(BulletinLogic);
+            VelocityWidget.refresh();
+        });
+
+        // Initial handshake on load
         window.addEventListener('load', () => {
-             if (window.RouteEngine) window.RouteEngine.calculate();
+            console.log("Modules: Handshake Active");
+            WeatherEngine.update(BulletinLogic);
         });
     </script>
 </body>
