@@ -1,25 +1,27 @@
 /** SYSTEM MANIFEST - ENGINE FOLDER LOCKED **/
+/** Updated: Dec 30, 2025 - Fixed Module Scoping for Flag Handshake **/
+
 const modulePaths = [
-    '/engine/weather-bulletin.js',
-    '/engine/weather-engine.js',
-    '/engine/route-engine.js',
-    '/engine/velocity-widget.js'
+    { path: '/engine/route-engine.js', type: 'module' },
+    { path: '/engine/velocity-widget.js', type: 'module' }, // Now consistent as module
+    { path: '/engine/weather-engine.js', type: 'module' },
+    { path: '/engine/weather-bulletin.js', type: 'module' }
 ];
 
-modulePaths.forEach(path => {
+modulePaths.forEach(mod => {
     const s = document.createElement('script');
-    s.src = path; 
-    s.type = 'module'; // Critical fix for 'export' errors
+    s.src = mod.path; 
+    s.type = mod.type; 
     s.async = false;
     
     s.onload = () => {
-        console.log(`System: ${path} initialized.`);
+        console.log(`System: ${mod.path} initialized.`);
         // Signal the map to update as engines come online
         window.dispatchEvent(new Event('weong:update'));
     };
 
     s.onerror = () => {
-        console.error(`CRITICAL: System cannot find ${path} in /engine/ folder.`);
+        console.error(`CRITICAL: System cannot find ${mod.path} in /engine/ folder.`);
     };
     
     document.body.appendChild(s);
