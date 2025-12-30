@@ -1,39 +1,26 @@
-/**
- * ROUTE-ENGINE.JS | SILENT PERFORMANCE BUILD
- * Zero UI, Zero Lag, Real-time Magnetism.
- */
 window.RouteEngine = {
     _control: null,
 
     calculate: function() {
         if (!window.map || window.hubMarkers.length < 2) return;
-        
-        const waypoints = window.hubMarkers.map(m => m.getLatLng());
+        const pts = window.hubMarkers.map(m => m.getLatLng());
 
-        // 1. If control exists, just update waypoints instead of re-adding to map
-        // This is significantly faster than removing/adding the whole control
+        // PERFORMANCE: If the line exists, just move it. Do not recreate it.
         if (this._control) {
-            this._control.setWaypoints(waypoints);
+            this._control.setWaypoints(pts);
             return;
         }
 
-        // 2. Initial Setup: Create the "Silent" Router
+        // INITIALIZE SILENTLY
         this._control = L.Routing.control({
-            waypoints: waypoints,
-            router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'driving'
-            }),
-            lineOptions: {
-                styles: [{ color: '#0070bb', weight: 8, opacity: 0.7 }],
-                addWaypoints: false
-            },
-            createMarker: () => null, // Shell owns markers [cite: 2025-12-30]
+            waypoints: pts,
+            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+            lineOptions: { styles: [{ color: '#0070bb', weight: 8, opacity: 0.7 }] },
+            createMarker: () => null,
             addWaypoints: false,
             draggableWaypoints: false,
-            fitSelectedRoutes: false, // Prevents camera jumps while dragging
-            show: false,              // Disables the panel [cite: 2025-12-30]
-            containerClassName: 'hidden' // Final fallback to hide UI
+            show: false, // Kill the panel via JS
+            fitSelectedRoutes: false
         }).addTo(window.map);
     }
 };
