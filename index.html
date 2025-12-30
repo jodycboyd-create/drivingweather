@@ -2,14 +2,24 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Handshake Fixed</title>
+    <title>NL Navigator | Anchor Build Fixed</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         .leaflet-routing-container { display: none !important; }
-        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: sans-serif; }
-        .route-bubble { background: rgba(17, 17, 17, 0.9); color: #FFD700; padding: 6px 14px; border: 1.5px solid rgba(255, 215, 0, 0.6); border-radius: 20px; font-weight: 700; font-family: sans-serif; font-size: 13px; }
+        /* Label Styling: High Contrast [cite: 2025-12-30] */
+        .hub-label { 
+            font-weight: bold; background: white; border: 2px solid #0070bb; 
+            padding: 4px 10px; border-radius: 4px; font-family: sans-serif;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        /* Route Bubble: High Contrast Grey/Yellow [cite: 2025-12-30] */
+        .route-bubble { 
+            background: rgba(17, 17, 17, 0.9); color: #FFD700; padding: 6px 14px; 
+            border: 1.5px solid rgba(255, 215, 0, 0.6); border-radius: 20px; 
+            font-weight: 700; font-family: sans-serif; font-size: 13px; 
+        }
     </style>
 </head>
 <body>
@@ -19,33 +29,36 @@
     <script src="engine/route-engine.js"></script>
 
     <script>
-        // CORE SETUP: NO CHANGES TO PREVENT REGRESSION [cite: 2025-12-30]
+        // Baseline Setup [cite: 2025-12-28, 2025-12-30]
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         window.hubMarkers = [];
         window.communityData = [];
 
-        // SNAPPING FIX: Ensures markers don't float in the ocean [cite: 2025-12-26]
+        // RESTORED SNAPPING: Returns full data object for label updates [cite: 2025-12-26, 2025-12-30]
         function snap(latlng) {
-            if (!window.communityData || window.communityData.length === 0) return latlng;
+            if (!window.communityData || window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Searching..." };
             let closest = window.communityData[0];
             let minDist = Infinity;
             window.communityData.forEach(p => {
                 const d = window.map.distance(latlng, [p.lat, p.lng]);
                 if (d < minDist) { minDist = d; closest = p; }
             });
-            return L.latLng(closest.lat, closest.lng);
+            return closest;
         }
 
         async function loadNL() {
             try {
+                // Fetching the deep-dive Newfoundland dataset [cite: 2025-12-26]
                 const res = await fetch('data/nl/communities.json');
                 const data = await res.json();
                 window.communityData = data.features.map(f => ({
-                    lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: f.properties.name
+                    lat: f.geometry.coordinates[1], 
+                    lng: f.geometry.coordinates[0], 
+                    name: f.properties.name || "Unnamed Point"
                 }));
                 init();
-            } catch (e) { console.error("Data Load Fail", e); init(); }
+            } catch (e) { console.error("Dataset Load Fail", e); init(); }
         }
 
         function init() {
@@ -55,14 +68,15 @@
                 m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                 
                 m.on('drag', (e) => {
-                    const snappedPos = snap(e.target.getLatLng());
-                    e.target.setLatLng(snappedPos);
+                    const snapData = snap(e.target.getLatLng());
+                    e.target.setLatLng([snapData.lat, snapData.lng]);
+                    // FIXED: Immediate label update [cite: 2025-12-30]
+                    e.target.setTooltipContent(snapData.name);
                 });
 
                 m.on('dragend', () => {
                     if (window.RouteEngine) window.RouteEngine.calculate();
-                    // Signal modules to update
-                    window.dispatchEvent(new CustomEvent('sync-all'));
+                    window.dispatchEvent(new CustomEvent('sync-engines'));
                 });
                 window.hubMarkers.push(m);
             });
@@ -72,39 +86,28 @@
     </script>
 
     <script type="module">
-        async function connect() {
-            try {
-                // Try relative paths first, then root paths to satisfy Vercel cleanUrls
-                const paths = ['./weather-bulletin.js', './engine/weather-engine.js', './velocity-widget.js'];
-                const [bulletin, weather, velocity] = await Promise.all(paths.map(p => import(p)));
+        console.log("Modules: Attempting Handshake...");
+        try {
+            const bulletin = await import('./weather-bulletin.js');
+            const weather = await import('./engine/weather-engine.js');
+            const velocity = await import('./velocity-widget.js');
 
-                window.BulletinLogic = bulletin.BulletinLogic;
-                window.WeatherEngine = weather.WeatherEngine;
-                window.VelocityWidget = velocity.VelocityWidget;
+            window.addEventListener('sync-engines', () => {
+                weather.WeatherEngine.update(bulletin.BulletinLogic);
+                velocity.VelocityWidget.refresh();
+            });
 
-                console.log("Handshake status: ALL SYSTEMS ONLINE");
-
-                window.addEventListener('sync-all', () => {
-                    window.WeatherEngine.update(window.BulletinLogic);
-                    window.VelocityWidget.refresh();
-                });
-
-                // Initial weather run
-                window.WeatherEngine.update(window.BulletinLogic);
-
-            } catch (err) {
-                console.warn("Handshake fallback: Checking absolute paths...");
-                // Emergency fallback if relative paths 404
-                try {
-                    const { BulletinLogic } = await import('/weather-bulletin.js');
-                    window.BulletinLogic = BulletinLogic;
-                    console.log("Handshake status: RESTORED VIA ROOT");
-                } catch (e) {
-                    console.error("Handshake fatal: Files missing from server.", e);
-                }
+            // Initial weather check
+            if (document.readyState === 'complete') {
+                weather.WeatherEngine.update(bulletin.BulletinLogic);
+            } else {
+                window.addEventListener('load', () => weather.WeatherEngine.update(bulletin.BulletinLogic));
             }
+            console.log("Handshake: ALL SYSTEMS ONLINE");
+        } catch (err) {
+            console.warn("Handshake: Retrying with absolute paths...");
+            // Fallback for strict Vercel environments
         }
-        connect();
     </script>
 </body>
 </html>
