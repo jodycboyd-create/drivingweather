@@ -12,7 +12,6 @@
   ],
   "rewrites": [
     { "source": "/weather-bulletin", "destination": "/engine/weather-bulletin.js" },
-    { "source": "/weather-engine", "destination": "/engine/weather-engine.js" },
     { "source": "/velocity-widget", "destination": "/engine/velocity-widget.js" },
     { "source": "/route-engine", "destination": "/engine/route-engine.js" }
   ]
