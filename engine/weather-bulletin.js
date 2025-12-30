@@ -1,6 +1,6 @@
-/** * [weong-bulletin] Unified Sync & Time Engine 
- * Status: Coupled to Route + Velocity Widget [cite: 2025-12-30]
- * Data: Real-time HRDPS Forecast (No -2° Hardcode) [cite: 2025-12-26]
+/** * [weong-bulletin] Final Sync Engine 
+ * Status: Coupled + Time-Aware + Visual Feedback [cite: 2025-12-30]
+ * Data: Dynamic HRDPS Newfoundland Dataset [cite: 2025-12-26]
  */
 
 (function() {
@@ -25,18 +25,14 @@
     const syncWeather = async () => {
         if (!window.map) return;
 
-        // 1. Identify Active Route and Departure Time [cite: 2025-12-30]
         let routeLayer = null;
         window.map.eachLayer(l => { if (l.feature?.geometry?.type === "LineString") routeLayer = l; });
         const depTime = window.currentDepartureTime || new Date();
         const coords = routeLayer?.feature?.geometry?.coordinates;
 
-        if (!coords) {
-            console.warn("Bulletin: No route data found in global anchor."); //
-            return;
-        }
+        if (!coords) return;
 
-        // 2. Anchor Check: Prevents decoupling & proxy lag [cite: 2025-12-30]
+        // Anchor Check: Geometry + Time in Hours [cite: 2025-12-30]
         const stateKey = JSON.stringify(coords[0]) + coords.length + depTime.getHours();
         if (stateKey === lastStateKey) return;
         lastStateKey = stateKey;
@@ -49,7 +45,6 @@
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
             
-            // Calculate Temporal Offset [cite: 2025-12-30]
             const travelHours = (idx / coords.length) * 6; 
             const forecastTime = new Date(depTime.getTime() + travelHours * 3600000);
             const timeISO = forecastTime.toISOString().substring(0, 13) + ":00:00Z";
@@ -57,7 +52,7 @@
             const marker = L.marker([lat, lng], {
                 icon: L.divIcon({
                     className: 'w-icon',
-                    html: `<div style="background:#000; border:2px solid #FFD700; border-radius:4px; width:48px; height:48px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000;">
+                    html: `<div class="sync-glow" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:48px; height:48px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000; animation: pulse 2s infinite;">
                             <span style="font-size:14px;">☁️</span>
                             <span class="t-val" style="font-size:13px; font-weight:bold; font-family:monospace;">...</span>
                            </div>`,
@@ -66,18 +61,19 @@
                 zIndexOffset: 15000 
             }).addTo(weatherLayer);
 
-            // 3. Hydrate with Real HRDPS Data [cite: 2025-12-26, 2025-12-30]
             const p = await fetchHRDPS(lat, lng, timeISO);
             if (p) {
                 const temp = p['HRDPS.CONTINENTAL_TT'] || 0;
                 const el = marker.getElement();
                 if (el) {
+                    const box = el.querySelector('.sync-glow');
                     const label = el.querySelector('.t-val');
+                    box.style.animation = "none"; // Stop glowing once data arrives [cite: 2025-12-30]
                     label.innerText = `${Math.round(temp)}°`;
                     label.style.color = temp <= 0 ? "#00d4ff" : "#FFD700";
                 }
                 marker.bindPopup(`<div style="font-family:monospace; font-size:11px; color:#fff; background:#111; padding:8px; border-left:3px solid #FFD700;">
-                    <b>FORECAST @ ${forecastTime.getHours()}:00</b><br>
+                    <b>${forecastTime.getHours()}:00 FORECAST</b><br>
                     TEMP: ${temp.toFixed(1)}°C<br>
                     WIND: ${(p['HRDPS.CONTINENTAL_UU'] || 0).toFixed(0)} km/h<br>
                     VIS: ${(p['HRDPS.CONTINENTAL_VIS'] || 10).toFixed(1)} km
@@ -86,5 +82,10 @@
         });
     };
 
-    setInterval(syncWeather, 400); // Responsive sync [cite: 2025-12-30]
+    // Inject required animation style [cite: 2025-12-30]
+    const style = document.createElement('style');
+    style.innerHTML = `@keyframes pulse { 0% { box-shadow: 0 0 5px #FFD700; } 50% { box-shadow: 0 0 20px #FFD700; } 100% { box-shadow: 0 0 5px #FFD700; } }`;
+    document.head.appendChild(style);
+
+    setInterval(syncWeather, 400); 
 })();
