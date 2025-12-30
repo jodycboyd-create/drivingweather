@@ -1,20 +1,19 @@
 /** THE SYSTEM MANIFEST **/
 const modules = [
     'weather-bulletin.js',
-    'engine/weather-engine.js',
-    'engine/route-engine.js',
+    'engine/weather-engine.js', // Ensure this file exists in /engine/
+    'engine/route-engine.js',   // Ensure this file exists in /engine/
     'velocity-widget.js'
 ];
 
-// Load sequence ensuring order
 modules.forEach(src => {
     const s = document.createElement('script');
-    s.src = src;
+    s.src = src; 
     s.async = false; 
     s.onload = () => {
-        // Trigger calculation as soon as the Route Engine lands
-        if (src.includes('route-engine') || src.includes('velocity')) {
-             window.dispatchEvent(new Event('weong:update'));
+        // Force the route to draw once all logic engines are on board
+        if (window.RouteEngine) {
+            window.dispatchEvent(new Event('weong:update'));
         }
     };
     document.body.appendChild(s);
