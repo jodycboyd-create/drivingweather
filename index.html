@@ -24,7 +24,7 @@
     </style>
 </head>
 <body>
-    <div id="build-tag">Build: v.2025.12.29.13</div>
+    <div id="build-tag">Build: v.2025.12.29.14</div>
     <div id="map"></div>
 
     <script>
@@ -37,6 +37,7 @@
 
         async function loadNLData() {
             try {
+                // Ensuring data path is correct relative to root
                 const response = await fetch('data/nl/communities.json');
                 const data = await response.json();
                 window.communityPoints = data.features.map(f => ({
@@ -45,7 +46,7 @@
                     name: f.properties.name || "Road Point"
                 }));
                 initApp();
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Data Load Error:", e); }
         }
 
         function initApp() {
@@ -64,15 +65,16 @@
                     marker.getTooltip().setContent(nearest.name);
                     
                     // CALL ENGINE FOR LIVE UPDATES
-                    if(window.RouteEngine) window.RouteEngine.calculate();
+                    if(window.RouteEngine && typeof window.RouteEngine.calculate === 'function') {
+                        window.RouteEngine.calculate();
+                    }
                 });
 
-                marker.on('dragend', () => { if(window.RouteEngine) window.RouteEngine.calculate(); });
+                marker.on('dragend', () => { 
+                    if(window.RouteEngine) window.RouteEngine.calculate(); 
+                });
                 window.hubMarkers.push(marker);
             });
-            
-            // Initial path check once engine loads
-            setTimeout(() => { if(window.RouteEngine) window.RouteEngine.calculate(); }, 500);
         }
 
         function findNearest(target) {
