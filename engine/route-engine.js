@@ -1,31 +1,27 @@
-/** [weong-route] Core Routing Engine - Integrated Metrics Build **/
-/** Locked: Dec 30, 2025 Baseline [cite: 2025-12-30] **/
+/** [weong-route] Core Routing Engine - Stability Locked Build **/
+/** Fixes: Route Jumping & Missing Metric Flag **/
 
 let currentRouteLayer = null;
 let metricFlag = null;
+let routeTimeout = null; // For debouncing jumps
 
-/**
- * Tactical Ribbon Style: 
- * Triple-layered for crisp definition on the NL map.
- */
 function drawTacticalRoute(routeData) {
     if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
-
     currentRouteLayer = L.layerGroup().addTo(window.map);
 
-    // 1. Shadow/Shoulder (Depth)
+    // Layer 1: Shoulder
     L.geoJSON(routeData.geometry, {
-        style: { color: '#000000', weight: 6, opacity: 0.3, lineJoin: 'round' }
+        style: { color: '#000', weight: 6, opacity: 0.3 }
     }).addTo(currentRouteLayer);
 
-    // 2. Core Asphalt (Sharpness)
+    // Layer 2: Core Ribbon
     L.geoJSON(routeData.geometry, {
-        style: { color: '#2d2d2d', weight: 3, opacity: 1, lineJoin: 'round' }
+        style: { color: '#2d2d2d', weight: 3, opacity: 1 }
     }).addTo(currentRouteLayer);
 
-    // 3. Precision Centerline (Detail)
+    // Layer 3: Dashed Center
     L.geoJSON(routeData.geometry, {
-        style: { color: '#FFD700', weight: 1, opacity: 1, dashArray: '6, 12', lineJoin: 'round' }
+        style: { color: '#FFD700', weight: 1, opacity: 1, dashArray: '6, 12' }
     }).addTo(currentRouteLayer);
 
     if (!window.routeInitialized) {
@@ -34,94 +30,60 @@ function drawTacticalRoute(routeData) {
     }
 }
 
-/**
- * Metric Flag: High-Contrast Data Overlay
- * Rendered at the midpoint of the calculated route.
- */
 function updateMetricFlag(detail) {
     const { h, m, dist, speed, mid } = detail;
     if (!mid) return;
-
     if (metricFlag) window.map.removeLayer(metricFlag);
 
     const flagHtml = `
-        <div style="
-            background: rgba(10, 10, 10, 0.95); 
-            border: 1px solid #FFD700; 
-            color: #FFFFFF; 
-            padding: 10px; 
-            border-radius: 4px; 
-            font-family: 'Courier New', monospace; 
-            width: 140px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
-            pointer-events: none;
-            backdrop-filter: blur(4px);
-        ">
-            <div style="font-size: 9px; color: #FFD700; border-bottom: 1px solid #333; margin-bottom: 6px; letter-spacing: 2px; text-transform: uppercase; font-weight: bold;">
-                Sector Stats
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; line-height: 1.4;">
+        <div style="background: rgba(10,10,10,0.9); border: 1px solid #FFD700; color: #fff; padding: 8px; border-radius: 2px; font-family: monospace; width: 130px; box-shadow: 0 0 15px #000; backdrop-filter: blur(3px);">
+            <div style="font-size: 9px; color: #FFD700; border-bottom: 1px solid #444; margin-bottom: 5px; font-weight: bold;">SECTOR DATA</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; font-size: 12px;">
                 <span style="color: #888;">DIST:</span><span style="text-align: right;">${dist}km</span>
                 <span style="color: #888;">TIME:</span><span style="text-align: right;">${h}h ${m}m</span>
-                <span style="color: #888;">PACE:</span><span style="color: #00FF00; text-align: right; font-weight: bold;">${speed}</span>
+                <span style="color: #888;">PACE:</span><span style="color: #00FF00; text-align: right;">${speed}</span>
             </div>
-        </div>
-    `;
+        </div>`;
 
     metricFlag = L.marker([mid.lat, mid.lng], {
-        icon: L.divIcon({
-            html: flagHtml,
-            className: 'tactical-flag',
-            iconSize: [150, 70],
-            iconAnchor: [75, 80] 
-        }),
+        icon: L.divIcon({ html: flagHtml, className: 'tactical-flag', iconSize: [140, 65], iconAnchor: [70, 75] }),
         interactive: false
     }).addTo(window.map);
 }
 
-/**
- * Main OSRM Calculation
- */
 async function calculateRoute() {
-    if (!window.hubMarkers || window.hubMarkers.length < 2) {
-        console.warn("System: Markers not ready for routing.");
-        return;
-    }
+    if (!window.hubMarkers || window.hubMarkers.length < 2) return;
 
-    const start = window.hubMarkers[0].getLatLng();
-    const end = window.hubMarkers[1].getLatLng();
-    const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+    // DEBOUNCE: Clear previous pending request to stop the "jumping"
+    clearTimeout(routeTimeout);
+    routeTimeout = setTimeout(async () => {
+        const start = window.hubMarkers[0].getLatLng();
+        const end = window.hubMarkers[1].getLatLng();
+        const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
 
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("OSRM Offline");
-        const data = await response.json();
-
-        if (data.routes && data.routes[0]) {
-            const route = data.routes[0];
-            drawTacticalRoute(route);
-            
-            window.dispatchEvent(new CustomEvent('weong:routeUpdated', { 
-                detail: {
-                    summary: route.summary,
-                    coordinates: route.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] })),
-                    totalDistance: route.distance
-                } 
-            }));
-        }
-    } catch (error) {
-        console.error("System: Nav link severed. Retrying...");
-        setTimeout(calculateRoute, 3000); // Auto-recovery logic
-    }
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.routes && data.routes[0]) {
+                const route = data.routes[0];
+                drawTacticalRoute(route);
+                
+                // Signal Velocity Widget to calculate stats
+                window.dispatchEvent(new CustomEvent('weong:routeUpdated', { 
+                    detail: {
+                        summary: route.summary,
+                        coordinates: route.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] })),
+                        totalDistance: route.distance
+                    } 
+                }));
+            }
+        } catch (e) { console.warn("Route Logic: Link busy."); }
+    }, 50); // 50ms buffer prevents the flickering/jumping
 }
 
-// Global Event Subscriptions
-window.addEventListener('weong:ready', () => calculateRoute());
-window.addEventListener('weong:update', () => calculateRoute());
-
-// This ensures the flag appears when the Velocity Widget completes its math
-window.addEventListener('weong:speedCalculated', (e) => {
-    updateMetricFlag(e.detail);
-});
+// HANDSHAKES
+window.addEventListener('weong:ready', calculateRoute);
+window.addEventListener('weong:update', calculateRoute);
+window.addEventListener('weong:speedCalculated', (e) => updateMetricFlag(e.detail));
 
 export { calculateRoute };
