@@ -1,6 +1,7 @@
 /**
- * ROUTE-ENGINE.JS | DYNAMIC ZOOM & NO-REGRESSION BUILD
- * Requirements: Sharp #777777, No Icons, 100/80/50 Speeds, Zoom-Adaptive Width.
+ * ROUTE-ENGINE.JS | ISLAND-SCALE DASH BUILD
+ * Fixes: Missing dashes at zoom level 7.
+ * Features: Adaptive width, Proportional dashes, 100/80/50 Speeds.
  * [cite: 2025-12-30]
  */
 window.RouteEngine = {
@@ -29,29 +30,39 @@ window.RouteEngine = {
                 const coordinates = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 const distanceKm = route.distance / 1000;
 
-                // Speed Math: 100/80/50 km/h
+                // Speed Math: 100/80/50 km/h (No Moose Logic)
                 const totalHrs = ((distanceKm * 0.75) / 100) + ((distanceKm * 0.20) / 80) + ((distanceKm * 0.05) / 50);
                 const hours = Math.floor(totalHrs);
                 const mins = Math.round((totalHrs - hours) * 60);
 
                 /**
-                 * DYNAMIC ZOOM LOGIC: Adjusts width based on current zoom level
-                 * High zoom (12+) = Thick road | Low zoom (7) = Sleek line
+                 * DYNAMIC SCALING
+                 * Ensures visibility without "bulk" at zoom 7.
                  */
                 const z = window.map.getZoom();
-                const baseWeight = z > 10 ? 9 : (z > 7 ? 6 : 4);
-                const borderWeight = baseWeight + 3;
+                const baseWeight = z > 10 ? 8 : (z > 7 ? 5 : 3);
+                const borderWeight = baseWeight + 2.5;
+                
+                // Scale dash length so it doesn't look like a solid line at distance
+                const dashPattern = z > 7 ? '10, 20' : '5, 10';
 
                 // 1. SHARP OUTER BORDER
-                L.polyline(coordinates, { color: '#444444', weight: borderWeight, opacity: 1, lineCap: 'round' }).addTo(this._layers);
+                L.polyline(coordinates, { 
+                    color: '#444444', weight: borderWeight, opacity: 1, lineCap: 'round' 
+                }).addTo(this._layers);
 
                 // 2. MAIN GREY RIBBON
-                L.polyline(coordinates, { color: '#777777', weight: baseWeight, opacity: 1, lineCap: 'round' }).addTo(this._layers);
+                L.polyline(coordinates, { 
+                    color: '#777777', weight: baseWeight, opacity: 1, lineCap: 'round' 
+                }).addTo(this._layers);
 
-                // 3. CENTER DASH (Hidden at low zoom for clarity)
-                if (z > 7) {
-                    L.polyline(coordinates, { color: '#FFD700', weight: 1.5, dashArray: '10, 20', opacity: 1 }).addTo(this._layers);
-                }
+                // 3. YELLOW CENTER DASH (Always active now)
+                L.polyline(coordinates, { 
+                    color: '#FFD700', 
+                    weight: Math.max(1, baseWeight * 0.25), 
+                    dashArray: dashPattern, 
+                    opacity: 1 
+                }).addTo(this._layers);
 
                 this._layers.addTo(window.map);
 
@@ -76,7 +87,7 @@ window.addEventListener('shell-live', () => {
         m.off('dragend'); 
         m.on('dragend', () => window.RouteEngine.calculate());
     });
-    // RE-CALCULATE ON ZOOM: Updates ribbon thickness dynamically
+    // Re-render on zoom to apply new dynamic weights/dashes
     window.map.on('zoomend', () => window.RouteEngine.calculate());
     window.RouteEngine.calculate();
 });
