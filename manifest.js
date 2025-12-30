@@ -1,26 +1,26 @@
-/** THE SYSTEM MANIFEST - DEPLOYMENT READY **/
+/** THE SYSTEM MANIFEST - ROOT-FOLDER OPTIMIZED **/
 const modulePaths = [
-    'weather-bulletin.js',
-    'engine/weather-engine.js',
-    'engine/route-engine.js',
-    'velocity-widget.js'
+    '/engine/weather-bulletin.js',
+    '/engine/weather-engine.js',
+    '/engine/route-engine.js',
+    '/velocity-widget.js'
 ];
 
 modulePaths.forEach(path => {
     const s = document.createElement('script');
-    // FIX: Force relative pathing to ensure files in /engine/ are found
     s.src = path; 
+    s.type = 'application/javascript';
     s.async = false;
     
+    s.onload = () => {
+        console.log(`System: ${path} active.`);
+        // Force a route redraw as each logic piece arrives
+        window.dispatchEvent(new Event('weong:update'));
+    };
+
     s.onerror = () => {
-        console.error(`404: System cannot find ${path}. Check folder structure.`);
+        console.error(`CRITICAL: Could not find ${path}. Check Vercel deployment logs.`);
     };
     
-    s.onload = () => {
-        // As soon as the Route or Velocity logic lands, refresh the map
-        if (window.RouteEngine || path.includes('velocity')) {
-            window.dispatchEvent(new Event('weong:update'));
-        }
-    };
     document.body.appendChild(s);
 });
