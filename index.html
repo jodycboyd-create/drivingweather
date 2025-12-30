@@ -2,24 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Anchor Build Fixed</title>
+    <title>NL Navigator | Final Anchor Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
-        .leaflet-routing-container { display: none !important; }
-        /* Label Styling: High Contrast [cite: 2025-12-30] */
-        .hub-label { 
-            font-weight: bold; background: white; border: 2px solid #0070bb; 
-            padding: 4px 10px; border-radius: 4px; font-family: sans-serif;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        /* Route Bubble: High Contrast Grey/Yellow [cite: 2025-12-30] */
-        .route-bubble { 
-            background: rgba(17, 17, 17, 0.9); color: #FFD700; padding: 6px 14px; 
-            border: 1.5px solid rgba(255, 215, 0, 0.6); border-radius: 20px; 
-            font-weight: 700; font-family: sans-serif; font-size: 13px; 
-        }
+        .leaflet-routing-container, .hidden-panel { display: none !important; }
+        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: sans-serif; }
+        /* High Contrast UI [cite: 2025-12-30] */
+        .route-bubble { background: rgba(17, 17, 17, 0.9); color: #FFD700; padding: 6px 14px; border: 1.5px solid rgba(255, 215, 0, 0.6); border-radius: 20px; font-weight: 700; font-family: sans-serif; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -29,15 +20,16 @@
     <script src="engine/route-engine.js"></script>
 
     <script>
-        // Baseline Setup [cite: 2025-12-28, 2025-12-30]
+        console.log("System: Initializing Leaflet Map...");
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
+        
         window.hubMarkers = [];
         window.communityData = [];
 
-        // RESTORED SNAPPING: Returns full data object for label updates [cite: 2025-12-26, 2025-12-30]
+        // RESTORED: Snap returns full object to allow label updates [cite: 2025-12-26, 2025-12-30]
         function snap(latlng) {
-            if (!window.communityData || window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Searching..." };
+            if (window.communityData.length === 0) return { lat: latlng.lat, lng: latlng.lng, name: "Searching..." };
             let closest = window.communityData[0];
             let minDist = Infinity;
             window.communityData.forEach(p => {
@@ -49,7 +41,7 @@
 
         async function loadNL() {
             try {
-                // Fetching the deep-dive Newfoundland dataset [cite: 2025-12-26]
+                console.log("System: Fetching community dataset...");
                 const res = await fetch('data/nl/communities.json');
                 const data = await res.json();
                 window.communityData = data.features.map(f => ({
@@ -58,11 +50,15 @@
                     name: f.properties.name || "Unnamed Point"
                 }));
                 init();
-            } catch (e) { console.error("Dataset Load Fail", e); init(); }
+            } catch (e) { console.error("Data Load Failed:", e); init(); }
         }
 
         function init() {
-            const starts = [{name:"Corner Brook", lat:48.9515, lng:-57.9482}, {name:"St. John's", lat:47.5615, lng:-52.7126}];
+            const starts = [
+                {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
+                {name:"St. John's", lat:47.5615, lng:-52.7126}
+            ];
+
             starts.forEach(s => {
                 const m = L.marker([s.lat, s.lng], { draggable: true }).addTo(window.map);
                 m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
@@ -75,39 +71,49 @@
                 });
 
                 m.on('dragend', () => {
+                    console.log("Marker: Drag End. Triggering engines...");
                     if (window.RouteEngine) window.RouteEngine.calculate();
-                    window.dispatchEvent(new CustomEvent('sync-engines'));
+                    window.dispatchEvent(new CustomEvent('engine-update'));
                 });
+
                 window.hubMarkers.push(m);
             });
-            setTimeout(() => { if (window.RouteEngine) window.RouteEngine.calculate(); }, 500);
+            
+            setTimeout(() => { 
+                console.log("System: Running first-load route calculation...");
+                if (window.RouteEngine) window.RouteEngine.calculate(); 
+            }, 500);
         }
+        
         loadNL();
     </script>
-
+    
     <script type="module">
-        console.log("Modules: Attempting Handshake...");
-        try {
-            const bulletin = await import('./weather-bulletin.js');
-            const weather = await import('./engine/weather-engine.js');
-            const velocity = await import('./velocity-widget.js');
+        console.log("Modules: Attempting Hardened Handshake...");
+        
+        async function connect() {
+            try {
+                // Use cache-busting to force Vercel to serve the actual file
+                const v = Date.now();
+                const bulletin = await import(`./weather-bulletin.js?v=${v}`);
+                const weather = await import(`./engine/weather-engine.js?v=${v}`);
+                const velocity = await import(`./velocity-widget.js?v=${v}`);
 
-            window.addEventListener('sync-engines', () => {
-                weather.WeatherEngine.update(bulletin.BulletinLogic);
-                velocity.VelocityWidget.refresh();
-            });
+                console.log("Handshake: SUCCESS. All engines mapped.");
 
-            // Initial weather check
-            if (document.readyState === 'complete') {
+                window.addEventListener('engine-update', () => {
+                    weather.WeatherEngine.update(bulletin.BulletinLogic);
+                    velocity.VelocityWidget.refresh();
+                });
+
+                // Trigger weather on load
                 weather.WeatherEngine.update(bulletin.BulletinLogic);
-            } else {
-                window.addEventListener('load', () => weather.WeatherEngine.update(bulletin.BulletinLogic));
+
+            } catch (err) {
+                console.error("Handshake: Module resolution blocked. Check vercel.json headers.", err);
             }
-            console.log("Handshake: ALL SYSTEMS ONLINE");
-        } catch (err) {
-            console.warn("Handshake: Retrying with absolute paths...");
-            // Fallback for strict Vercel environments
         }
+        connect();
     </script>
 </body>
 </html>
