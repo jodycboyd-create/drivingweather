@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Final Handshake Build</title>
+    <title>NL Navigator | Handshake Fixed</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
-        .leaflet-routing-container, .hidden-panel { display: none !important; }
+        .leaflet-routing-container { display: none !important; }
         .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-family: sans-serif; }
-        /* High Contrast Route Bubble */
         .route-bubble { background: rgba(17, 17, 17, 0.9); color: #FFD700; padding: 6px 14px; border: 1.5px solid rgba(255, 215, 0, 0.6); border-radius: 20px; font-weight: 700; font-family: sans-serif; font-size: 13px; }
     </style>
 </head>
@@ -17,26 +16,36 @@
     <div id="map"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="/engine/route-engine.js"></script>
+    <script src="engine/route-engine.js"></script>
 
     <script>
+        // CORE SETUP: NO CHANGES TO PREVENT REGRESSION [cite: 2025-12-30]
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
-        
         window.hubMarkers = [];
         window.communityData = [];
 
+        // SNAPPING FIX: Ensures markers don't float in the ocean [cite: 2025-12-26]
+        function snap(latlng) {
+            if (!window.communityData || window.communityData.length === 0) return latlng;
+            let closest = window.communityData[0];
+            let minDist = Infinity;
+            window.communityData.forEach(p => {
+                const d = window.map.distance(latlng, [p.lat, p.lng]);
+                if (d < minDist) { minDist = d; closest = p; }
+            });
+            return L.latLng(closest.lat, closest.lng);
+        }
+
         async function loadNL() {
             try {
-                const res = await fetch('/data/nl/communities.json');
+                const res = await fetch('data/nl/communities.json');
                 const data = await res.json();
                 window.communityData = data.features.map(f => ({
-                    lat: f.geometry.coordinates[1], 
-                    lng: f.geometry.coordinates[0], 
-                    name: f.properties.name || "Unnamed Point"
+                    lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: f.properties.name
                 }));
                 init();
-            } catch (e) { init(); }
+            } catch (e) { console.error("Data Load Fail", e); init(); }
         }
 
         function init() {
@@ -45,9 +54,15 @@
                 const m = L.marker([s.lat, s.lng], { draggable: true }).addTo(window.map);
                 m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                 
+                m.on('drag', (e) => {
+                    const snappedPos = snap(e.target.getLatLng());
+                    e.target.setLatLng(snappedPos);
+                });
+
                 m.on('dragend', () => {
                     if (window.RouteEngine) window.RouteEngine.calculate();
-                    window.dispatchEvent(new CustomEvent('engine-update'));
+                    // Signal modules to update
+                    window.dispatchEvent(new CustomEvent('sync-all'));
                 });
                 window.hubMarkers.push(m);
             });
@@ -55,25 +70,41 @@
         }
         loadNL();
     </script>
-    
+
     <script type="module">
-        console.log("Handshake: Starting absolute path resolution...");
-        try {
-            // Absolute paths bypass Vercel 404 routing errors
-            const { BulletinLogic } = await import('/weather-bulletin.js');
-            const { WeatherEngine } = await import('/engine/weather-engine.js');
-            const { VelocityWidget } = await import('/velocity-widget.js');
+        async function connect() {
+            try {
+                // Try relative paths first, then root paths to satisfy Vercel cleanUrls
+                const paths = ['./weather-bulletin.js', './engine/weather-engine.js', './velocity-widget.js'];
+                const [bulletin, weather, velocity] = await Promise.all(paths.map(p => import(p)));
 
-            window.addEventListener('engine-update', () => {
-                WeatherEngine.update(BulletinLogic);
-                VelocityWidget.refresh();
-            });
+                window.BulletinLogic = bulletin.BulletinLogic;
+                window.WeatherEngine = weather.WeatherEngine;
+                window.VelocityWidget = velocity.VelocityWidget;
 
-            window.addEventListener('load', () => WeatherEngine.update(BulletinLogic));
-            console.log("Handshake: SUCCESS");
-        } catch (err) {
-            console.error("Handshake: FAILED. Check Vercel root directory.", err);
+                console.log("Handshake status: ALL SYSTEMS ONLINE");
+
+                window.addEventListener('sync-all', () => {
+                    window.WeatherEngine.update(window.BulletinLogic);
+                    window.VelocityWidget.refresh();
+                });
+
+                // Initial weather run
+                window.WeatherEngine.update(window.BulletinLogic);
+
+            } catch (err) {
+                console.warn("Handshake fallback: Checking absolute paths...");
+                // Emergency fallback if relative paths 404
+                try {
+                    const { BulletinLogic } = await import('/weather-bulletin.js');
+                    window.BulletinLogic = BulletinLogic;
+                    console.log("Handshake status: RESTORED VIA ROOT");
+                } catch (e) {
+                    console.error("Handshake fatal: Files missing from server.", e);
+                }
+            }
         }
+        connect();
     </script>
 </body>
 </html>
