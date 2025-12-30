@@ -8,7 +8,7 @@
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* NUCLEAR PANEL KILLER: Prevents performance-draining UI from rendering [cite: 2025-12-30] */
+        /* NUCLEAR PANEL KILLER: Prevents performance-draining UI from rendering */
         .leaflet-routing-container, .leaflet-routing-error, .hidden-panel {
             display: none !important;
             visibility: hidden !important;
@@ -22,23 +22,37 @@
             padding: 4px 10px; border-radius: 4px; font-family: sans-serif;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
+
+        /* Professional Route Flag */
+        .route-bubble {
+            background: rgba(17, 17, 17, 0.9);
+            backdrop-filter: blur(4px);
+            color: #FFD700;
+            padding: 6px 14px;
+            border: 1.5px solid rgba(255, 215, 0, 0.6);
+            border-radius: 20px;
+            font-weight: 700;
+            white-space: nowrap;
+            font-family: sans-serif;
+            font-size: 13px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // Baseline Build [cite: 2025-12-28]
+        // Baseline Build
         window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
         
         window.hubMarkers = [];
         window.communityData = [];
 
-        // LOAD DATA: Final Newfoundland Dataset [cite: 2025-12-26]
+        // LOAD DATA: Final Newfoundland Dataset
         async function loadNL() {
             try {
                 const res = await fetch('data/nl/communities.json');
@@ -55,7 +69,7 @@
             }
         }
 
-        // SNAPPING LOGIC: Real-time road magnetism [cite: 2025-12-30]
+        // SNAPPING LOGIC: Real-time road magnetism
         function snap(latlng) {
             if (window.communityData.length === 0) return latlng;
             let closest = window.communityData[0];
@@ -77,19 +91,22 @@
                 const m = L.marker([s.lat, s.lng], { draggable: true }).addTo(window.map);
                 m.bindTooltip(s.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
                 
-                // TRIGGER: Continuous calculation while dragging for "Magnetic" feel [cite: 2025-12-30]
+                // UI ONLY: Update marker position and label while dragging
                 m.on('drag', function(e) {
                     const p = snap(e.target.getLatLng());
                     e.target.setLatLng([p.lat, p.lng]);
                     e.target.setTooltipContent(p.name);
-                    
-                    // HANDSHAKE: Signal the logic engine
+                });
+
+                // DATA ONLY: Trigger heavy route fetch only once drag is finished
+                m.on('dragend', function() {
                     if (window.RouteEngine) window.RouteEngine.calculate();
                 });
+
                 window.hubMarkers.push(m);
             });
 
-            // Dispatch Handshake Event [cite: 2025-12-30]
+            // Dispatch Handshake Event
             window.dispatchEvent(new Event('shell-live'));
         }
         
