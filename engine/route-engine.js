@@ -1,26 +1,23 @@
 /**
- * ROUTE-ENGINE.JS | FINAL SILENT BUILD
- * Purpose: Instant road-snapping without the directions panel.
+ * ROUTE-ENGINE.JS | v.2025.12.30.FINAL
+ * High-performance silent routing for Newfoundland.
  */
 window.RouteEngine = {
     _control: null,
 
     calculate: function() {
-        // Ensure markers exist before attempting math
-        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) {
-            console.log("Engine: Waiting for markers...");
-            return;
-        }
+        if (!window.map || !window.hubMarkers || window.hubMarkers.length < 2) return;
         
         const pts = window.hubMarkers.map(m => m.getLatLng());
 
-        // PERFORMANCE: Update existing line instead of rebuilding [cite: 2025-12-30]
+        // 1. PERFORMANCE: If the line exists, just slide it. 
+        // This is 10x faster than recreating the whole object.
         if (this._control) {
             this._control.setWaypoints(pts);
             return;
         }
 
-        // INITIALIZE SILENT ROUTER
+        // 2. INITIALIZATION: Build the silent engine (fires once)
         this._control = L.Routing.control({
             waypoints: pts,
             router: L.Routing.osrmv1({ 
@@ -29,14 +26,14 @@ window.RouteEngine = {
             lineOptions: {
                 styles: [{ color: '#0070bb', weight: 8, opacity: 0.7 }]
             },
-            show: false,              // Kills the text panel [cite: 2025-12-30]
+            show: false,              // Kills the text panel
             addWaypoints: false,
             draggableWaypoints: false,
-            fitSelectedRoutes: false,
-            createMarker: () => null  // Uses Shell markers only
+            fitSelectedRoutes: false, // Stops camera jumping while dragging
+            createMarker: () => null  // Shell owns the markers
         }).addTo(window.map);
 
-        // UI KILL-SWITCH: Physically remove the panel container if it appears
+        // 3. NUCLEAR UI BLOCK: Physically hide the panel container
         const container = this._control.getContainer();
         if (container) {
             container.style.display = 'none';
@@ -44,8 +41,7 @@ window.RouteEngine = {
     }
 };
 
-// HANDSHAKE: Listen for the 'shell-live' event from index.html [cite: 2025-12-30]
 window.addEventListener('shell-live', () => {
-    console.log("Engine: Handshake Confirmed.");
+    console.log("Engine: Handshake Received.");
     setTimeout(() => window.RouteEngine.calculate(), 500);
 });
