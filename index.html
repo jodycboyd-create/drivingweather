@@ -20,12 +20,11 @@
             background: white; padding: 5px 12px; border: 2px solid #333;
             font-family: monospace; font-weight: bold;
         }
-        /* HIDE THE UNWANTED DIRECTIONS PANEL */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
-    <div id="build-tag">Build: v.2025.12.29.10</div>
+    <div id="build-tag">Build: v.2025.12.29.11</div>
     <div id="map"></div>
 
     <script>
@@ -36,7 +35,6 @@
         let hubMarkers = [];
         let routingControl = null;
 
-        // Load locked-in Newfoundland dataset [cite: 2025-12-26]
         async function loadNLData() {
             try {
                 const response = await fetch('data/nl/communities.json');
@@ -60,11 +58,10 @@
                 const marker = L.marker([h.lat, h.lng], { draggable: true }).addTo(map);
                 marker.bindTooltip(h.name, { permanent: true, direction: 'top', className: 'hub-label', offset: [0, -10] });
                 
-                // THE MAGNETIC SNAP TRIGGER
                 marker.on('drag', function(e) {
                     const nearest = findNearest(e.target.getLatLng());
-                    marker.setLatLng([nearest.lat, nearest.lng]); // Snap position
-                    marker.getTooltip().setContent(nearest.name); // Snap flag name
+                    marker.setLatLng([nearest.lat, nearest.lng]); 
+                    marker.getTooltip().setContent(nearest.name);
                 });
 
                 marker.on('dragend', updateRoute);
@@ -75,16 +72,18 @@
 
         function updateRoute() {
             if (routingControl) map.removeControl(routingControl);
-            
             const waypoints = hubMarkers.map(m => m.getLatLng());
             
             routingControl = L.Routing.control({
                 waypoints: waypoints,
-                createMarker: function() { return null; }, // PREVENTS ENGINE FROM CREATING OCEAN PINS
+                createMarker: function() { return null; },
                 addWaypoints: false,
                 routeWhileDragging: false,
                 lineOptions: { styles: [{ color: '#0070bb', weight: 6 }] }
             }).addTo(map);
+
+            // EMIT EVENT FOR EXTERNAL ENGINE
+            map.fire('route-updated', { control: routingControl });
         }
 
         function findNearest(target) {
@@ -97,8 +96,8 @@
             }
             return closest;
         }
-
         loadNLData();
     </script>
+    <script src="engine/route-engine.js"></script>
 </body>
 </html>
