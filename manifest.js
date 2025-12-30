@@ -4,7 +4,6 @@
 const modulePaths = [
     { path: '/engine/route-engine.js', type: 'module' },
     { path: '/engine/velocity-widget.js', type: 'module' }, // Now consistent as module
-    { path: '/engine/weather-engine.js', type: 'module' },
     { path: '/engine/weather-bulletin.js', type: 'module' }
 ];
 
