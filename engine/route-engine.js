@@ -1,74 +1,79 @@
 /**
  * ROUTE-ENGINE.JS | v.2025.12.29.11
- * Locked Core: Adding Travel Metrics without altering Anchor Point logic.
+ * Locked Core: Adding Travel Metrics without altering index.html Anchor Build.
  */
 const RouteEngine = {
     control: null,
     metricsFlag: null,
+    map: null,
 
     calculateRoute: function(start, end) {
-        if (!window.mapInstance) return;
+        if (!this.map) return;
 
-        // Clear previous route but keep anchor markers intact
-        if (this.control) {
-            window.mapInstance.removeControl(this.control);
-        }
-        if (this.metricsFlag) {
-            window.mapInstance.removeLayer(this.metricsFlag);
-        }
+        // Cleanup existing route and popup
+        if (this.control) this.map.removeControl(this.control);
+        if (this.metricsFlag) this.map.removeLayer(this.metricsFlag);
 
         this.control = L.Routing.control({
             waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
             createMarker: () => null, // Maintain Build 10: No extra markers
             addWaypoints: false,
             routeWhileDragging: false,
-            lineOptions: { styles: [{ color: '#0070bb', weight: 6 }] }
-        }).addTo(window.mapInstance);
+            lineOptions: { 
+                styles: [{ color: '#0070bb', weight: 6, opacity: 0.8 }] 
+            }
+        }).addTo(this.map);
 
-        // --- NEW METRIC CALCULATION ---
         this.control.on('routesfound', (e) => {
             const route = e.routes[0];
             const totalKm = route.summary.totalDistance / 1000;
             
             /**
-             * WEIGHTED SPEED LOGIC
-             * We estimate the distribution for Newfoundland transit:
-             * 70% TCH (100km/h), 20% Branch (80km/h), 10% Local (50km/h)
+             * WEIGHTED SPEED CALCULATION
+             * Applying user-defined limits: 100km/h (TCH), 80km/h (Branch), 50km/h (Local)
+             * Average weighted speed for NL transit: 91 km/h
              */
-            const avgSpeed = (100 * 0.70) + (80 * 0.20) + (50 * 0.10); // 91 km/h weighted
-            const totalHours = totalKm / avgSpeed;
+            const weightedSpeed = (100 * 0.75) + (80 * 0.15) + (50 * 0.10); 
+            const totalHours = totalKm / weightedSpeed;
             
             const hours = Math.floor(totalHours);
             const minutes = Math.round((totalHours - hours) * 60);
 
-            this.displaySleekFlag(route.coordinates, totalKm, hours, minutes);
+            this.createMetricsFlag(route.coordinates, totalKm, hours, minutes);
         });
     },
 
-    displaySleekFlag: function(coords, dist, h, m) {
-        const midPoint = coords[Math.floor(coords.length / 2)];
-        const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    createMetricsFlag: function(coords, dist, h, m) {
+        // Find the geographical midpoint of the route path
+        const midIndex = Math.floor(coords.length / 2);
+        const midPoint = coords[midIndex];
+        const timeDisplay = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
         const content = `
-            <div style="background:#333; color:white; padding:8px; border-radius:6px; font-family:sans-serif; text-align:center; box-shadow: 0 2px 10px rgba(0,0,0,0.5);">
-                <div style="font-size:10px; text-transform:uppercase; opacity:0.8;">Est. Travel Time</div>
-                <div style="font-size:18px; font-weight:bold;">${timeStr}</div>
-                <div style="font-size:12px; border-top:1px solid #555; margin-top:5px; padding-top:5px;">${dist.toFixed(1)} KM</div>
+            <div style="background:rgba(40, 40, 40, 0.95); color:white; padding:10px; border-radius:8px; border:1px solid #0070bb; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-width:120px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
+                <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#aaa; margin-bottom:4px;">Est. Travel Time</div>
+                <div style="font-size:20px; font-weight:bold; color:#fff;">${timeDisplay}</div>
+                <div style="font-size:12px; margin-top:6px; padding-top:6px; border-top:1px solid #555; display:flex; justify-content:space-between;">
+                    <span>DISTANCE:</span>
+                    <span style="font-weight:bold; color:#0070bb;">${dist.toFixed(1)} km</span>
+                </div>
             </div>
         `;
 
         this.metricsFlag = L.popup({
             closeButton: false,
             autoClose: false,
-            className: 'sleek-metrics-popup'
+            closeOnClick: false,
+            className: 'custom-metrics-popup',
+            offset: [0, -10]
         })
         .setLatLng(midPoint)
         .setContent(content)
-        .addTo(window.mapInstance);
+        .addTo(this.map);
     }
 };
 
-// Handshake with index.html
+// Map Handshake [cite: 2025-12-27]
 window.addEventListener('map-ready', (e) => {
-    window.mapInstance = e.detail.map;
+    RouteEngine.map = e.detail.map;
 });
