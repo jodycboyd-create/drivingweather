@@ -2,129 +2,71 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Tactical Anchor Build</title>
-    
+    <title>NL Navigator | Locked Anchor Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; font-family: sans-serif; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
-        
         #widget-dock { 
             position: absolute; bottom: 30px; left: 20px; z-index: 1000;
             display: flex; flex-direction: column; gap: 15px; pointer-events: none;
         }
         .widget-anchor { pointer-events: auto; }
-
-        /* RESTORED: Exact pin label styling from image_2266a7.png */
-        .hub-label { 
-            font-weight: bold; 
-            background: white; 
-            border: 2px solid #0070bb; 
-            padding: 4px 10px; 
-            border-radius: 4px;
-            color: #000;
-            font-size: 14px;
-        }
-
-        /* High Contrast Route Ribbon */
-        .route-bubble { 
-            background: rgba(15, 15, 15, 0.95); 
-            color: #FFD700; 
-            padding: 8px 18px; 
-            border: 2px solid #FFD700; 
-            border-radius: 30px; 
-            font-weight: 900;
-        }
+        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-size: 14px; }
     </style>
 </head>
 <body>
     <div id="map"></div>
-
     <div id="widget-dock">
         <div id="weather-anchor" class="widget-anchor"></div>
         <div id="velocity-anchor" class="widget-anchor"></div>
+        <div id="module-expansion-zone" class="widget-anchor"></div>
     </div>
-    
-    <script src="weather-bulletin.js"></script>
-    <script src="engine/weather-engine.js"></script>
-    <script src="engine/route-engine.js"></script>
-    <script src="velocity-widget.js"></script>
+
+    <script src="manifest.js"></script>
 
     <script>
-        /** [weong-route] Core Logic - Do Not Alter **/
-        window.addEventListener('DOMContentLoaded', function() {
-            // Map Initialization
+        /** CORE SYSTEM - DO NOT REMODEL [cite: 2025-12-30] **/
+        window.addEventListener('load', async function() {
+            // Map Setup
             window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
             
-            window.hubMarkers = [];
+            // Shared Data Bus
             window.communityData = [];
+            window.hubMarkers = [];
 
-            // SNAPPING ENGINE [cite: 2025-12-26]
-            function snap(latlng) {
-                if (!window.communityData.length) return { lat: latlng.lat, lng: latlng.lng, name: "Locating..." };
-                let closest = window.communityData[0];
-                let minDist = Infinity;
-                window.communityData.forEach(p => {
-                    const d = window.map.distance(latlng, [p.lat, p.lng]);
-                    if (d < minDist) { minDist = d; closest = p; }
+            // 1. Load Data
+            try {
+                const res = await fetch('data/nl/communities.json');
+                const data = await res.json();
+                window.communityData = data.features.map(f => ({
+                    lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: f.properties.name
+                }));
+            } catch (e) { console.warn("Using baseline hub coordinates."); }
+
+            // 2. Initialize Hubs
+            const hubs = [{name:"Corner Brook", lat:48.9515, lng:-57.9482}, {name:"St. John's", lat:47.5615, lng:-52.7126}];
+            hubs.forEach(h => {
+                const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
+                m.bindTooltip(h.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
+                m.on('drag', (e) => {
+                    // Snapping Logic [cite: 2025-12-26]
+                    let closest = window.communityData[0];
+                    let minDist = Infinity;
+                    window.communityData.forEach(p => {
+                        const d = window.map.distance(e.target.getLatLng(), [p.lat, p.lng]);
+                        if (d < minDist) { minDist = d; closest = p; }
+                    });
+                    e.target.setLatLng([closest.lat, closest.lng]);
+                    e.target.setTooltipContent(closest.name);
                 });
-                return closest;
-            }
+                window.hubMarkers.push(m);
+            });
 
-            // DEEP DIVE DATA HANDSHAKE [cite: 2025-12-30]
-            async function loadData() {
-                try {
-                    const res = await fetch('data/nl/communities.json');
-                    const data = await res.json();
-                    window.communityData = data.features.map(f => ({
-                        lat: f.geometry.coordinates[1], 
-                        lng: f.geometry.coordinates[0], 
-                        name: f.properties.name
-                    }));
-                    console.log("System: NL Data Locked (" + window.communityData.length + " nodes)");
-                } catch (e) { 
-                    console.warn("System: Using baseline hub coordinates.");
-                }
-                init();
-            }
-
-            function init() {
-                const hubs = [
-                    {name:"Corner Brook", lat:48.9515, lng:-57.9482}, 
-                    {name:"St. John's", lat:47.5615, lng:-52.7126}
-                ];
-                
-                hubs.forEach(h => {
-                    const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
-                    
-                    // Permanent labels with restored font settings
-                    m.bindTooltip(h.name, { 
-                        permanent: true, 
-                        className: 'hub-label', 
-                        direction: 'top', 
-                        offset: [0, -10] 
-                    });
-
-                    m.on('drag', (e) => {
-                        const s = snap(e.target.getLatLng());
-                        e.target.setLatLng([s.lat, s.lng]);
-                        e.target.setTooltipContent(s.name);
-                    });
-
-                    m.on('dragend', () => { 
-                        if(window.RouteEngine) window.RouteEngine.calculate(); 
-                    });
-                    
-                    window.hubMarkers.push(m);
-                });
-
-                if(window.RouteEngine) window.RouteEngine.calculate();
-            }
-
-            loadData();
+            // 3. Signal Modules to Start
+            window.dispatchEvent(new CustomEvent('weong:systemReady'));
         });
     </script>
 </body>
