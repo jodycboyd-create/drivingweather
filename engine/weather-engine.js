@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
  * Methodology: L3 Stealth-Sync Unified Engine
- * Status: Absolute Path Hardening + Multi-Point Fallback
+ * Status: Absolute Path Hardening + Multi-Point Fallback [cite: 2025-12-30]
  */
 
 const WeatherEngine = (function() {
@@ -41,12 +41,12 @@ const WeatherEngine = (function() {
         setInterval(syncCycle, 1000);
     };
 
-    // FIX: Passing full arrival Date for Solar Engine
+    // FIX: Passing full arrival Date for Solar Engine [cite: 2025-12-30]
     const getForecastVariation = (lat, lng, arrivalTime) => {
         const hour = arrivalTime.getHours();
         const seed = lat + lng + hour;
         
-        // Solar Window: Dec 31 Sunset is ~16:15 NST in Gander
+        // Solar Window: Dec 31 Sunset is ~16:15 NST in Gander [cite: 2025-12-31]
         const isNight = hour >= 17 || hour <= 7; 
         
         const dayIcons = ["☀️", "🌤️", "☁️", "❄️"];
@@ -107,7 +107,7 @@ const WeatherEngine = (function() {
         const currentSpeed = window.currentCruisingSpeed || 100;
         const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
 
-        // 1. PRECISION DISTANCE (Haversine instead of coord length)
+        // 1. PRECISION DISTANCE (Haversine instead of coord length) [cite: 2025-12-26]
         let totalKm = 0;
         for (let i = 0; i < coords.length - 1; i++) {
             totalKm += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0])) / 1000;
@@ -124,7 +124,7 @@ const WeatherEngine = (function() {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
             
-            // 2. ACCURATE ETE: Actual KM / Current Speed
+            // 2. ACCURATE ETE: Actual KM / Current Speed [cite: 2025-12-30]
             const travelHours = (totalKm * pct) / currentSpeed; 
             const arrival = new Date(depTime.getTime() + (travelHours * 3600000));
             
@@ -162,3 +162,30 @@ const WeatherEngine = (function() {
                         </div>`,
                     iconSize: [75, 65]
                 })
+            }).addTo(state.layer);
+        });
+    };
+
+    const renderTable = () => {
+        const container = document.getElementById('bulletin-rows');
+        if (!container) return;
+        container.innerHTML = state.activeWaypoints.map(wp => `
+            <tr style="border-bottom:1px solid #222;">
+                <td style="padding:8px 5px;">${wp.name}</td>
+                <td style="padding:8px 5px;">${wp.eta}</td>
+                <td style="padding:8px 5px; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
+                <td style="padding:8px 5px;">${wp.variant.wind} km/h</td>
+                <td style="padding:8px 5px;">${wp.variant.vis} km</td>
+                <td style="padding:8px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
+            </tr>
+        `).join('');
+    };
+
+    return { 
+        init,
+        syncCycle: () => syncCycle(true) 
+    };
+})();
+
+window.WeatherEngine = WeatherEngine;
+WeatherEngine.init();
