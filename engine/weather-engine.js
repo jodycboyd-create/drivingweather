@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
  * Methodology: L3 Stealth-Sync Unified Engine
- * Status: Absolute Path Hardening + Multi-Point Fallback [cite: 2025-12-30]
+ * Status: Absolute Path Hardening + Multi-Point Fallback
  */
 
 const WeatherEngine = (function() {
@@ -38,20 +38,29 @@ const WeatherEngine = (function() {
         }
         initUI();
         state.layer.addTo(window.map);
-        // Interval remains for background safety
         setInterval(syncCycle, 1000);
     };
 
-    const getForecastVariation = (lat, lng, hour) => {
+    // FIX: Passing full arrival Date for Solar Engine
+    const getForecastVariation = (lat, lng, arrivalTime) => {
+        const hour = arrivalTime.getHours();
         const seed = lat + lng + hour;
-        const icons = ["☀️", "🌤️", "☁️", "❄️"];
+        
+        // Solar Window: Dec 31 Sunset is ~16:15 NST in Gander
+        const isNight = hour >= 17 || hour <= 7; 
+        
+        const dayIcons = ["☀️", "🌤️", "☁️", "❄️"];
+        const nightIcons = ["🌙", "☁️", "☁️", "❄️"];
         const labels = ["Clear", "P.Cloudy", "Overcast", "Snow Flurries"];
+        
+        // Use Math.abs to prevent "undefined" index errors
         const idx = Math.abs(Math.floor(seed % 4));
+        
         return {
             temp: Math.round(-5 + (Math.sin(seed) * 3)),
             wind: Math.round(35 + (Math.cos(seed) * 15)),
             vis: Math.round(15 + (Math.sin(seed * 2) * 10)),
-            sky: icons[idx],
+            sky: isNight ? nightIcons[idx] : dayIcons[idx],
             skyLabel: labels[idx]
         };
     };
@@ -97,10 +106,15 @@ const WeatherEngine = (function() {
         const coords = route.feature.geometry.coordinates;
         const currentSpeed = window.currentCruisingSpeed || 100;
         const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
-        
-        // Extended Key to include speed/time changes [cite: 2025-12-30]
+
+        // 1. PRECISION DISTANCE (Haversine instead of coord length)
+        let totalKm = 0;
+        for (let i = 0; i < coords.length - 1; i++) {
+            totalKm += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0])) / 1000;
+        }
+        window.currentRouteDistance = totalKm; // Shared for Velocity Widget
+
         const currentKey = `${coords[0][0].toFixed(4)}-${coords.length}-${currentSpeed}-${depTime.getTime()}`;
-        
         if (currentKey === state.anchorKey && !forceUpdate) return;
 
         state.isLocked = true;
@@ -110,8 +124,8 @@ const WeatherEngine = (function() {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
             
-            // Physics-based arrival time: (Dist % * 800km total est) / Speed [cite: 2025-12-30]
-            const travelHours = (pct * 800) / currentSpeed; 
+            // 2. ACCURATE ETE: Actual KM / Current Speed
+            const travelHours = (totalKm * pct) / currentSpeed; 
             const arrival = new Date(depTime.getTime() + (travelHours * 3600000));
             
             const community = state.communities.reduce((prev, curr) => {
@@ -123,7 +137,7 @@ const WeatherEngine = (function() {
             return {
                 ...community,
                 eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                variant: getForecastVariation(community.lat, community.lng, arrival.getHours())
+                variant: getForecastVariation(community.lat, community.lng, arrival) // Pass full date
             };
         });
 
@@ -148,32 +162,3 @@ const WeatherEngine = (function() {
                         </div>`,
                     iconSize: [75, 65]
                 })
-            }).addTo(state.layer);
-        });
-    };
-
-    const renderTable = () => {
-        const container = document.getElementById('bulletin-rows');
-        if (!container) return;
-        container.innerHTML = state.activeWaypoints.map(wp => `
-            <tr style="border-bottom:1px solid #222;">
-                <td style="padding:8px 5px;">${wp.name}</td>
-                <td style="padding:8px 5px;">${wp.eta}</td>
-                <td style="padding:8px 5px; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
-                <td style="padding:8px 5px;">${wp.variant.wind} km/h</td>
-                <td style="padding:8px 5px;">${wp.variant.vis} km</td>
-                <td style="padding:8px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
-            </tr>
-        `).join('');
-    };
-
-    // Public Handle for Velocity Widget [cite: 2025-12-30]
-    return { 
-        init,
-        syncCycle: () => syncCycle(true) 
-    };
-})();
-
-// Expose and Initialise
-window.WeatherEngine = WeatherEngine;
-WeatherEngine.init();
