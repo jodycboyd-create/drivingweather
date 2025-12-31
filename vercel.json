@@ -9,19 +9,13 @@
   ],
   "routes": [
     {
-      "src": "/engine/(.*).js",
-      "headers": { 
-        "Cache-Control": "no-store, must-revalidate",
-        "Access-Control-Allow-Origin": "*" 
-      },
-      "continue": true
+      "src": "/data/communities.json",
+      "dest": "/data/nl/communities.json",
+      "headers": { "x-legacy-redirect": "true" }
     },
     {
-      "src": "/data/nl/communities.json",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600"
-      },
+      "src": "/engine/(.*)",
+      "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" },
       "continue": true
     },
     { "handle": "filesystem" },
