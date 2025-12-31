@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
- * Methodology: L3 Stealth-Sync Unified Engine + Mission Data Export
- * Status: Metric Suppression + Clipboard Integration [cite: 2025-12-31]
+ * Methodology: L3 Stealth-Sync Unified Engine + Active Flag Scrubbing
+ * Status: Absolute Metric Blackout [cite: 2025-12-31]
  */
 
 const WeatherEngine = (function() {
@@ -15,6 +15,33 @@ const WeatherEngine = (function() {
     };
 
     const init = async () => {
+        // --- HARDENED ROUTE FLAG SCRUBBING [cite: 2025-12-31] ---
+        const styleTag = document.createElement('style');
+        styleTag.innerHTML = `
+            .leaflet-routing-container, 
+            .leaflet-routing-alt, 
+            .leaflet-routing-geocoder,
+            .leaflet-routing-error,
+            .leaflet-routing-icons,
+            .leaflet-routing-message { 
+                display: none !important; 
+                visibility: hidden !important; 
+                opacity: 0 !important;
+                pointer-events: none !important;
+                max-height: 0 !important;
+                overflow: hidden !important;
+            }
+        `;
+        document.head.appendChild(styleTag);
+
+        // Active DOM scrubbing for dynamically generated routing elements
+        const scrubber = new MutationObserver(() => {
+            const flags = document.querySelectorAll('.leaflet-routing-container');
+            flags.forEach(f => f.remove());
+        });
+        scrubber.observe(document.body, { childList: true, subtree: true });
+        // --------------------------------------------------------
+
         try {
             const res = await fetch('/data/nl/communities.json');
             if (!res.ok) throw new Error("404");
@@ -25,10 +52,7 @@ const WeatherEngine = (function() {
                 lat: f.geometry.coordinates[1],
                 lng: f.geometry.coordinates[0]
             }));
-            
-            console.log(`System: NL Dataset Active (${state.communities.length} nodes)`);
         } catch (e) {
-            console.warn("WEONG-L3: Network 404. Deploying Hardened NL Baseline.");
             state.communities = [
                 { name: "Gander", lat: 48.9578, lng: -54.6122 },
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
@@ -36,48 +60,24 @@ const WeatherEngine = (function() {
                 { name: "Grand Falls-Windsor", lat: 48.93, lng: -55.65 }
             ];
         }
+        
         initUI();
         state.layer.addTo(window.map);
-        
-        // --- ROUTE METRIC SUPPRESSION ---
-        const styleTag = document.createElement('style');
-        styleTag.innerHTML = `
-            .leaflet-routing-container, 
-            .leaflet-routing-alt, 
-            .leaflet-routing-geocoder,
-            .leaflet-routing-error { 
-                display: none !important; 
-                visibility: hidden !important; 
-                opacity: 0 !important;
-                pointer-events: none !important;
-            }
-        `;
-        document.head.appendChild(styleTag);
-
         setInterval(syncCycle, 1000);
     };
 
     const copyToClipboard = () => {
         if (state.activeWaypoints.length === 0) return;
-        
         const header = "NL ROUTE WEATHER MATRIX - " + new Date().toLocaleDateString() + "\n";
-        const subHeader = "COMMUNITY | ETA | TEMP | WIND | VIS | SKY\n" + "-".repeat(50) + "\n";
-        
+        const subHeader = "COMMUNITY | ETA | TEMP | WIND | VIS | SKY\n" + "-".repeat(60) + "\n";
         const rows = state.activeWaypoints.map(wp => 
             `${wp.name.padEnd(20)} | ${wp.eta} | ${wp.variant.temp}°C | ${wp.variant.wind}km/h | ${wp.variant.vis}km | ${wp.variant.skyLabel}`
         ).join('\n');
 
-        const fullText = header + subHeader + rows;
-        
-        navigator.clipboard.writeText(fullText).then(() => {
+        navigator.clipboard.writeText(header + subHeader + rows).then(() => {
             const btn = document.getElementById('btn-copy-bulletin');
-            const originalText = btn.innerText;
             btn.innerText = "COPIED!";
-            btn.style.background = "#fff";
-            setTimeout(() => {
-                btn.innerText = originalText;
-                btn.style.background = "#FFD700";
-            }, 2000);
+            setTimeout(() => btn.innerText = "COPY DATA", 2000);
         });
     };
 
@@ -85,11 +85,9 @@ const WeatherEngine = (function() {
         const hour = arrivalTime.getHours();
         const seed = lat + lng + hour;
         const isNight = hour >= 17 || hour <= 7; 
-        
         const dayIcons = ["☀️", "🌤️", "☁️", "❄️"];
         const nightIcons = ["🌙", "☁️", "☁️", "❄️"];
         const labels = ["Clear", "P.Cloudy", "Overcast", "Snow Flurries"];
-        
         const idx = Math.abs(Math.floor(seed % 4));
         
         return {
@@ -126,18 +124,15 @@ const WeatherEngine = (function() {
                 </div>
             </div>`;
         if(!document.getElementById('bulletin-widget')) document.body.insertAdjacentHTML('beforeend', widgetHTML);
-        
         document.getElementById('btn-open-bulletin').onclick = () => {
             state.isOpen = !state.isOpen;
             document.getElementById('bulletin-modal').style.display = state.isOpen ? 'block' : 'none';
         };
-
         document.getElementById('btn-copy-bulletin').onclick = copyToClipboard;
     };
 
     const syncCycle = async (forceUpdate = false) => {
         if (state.isLocked || !window.map || state.communities.length === 0) return;
-        
         const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
         if (!route) return;
 
@@ -160,16 +155,13 @@ const WeatherEngine = (function() {
         state.activeWaypoints = state.nodes.map(pct => {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
-            
             const travelHours = (totalKm * pct) / currentSpeed; 
             const arrival = new Date(depTime.getTime() + (travelHours * 3600000));
-            
             const community = state.communities.reduce((prev, curr) => {
                 const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
                 const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
                 return dCurr < dPrev ? curr : prev;
             });
-
             return {
                 ...community,
                 eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
@@ -179,11 +171,7 @@ const WeatherEngine = (function() {
 
         renderIcons();
         renderTable();
-
-        if (window.VelocityWidget && typeof window.VelocityWidget.render === 'function') {
-            window.VelocityWidget.render();
-        }
-
+        if (window.VelocityWidget && typeof window.VelocityWidget.render === 'function') window.VelocityWidget.render();
         state.isLocked = false;
     };
 
