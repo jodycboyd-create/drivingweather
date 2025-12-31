@@ -1,5 +1,5 @@
 /** * Project: [weong-bulletin]
- * Logic: Compressed nglass Tactical HUD
+ * Logic: Compressed nglass Tactical HUD + Sync-to-Now
  * Status: Final Layout Lock-in [cite: 2025-12-31]
  */
 
@@ -23,7 +23,6 @@ const VelocityWidget = {
 
         const widget = document.createElement('div');
         widget.id = 'velocity-widget-container';
-        // nglass aesthetic: blur, transparency, and rounded corners
         widget.style.cssText = `
             position: fixed; bottom: 20px; right: 20px; z-index: 10000;
             background: rgba(15, 15, 15, 0.75); backdrop-filter: blur(12px);
@@ -35,7 +34,10 @@ const VelocityWidget = {
 
         widget.innerHTML = `
             <div style="flex: 1.2; border-right: 1px solid rgba(255,215,0,0.1); padding-right: 10px;">
-                <div style="font-size: 9px; opacity: 0.6; letter-spacing: 1px; margin-bottom: 4px;">DEPARTURE</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 9px; opacity: 0.6; letter-spacing: 1px;">DEPARTURE</span>
+                    <button onclick="VelocityWidget.syncNow()" style="background:#FFD700; color:#000; border:none; border-radius:3px; font-size:8px; font-weight:bold; padding:1px 4px; cursor:pointer;">NOW</button>
+                </div>
                 <div id="m-dep-time" style="font-size: 20px; color: #fff; font-weight: bold; line-height: 1;">--:--</div>
                 <div id="v-day-display" style="font-size: 10px; color: #FFD700; margin: 4px 0 8px 0;">Dec 31</div>
                 <div style="display: flex; gap: 4px;">
@@ -76,6 +78,11 @@ const VelocityWidget = {
         this.render();
     },
 
+    syncNow: function() {
+        this.state.departureTime = new Date();
+        this.render();
+    },
+
     updateSpeed: function(delta) {
         this.state.speedAdjustment += delta;
         this.render();
@@ -102,7 +109,6 @@ const VelocityWidget = {
         const m = Math.round((travelHours - h) * 60);
         const arrivalDate = new Date(this.state.departureTime.getTime() + (travelHours * 3600000));
 
-        // Update UI DOM
         const depTimeEl = document.getElementById('m-dep-time');
         const arrTimeEl = document.getElementById('m-arr-time');
         const durEl = document.getElementById('m-travel-dur');
@@ -117,7 +123,6 @@ const VelocityWidget = {
         if (speedOffEl) speedOffEl.innerText = (this.state.speedAdjustment >= 0 ? "+" : "") + this.state.speedAdjustment;
         if (dayEl) dayEl.innerText = this.state.departureTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-        // Sync Global State
         window.currentCruisingSpeed = finalSpeed;
         window.currentDepartureTime = this.state.departureTime;
         
