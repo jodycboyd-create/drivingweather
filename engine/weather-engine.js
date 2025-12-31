@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
  * Methodology: L3 Stealth-Sync Unified Engine
- * Status: Absolute Path Hardening + Multi-Point Fallback
+ * Status: Absolute Path Hardening + Multi-Point Fallback [cite: 2025-12-30]
  */
 
 const WeatherEngine = (function() {
@@ -98,7 +98,82 @@ const WeatherEngine = (function() {
         const currentSpeed = window.currentCruisingSpeed || 100;
         const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
         
-        // Extended Key to include speed/time changes
+        // Extended Key to include speed/time changes [cite: 2025-12-30]
         const currentKey = `${coords[0][0].toFixed(4)}-${coords.length}-${currentSpeed}-${depTime.getTime()}`;
         
-        if (currentKey === state.anchorKey && !forceUpdate)
+        if (currentKey === state.anchorKey && !forceUpdate) return;
+
+        state.isLocked = true;
+        state.anchorKey = currentKey;
+        
+        state.activeWaypoints = state.nodes.map(pct => {
+            const idx = Math.floor((coords.length - 1) * pct);
+            const [lng, lat] = coords[idx];
+            
+            // Physics-based arrival time: (Dist % * 800km total est) / Speed [cite: 2025-12-30]
+            const travelHours = (pct * 800) / currentSpeed; 
+            const arrival = new Date(depTime.getTime() + (travelHours * 3600000));
+            
+            const community = state.communities.reduce((prev, curr) => {
+                const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
+                const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
+                return dCurr < dPrev ? curr : prev;
+            });
+
+            return {
+                ...community,
+                eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                variant: getForecastVariation(community.lat, community.lng, arrival.getHours())
+            };
+        });
+
+        renderIcons();
+        renderTable();
+        state.isLocked = false;
+    };
+
+    const renderIcons = () => {
+        state.layer.clearLayers();
+        state.activeWaypoints.forEach(wp => {
+            L.marker([wp.lat, wp.lng], {
+                icon: L.divIcon({
+                    className: 'w-node',
+                    html: `<div style="background:#000; border:2px solid #FFD700; border-radius:4px; width:75px; height:65px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000;">
+                            <span style="font-size:8px; font-weight:bold; background:#FFD700; color:#000; width:100%; text-align:center;">${wp.name.split(' ')[0]}</span>
+                            <span style="font-size:18px;">${wp.variant.sky}</span>
+                            <div style="display:flex; gap:4px; font-size:12px; font-weight:bold;">
+                                <span style="${wp.variant.temp <= 0 ? 'color:#00d4ff' : 'color:#ff4500'}">${wp.variant.temp}°</span>
+                                <span style="color:#fff;">${wp.variant.wind}k</span>
+                            </div>
+                        </div>`,
+                    iconSize: [75, 65]
+                })
+            }).addTo(state.layer);
+        });
+    };
+
+    const renderTable = () => {
+        const container = document.getElementById('bulletin-rows');
+        if (!container) return;
+        container.innerHTML = state.activeWaypoints.map(wp => `
+            <tr style="border-bottom:1px solid #222;">
+                <td style="padding:8px 5px;">${wp.name}</td>
+                <td style="padding:8px 5px;">${wp.eta}</td>
+                <td style="padding:8px 5px; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
+                <td style="padding:8px 5px;">${wp.variant.wind} km/h</td>
+                <td style="padding:8px 5px;">${wp.variant.vis} km</td>
+                <td style="padding:8px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
+            </tr>
+        `).join('');
+    };
+
+    // Public Handle for Velocity Widget [cite: 2025-12-30]
+    return { 
+        init,
+        syncCycle: () => syncCycle(true) 
+    };
+})();
+
+// Expose and Initialise
+window.WeatherEngine = WeatherEngine;
+WeatherEngine.init();
