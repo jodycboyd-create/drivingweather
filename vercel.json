@@ -1,31 +1,12 @@
 {
   "version": 2,
-  "name": "weong-bulletin-l3",
   "cleanUrls": true,
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
-    { "src": "engine/route-engine.js", "use": "@vercel/static" },
-    { "src": "engine/velocity-widget.js", "use": "@vercel/static" },
-    { "src": "engine/weather-engine.js", "use": "@vercel/static" },
-    { "src": "data/communities.json", "use": "@vercel/static" }
+    { "src": "engine/*.js", "use": "@vercel/static" },
+    { "src": "data/*.json", "use": "@vercel/static" }
   ],
   "routes": [
-    {
-      "src": "/engine/(.*).js",
-      "headers": { 
-        "Cache-Control": "no-store, must-revalidate",
-        "Service-Worker-Allowed": "/" 
-      },
-      "continue": true
-    },
-    {
-      "src": "/data/communities.json",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600"
-      },
-      "continue": true
-    },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
