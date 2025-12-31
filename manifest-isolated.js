@@ -1,27 +1,29 @@
-/** * PROJECT: [weong-route] + [weong-bulletin]
- * STATUS: MANDATORY CACHE BREAKER
- * TIMESTAMP: 2025-12-31 10:30 AM
+/** * Project: [weong-route] + [weong-bulletin]
+ * Status: L3 FINAL BUILD - ALL ENGINES ACTIVE
+ * Updated: Dec 31, 2025 [cite: 2025-12-30]
  */
 
-// We use a completely new version string to force the CDN to refresh
-const ISOLATION_VERSION = "DEPLOYMENT_ID_ALPHA_505";
+// Final cache-breaker version
+const VERSION = "L3_FINAL_SYNC_001"; 
 
-console.log(`%c CRITICAL: EXECUTING MANIFEST VERSION ${ISOLATION_VERSION}`, "background: red; color: white; padding: 10px;");
-console.log("If you see this message, the engines below SHOULD NOT load.");
+console.log(`%c SYSTEM: INITIALIZING UNIFIED ENGINE (${VERSION})`, "color: #FFD700; font-weight: bold; background: #000; padding: 5px;");
 
 const modulePaths = [
-    // { path: `/engine/route-engine.js?v=${ISOLATION_VERSION}`, type: 'module' },
-    // { path: `/engine/velocity-widget.js?v=${ISOLATION_VERSION}`, type: 'module' },
-    // { path: `/engine/weather-engine.js?v=${ISOLATION_VERSION}`, type: 'module' }
+    { path: `/engine/route-engine.js?v=${VERSION}`, type: 'module' },
+    { path: `/engine/velocity-widget.js?v=${VERSION}`, type: 'module' },
+    { path: `/engine/weather-engine.js?v=${VERSION}`, type: 'module' }
 ];
 
-// This loop should now do nothing because modulePaths is empty
 modulePaths.forEach(mod => {
     const s = document.createElement('script');
     s.src = mod.path; 
     s.type = mod.type; 
     s.async = false;
-    s.onload = () => console.log(`SYSTEM: Engine ${mod.path} unexpectedly loaded.`);
+    s.onload = () => {
+        console.log(`%c Success: ${mod.path} ready.`, "color: #00FF00;");
+        window.dispatchEvent(new Event('weong:update'));
+    };
+    s.onerror = () => console.error(`CRITICAL: Failed to load ${mod.path}`);
     document.body.appendChild(s);
 });
 
