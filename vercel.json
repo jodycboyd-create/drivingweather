@@ -10,8 +10,7 @@
   "routes": [
     {
       "src": "/data/communities.json",
-      "dest": "/data/nl/communities.json",
-      "headers": { "x-legacy-redirect": "true" }
+      "dest": "/data/nl/communities.json"
     },
     {
       "src": "/engine/(.*)",
