@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] + [weong-route]
+/** * Project: [weong-bulletin]
  * Methodology: L3 Stealth-Sync Unified Engine
- * Status: Absolute Path Hardening + Shared State
+ * Status: Absolute Path Hardening + Multi-Point Fallback [cite: 2025-12-30]
  */
 
 const WeatherEngine = (function() {
@@ -16,12 +16,11 @@ const WeatherEngine = (function() {
 
     const init = async () => {
         try {
-            // Updated to the verified Newfoundland Deep Dive path
+            // Updated to the Newfoundland Deep Dive path
             const res = await fetch('/data/nl/communities.json');
             if (!res.ok) throw new Error("404");
             const rawData = await res.json();
             
-            // Map GeoJSON properties to state
             state.communities = rawData.features.map(f => ({
                 name: f.properties.name,
                 lat: f.geometry.coordinates[1],
@@ -31,7 +30,7 @@ const WeatherEngine = (function() {
             console.log(`System: NL Dataset Active (${state.communities.length} nodes)`);
         } catch (e) {
             console.warn("WEONG-L3: Network 404. Deploying Hardened NL Baseline.");
-            // FIX: Multiple points ensure markers can move even if fetch fails
+            // FIX: Multiple points ensure markers can move even if the JSON fetch fails
             state.communities = [
                 { name: "Gander", lat: 48.9578, lng: -54.6122 },
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
@@ -39,7 +38,6 @@ const WeatherEngine = (function() {
                 { name: "Grand Falls-Windsor", lat: 48.93, lng: -55.65 }
             ];
         }
-
         initUI();
         state.layer.addTo(window.map);
         setInterval(syncCycle, 1000);
@@ -94,7 +92,6 @@ const WeatherEngine = (function() {
     const syncCycle = async () => {
         if (state.isLocked || !window.map || state.communities.length === 0) return;
         
-        // Find the active route LineString from route-engine.js
         const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
         if (!route) return;
 
@@ -111,6 +108,60 @@ const WeatherEngine = (function() {
             const [lng, lat] = coords[idx];
             const arrival = new Date(depTime.getTime() + (pct * 8) * 3600000);
             
-            // Logic Fix: Ensure closest community is found
             const community = state.communities.reduce((prev, curr) => {
-                const dPrev = Math.hypot(lat - prev.lat, lng - prev.
+                const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
+                const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
+                return dCurr < dPrev ? curr : prev;
+            });
+
+            return {
+                ...community,
+                eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                variant: getForecastVariation(community.lat, community.lng, arrival.getHours())
+            };
+        });
+
+        renderIcons();
+        renderTable();
+        state.isLocked = false;
+    };
+
+    const renderIcons = () => {
+        state.layer.clearLayers();
+        state.activeWaypoints.forEach(wp => {
+            L.marker([wp.lat, wp.lng], {
+                icon: L.divIcon({
+                    className: 'w-node',
+                    html: `<div style="background:#000; border:2px solid #FFD700; border-radius:4px; width:75px; height:65px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000;">
+                            <span style="font-size:8px; font-weight:bold; background:#FFD700; color:#000; width:100%; text-align:center;">${wp.name.split(' ')[0]}</span>
+                            <span style="font-size:18px;">${wp.variant.sky}</span>
+                            <div style="display:flex; gap:4px; font-size:12px; font-weight:bold;">
+                                <span style="${wp.variant.temp <= 0 ? 'color:#00d4ff' : 'color:#ff4500'}">${wp.variant.temp}°</span>
+                                <span style="color:#fff;">${wp.variant.wind}k</span>
+                            </div>
+                        </div>`,
+                    iconSize: [75, 65]
+                })
+            }).addTo(state.layer);
+        });
+    };
+
+    const renderTable = () => {
+        const container = document.getElementById('bulletin-rows');
+        if (!container) return;
+        container.innerHTML = state.activeWaypoints.map(wp => `
+            <tr style="border-bottom:1px solid #222;">
+                <td style="padding:8px 5px;">${wp.name}</td>
+                <td style="padding:8px 5px;">${wp.eta}</td>
+                <td style="padding:8px 5px; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
+                <td style="padding:8px 5px;">${wp.variant.wind} km/h</td>
+                <td style="padding:8px 5px;">${wp.variant.vis} km</td>
+                <td style="padding:8px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
+            </tr>
+        `).join('');
+    };
+
+    return { init };
+})();
+
+WeatherEngine.init();
