@@ -2,9 +2,9 @@
 const VERSION = "V3_ABSOLUTE_RESET"; 
 
 const modulePaths = [
-    { path: `/engine/route-engine.js?v=${VERSION}`, type: 'module' },
-    { path: `/engine/velocity-widget.js?v=${VERSION}`, type: 'module' },
-    { path: `/engine/weather-engine.js?v=${VERSION}`, type: 'module' }
+//    { path: `/engine/route-engine.js?v=${VERSION}`, type: 'module' },
+//    { path: `/engine/velocity-widget.js?v=${VERSION}`, type: 'module' },
+//    { path: `/engine/weather-engine.js?v=${VERSION}`, type: 'module' }
 ];
 
 modulePaths.forEach(mod => {
