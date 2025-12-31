@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "name": "weong-bulletin-l3",
   "cleanUrls": true,
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
@@ -7,6 +8,14 @@
     { "src": "data/nl/communities.json", "use": "@vercel/static" }
   ],
   "routes": [
+    {
+      "src": "/engine/(.*).js",
+      "headers": { 
+        "Cache-Control": "no-store, must-revalidate",
+        "Access-Control-Allow-Origin": "*" 
+      },
+      "continue": true
+    },
     {
       "src": "/data/nl/communities.json",
       "headers": {
