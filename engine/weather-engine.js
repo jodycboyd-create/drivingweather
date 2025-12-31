@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
- * Methodology: L3 Stealth-Sync Unified Engine
- * Status: Absolute Path Hardening + Multi-Point Fallback [cite: 2025-12-30]
+ * Methodology: L3 Stealth-Sync Unified Engine + Geometric Anchoring
+ * Status: Absolute Path Hardening + Pin-Move Detection
  */
 
 const WeatherEngine = (function() {
@@ -38,22 +38,24 @@ const WeatherEngine = (function() {
         }
         initUI();
         state.layer.addTo(window.map);
+        
+        // Remove native route metrics flag
+        const styleTag = document.createElement('style');
+        styleTag.innerHTML = `.leaflet-routing-container, .leaflet-routing-alt { display: none !important; }`;
+        document.head.appendChild(styleTag);
+
         setInterval(syncCycle, 1000);
     };
 
-    // FIX: Passing full arrival Date for Solar Engine [cite: 2025-12-30]
     const getForecastVariation = (lat, lng, arrivalTime) => {
         const hour = arrivalTime.getHours();
         const seed = lat + lng + hour;
-        
-        // Solar Window: Dec 31 Sunset is ~16:15 NST in Gander [cite: 2025-12-31]
         const isNight = hour >= 17 || hour <= 7; 
         
         const dayIcons = ["☀️", "🌤️", "☁️", "❄️"];
         const nightIcons = ["🌙", "☁️", "☁️", "❄️"];
         const labels = ["Clear", "P.Cloudy", "Overcast", "Snow Flurries"];
         
-        // Use Math.abs to prevent "undefined" index errors
         const idx = Math.abs(Math.floor(seed % 4));
         
         return {
@@ -107,14 +109,15 @@ const WeatherEngine = (function() {
         const currentSpeed = window.currentCruisingSpeed || 100;
         const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
 
-        // 1. PRECISION DISTANCE (Haversine instead of coord length) [cite: 2025-12-26]
+        // 1. PRECISION DISTANCE CALCULATION
         let totalKm = 0;
         for (let i = 0; i < coords.length - 1; i++) {
             totalKm += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0])) / 1000;
         }
-        window.currentRouteDistance = totalKm; // Shared for Velocity Widget
+        window.currentRouteDistance = totalKm;
 
-        const currentKey = `${coords[0][0].toFixed(4)}-${coords.length}-${currentSpeed}-${depTime.getTime()}`;
+        // 2. GEOMETRIC ANCHOR: Detects coordinate count and physical distance change
+        const currentKey = `${coords[0][0].toFixed(4)}-${totalKm.toFixed(2)}-${currentSpeed}-${depTime.getTime()}`;
         if (currentKey === state.anchorKey && !forceUpdate) return;
 
         state.isLocked = true;
@@ -124,7 +127,6 @@ const WeatherEngine = (function() {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
             
-            // 2. ACCURATE ETE: Actual KM / Current Speed [cite: 2025-12-30]
             const travelHours = (totalKm * pct) / currentSpeed; 
             const arrival = new Date(depTime.getTime() + (travelHours * 3600000));
             
@@ -137,12 +139,18 @@ const WeatherEngine = (function() {
             return {
                 ...community,
                 eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                variant: getForecastVariation(community.lat, community.lng, arrival) // Pass full date
+                variant: getForecastVariation(community.lat, community.lng, arrival)
             };
         });
 
         renderIcons();
         renderTable();
+
+        // 3. WIDGET HANDSHAKE: Update Velocity Widget numbers
+        if (window.VelocityWidget && typeof window.VelocityWidget.render === 'function') {
+            window.VelocityWidget.render();
+        }
+
         state.isLocked = false;
     };
 
