@@ -1,10 +1,12 @@
 /** SYSTEM MANIFEST - ENGINE FOLDER LOCKED **/
-/** Updated: Dec 30, 2025 - Fixed Module Scoping for Flag Handshake **/
+/** Updated: Dec 30, 2025 - Forced Cache-Busting L3 **/
+
+const VERSION = Date.now(); // Generates a unique ID per load
 
 const modulePaths = [
-    { path: '/engine/route-engine.js', type: 'module' },
-    { path: '/engine/velocity-widget.js', type: 'module' }, // Now consistent as module
-    { path: '/engine/weather-engine.js', type: 'module' }
+    { path: `/engine/route-engine.js?v=${VERSION}`, type: 'module' },
+    { path: `/engine/velocity-widget.js?v=${VERSION}`, type: 'module' },
+    { path: `/engine/weather-engine.js?v=${VERSION}`, type: 'module' }
 ];
 
 modulePaths.forEach(mod => {
@@ -14,8 +16,7 @@ modulePaths.forEach(mod => {
     s.async = false;
     
     s.onload = () => {
-        console.log(`System: ${mod.path} initialized.`);
-        // Signal the map to update as engines come online
+        console.log(`System: ${mod.path.split('?')[0]} initialized.`);
         window.dispatchEvent(new Event('weong:update'));
     };
 
