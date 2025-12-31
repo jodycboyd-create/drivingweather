@@ -1,7 +1,6 @@
 /** * Project: [weong-bulletin]
- * Methodology: L3 Glassmorphism UI + Null-Safe Data Pass-Through
- * Status: Professional HUD Restoration [cite: 2025-12-31]
- * Logic: Strictly displays "--" if weong data is unavailable.
+ * Methodology: L3 Glassmorphism UI + Explicit Master Data Ingestion
+ * Status: Professional HUD - Core Logic Lock-in [cite: 2025-12-31]
  */
 
 const WeatherEngine = (function() {
@@ -15,8 +14,30 @@ const WeatherEngine = (function() {
         nodes: [0.15, 0.35, 0.55, 0.75, 0.95]
     };
 
+    /**
+     * CORE FIX: Explicit Ingestor
+     * Connects the UI to your locked Newfoundland Deep Dive data.
+     */
+    const loadMasterData = async () => {
+        try {
+            // Attempt to fetch your permanent NL data store
+            const response = await fetch('/data/nl/weong-master-forecast.json');
+            if (response.ok) {
+                window.weongForecastData = await response.json();
+                console.log("WEONG Bulletin: Master Data Synced Successfully.");
+            } else {
+                console.error("WEONG Bulletin: Master file not found. Standing by for manual data injection.");
+            }
+        } catch (e) {
+            console.error("WEONG Bulletin: Ingestion Error.", e);
+        }
+    };
+
     const init = async () => {
-        // --- 1. HUD STYLING & ROUTE SCRUBBING ---
+        // Trigger data sync immediately
+        await loadMasterData();
+
+        // --- HUD STYLING & ROUTE SCRUBBING ---
         const styleTag = document.createElement('style');
         styleTag.innerHTML = `
             .leaflet-routing-container, .leaflet-routing-alt, 
@@ -36,55 +57,39 @@ const WeatherEngine = (function() {
         });
         scrubber.observe(document.body, { childList: true, subtree: true });
 
-        // --- 2. NEWFOUNDLAND COMMUNITY REGISTRY ---
-        try {
-            const res = await fetch('/data/nl/communities.json');
-            if (!res.ok) throw new Error();
-            const rawData = await res.json();
-            state.communities = rawData.features.map(f => ({
-                name: f.properties.name,
-                lat: f.geometry.coordinates[1],
-                lng: f.geometry.coordinates[0]
-            }));
-        } catch (e) {
-            state.communities = [
-                { name: "Gander", lat: 48.9578, lng: -54.6122 },
-                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
-                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 },
-                { name: "Grand Falls-Windsor", lat: 48.93, lng: -55.65 },
-                { name: "Clarenville", lat: 48.16, lng: -53.96 },
-                { name: "Deer Lake", lat: 49.17, lng: -57.43 }
-            ];
-        }
+        // --- NEWFOUNDLAND COMMUNITY REGISTRY ---
+        state.communities = [
+            { name: "Gander", lat: 48.9578, lng: -54.6122 },
+            { name: "St. John's", lat: 47.5615, lng: -52.7126 },
+            { name: "Corner Brook", lat: 48.9515, lng: -57.9482 },
+            { name: "Grand Falls-Windsor", lat: 48.93, lng: -55.65 },
+            { name: "Clarenville", lat: 48.16, lng: -53.96 },
+            { name: "Deer Lake", lat: 49.17, lng: -57.43 }
+        ];
         
         initUI();
         state.layer.addTo(window.map);
         setInterval(syncCycle, 1000);
     };
 
-    /**
-     * NULL-SAFE DATA PASS-THROUGH
-     * Strictly pulls from weongForecastData. No defaults.
-     */
     const getForecastVariation = (lat, lng, arrivalTime) => {
         const hour = arrivalTime.getHours();
         
-        // Initial state: Data unavailable
         let output = {
             temp: "--", 
             wind: "--",
             vis: "--",
-            sky: "",
+            sky: "❓",
             skyLabel: "N/A"
         };
 
-        // --- STRICT DATA INGESTION ---
+        // Check for specific hourly entry in the Master Data
         if (window.weongForecastData && window.weongForecastData[hour]) {
             const data = window.weongForecastData[hour];
             output.temp = data.temp;
             output.wind = data.wind;
             output.vis  = data.vis;
-            output.sky  = data.icon || "";
+            output.sky  = data.icon || "☁️";
             output.skyLabel = data.condition || "Forecasted";
         }
 
@@ -140,7 +145,6 @@ const WeatherEngine = (function() {
 
     const syncCycle = async (forceUpdate = false) => {
         if (state.isLocked || !window.map || state.communities.length === 0) return;
-        
         const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
         if (!route) return;
 
@@ -192,7 +196,7 @@ const WeatherEngine = (function() {
                     html: `
                     <div style="background:rgba(20,20,20,0.85); backdrop-filter:blur(8px); border:1px solid rgba(255,215,0,0.3); border-radius:15px; width:70px; height:70px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; box-shadow:0 10px 25px rgba(0,0,0,0.4);">
                         <div style="font-size:8px; font-weight:bold; background:rgba(255,215,0,0.8); color:#000; width:100%; text-align:center; position:absolute; top:0; border-radius:14px 14px 0 0; padding:2px 0;">${wp.name.split(' ')[0]}</div>
-                        <span style="font-size:22px; margin-top:8px;">${wp.variant.sky || '❓'}</span>
+                        <span style="font-size:22px; margin-top:8px;">${wp.variant.sky}</span>
                         <span style="font-size:14px; font-weight:bold;">${tempDisplay}</span>
                     </div>`,
                     iconSize: [70, 70],
