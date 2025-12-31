@@ -1,7 +1,7 @@
 /** * Project: [weong-bulletin]
- * Methodology: L3 Glassmorphism UI + Pure Data Pass-Through
- * Status: Final Professional HUD [cite: 2025-12-31]
- * Core Logic: Strict adherence to user data provenance without compression.
+ * Methodology: L3 Glassmorphism UI + Null-Safe Data Pass-Through
+ * Status: Professional HUD Restoration [cite: 2025-12-31]
+ * Logic: Strictly displays "--" if weong data is unavailable.
  */
 
 const WeatherEngine = (function() {
@@ -36,7 +36,7 @@ const WeatherEngine = (function() {
         });
         scrubber.observe(document.body, { childList: true, subtree: true });
 
-        // --- 2. NEWFOUNDLAND COMMUNITY REGISTRY (LOCK-IN) ---
+        // --- 2. NEWFOUNDLAND COMMUNITY REGISTRY ---
         try {
             const res = await fetch('/data/nl/communities.json');
             if (!res.ok) throw new Error();
@@ -47,7 +47,6 @@ const WeatherEngine = (function() {
                 lng: f.geometry.coordinates[0]
             }));
         } catch (e) {
-            // Hard-coded deep dive fallback for Newfoundland
             state.communities = [
                 { name: "Gander", lat: 48.9578, lng: -54.6122 },
                 { name: "St. John's", lat: 47.5615, lng: -52.7126 },
@@ -64,30 +63,29 @@ const WeatherEngine = (function() {
     };
 
     /**
-     * PURE DATA PASS-THROUGH
-     * Pulls directly from the weongForecastData object.
+     * NULL-SAFE DATA PASS-THROUGH
+     * Strictly pulls from weongForecastData. No defaults.
      */
     const getForecastVariation = (lat, lng, arrivalTime) => {
         const hour = arrivalTime.getHours();
-        const isNight = hour >= 17 || hour <= 7; 
         
-        // Default L3 Logic if master data is missing
+        // Initial state: Data unavailable
         let output = {
-            temp: -2, 
-            wind: 20,
-            vis: 15,
-            sky: isNight ? "🌙" : "☀️",
-            skyLabel: "Clear"
+            temp: "--", 
+            wind: "--",
+            vis: "--",
+            sky: "",
+            skyLabel: "N/A"
         };
 
-        // --- DIRECT INGESTION FROM WEONG DATASET ---
+        // --- STRICT DATA INGESTION ---
         if (window.weongForecastData && window.weongForecastData[hour]) {
             const data = window.weongForecastData[hour];
             output.temp = data.temp;
             output.wind = data.wind;
             output.vis  = data.vis;
-            output.sky  = data.icon || output.sky;
-            output.skyLabel = data.condition || output.skyLabel;
+            output.sky  = data.icon || "";
+            output.skyLabel = data.condition || "Forecasted";
         }
 
         return output;
@@ -97,7 +95,7 @@ const WeatherEngine = (function() {
         const widgetHTML = `
             <div id="bulletin-widget" style="position:fixed; top:20px; left:20px; z-index:70000; font-family:sans-serif;">
                 <button id="btn-open-bulletin" style="background:rgba(0,0,0,0.8); backdrop-filter:blur(10px); color:#FFD700; border:1px solid rgba(255,215,0,0.3); padding:10px 20px; cursor:pointer; font-weight:bold; border-radius:12px; font-size:12px;">TABULAR FORECAST</button>
-                <div id="bulletin-modal" style="display:none; margin-top:10px; background:rgba(15,15,15,0.9); backdrop-filter:blur(15px); border:1px solid rgba(255,215,0,0.2); width:600px; padding:20px; color:#FFD700; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,0.5);">
+                <div id="bulletin-modal" style="display:none; margin-top:10px; background:rgba(15,15,15,0.95); backdrop-filter:blur(15px); border:1px solid rgba(255,215,0,0.2); width:600px; padding:20px; color:#FFD700; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,0.8);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid rgba(255,215,0,0.1); padding-bottom:12px;">
                         <span style="font-weight:bold; font-size:13px; letter-spacing:1px;">NL WEATHER MATRIX [L3]</span>
                         <button id="btn-copy-bulletin" style="background:#FFD700; color:#000; border:none; padding:5px 15px; cursor:pointer; font-size:10px; font-weight:bold; border-radius:8px;">COPY DATA</button>
@@ -129,12 +127,11 @@ const WeatherEngine = (function() {
     const copyToClipboard = () => {
         if (state.activeWaypoints.length === 0) return;
         const header = "NL ROUTE WEATHER MATRIX - " + new Date().toLocaleDateString() + "\n";
-        const subHeader = "COMMUNITY | ETA | TEMP | WIND | VIS | SKY\n" + "-".repeat(65) + "\n";
         const rows = state.activeWaypoints.map(wp => 
-            `${wp.name.padEnd(20)} | ${wp.eta} | ${wp.variant.temp}°C | ${wp.variant.wind}km/h | ${wp.variant.vis}km | ${wp.variant.skyLabel}`
+            `${wp.name.padEnd(20)} | ${wp.eta} | ${wp.variant.temp}${typeof wp.variant.temp === 'number' ? '°C' : ''} | ${wp.variant.wind}km/h | ${wp.variant.vis}km | ${wp.variant.skyLabel}`
         ).join('\n');
 
-        navigator.clipboard.writeText(header + subHeader + rows).then(() => {
+        navigator.clipboard.writeText(header + rows).then(() => {
             const btn = document.getElementById('btn-copy-bulletin');
             btn.innerText = "COPIED!";
             setTimeout(() => btn.innerText = "COPY DATA", 2000);
@@ -144,7 +141,6 @@ const WeatherEngine = (function() {
     const syncCycle = async (forceUpdate = false) => {
         if (state.isLocked || !window.map || state.communities.length === 0) return;
         
-        // Locate the active route on the map
         const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
         if (!route) return;
 
@@ -152,28 +148,22 @@ const WeatherEngine = (function() {
         const currentSpeed = window.currentCruisingSpeed || 100;
         const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
 
-        // Calculate Distance
         let totalKm = 0;
         for (let i = 0; i < coords.length - 1; i++) {
             totalKm += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0])) / 1000;
         }
-        window.currentRouteDistance = totalKm;
 
-        // Cache Key to prevent redundant renders
         const currentKey = `${totalKm.toFixed(2)}-${currentSpeed}-${depTime.getTime()}`;
         if (currentKey === state.anchorKey && !forceUpdate) return;
 
         state.isLocked = true;
         state.anchorKey = currentKey;
         
-        // Generate Waypoints
         state.activeWaypoints = state.nodes.map(pct => {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
             const travelHours = (totalKm * pct) / currentSpeed; 
             const arrival = new Date(depTime.getTime() + (travelHours * 3600000));
-            
-            // Find nearest community from registry
             const community = state.communities.reduce((prev, curr) => {
                 const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
                 const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
@@ -189,26 +179,21 @@ const WeatherEngine = (function() {
 
         renderIcons();
         renderTable();
-        
-        // Update the VelocityWidget metrics simultaneously
-        if (window.VelocityWidget && typeof window.VelocityWidget.render === 'function') {
-            window.VelocityWidget.render();
-        }
-        
         state.isLocked = false;
     };
 
     const renderIcons = () => {
         state.layer.clearLayers();
         state.activeWaypoints.forEach(wp => {
+            const tempDisplay = typeof wp.variant.temp === 'number' ? `${wp.variant.temp}°` : wp.variant.temp;
             L.marker([wp.lat, wp.lng], {
                 icon: L.divIcon({
                     className: 'w-node',
                     html: `
-                    <div style="background:rgba(20,20,20,0.8); backdrop-filter:blur(8px); border:1px solid rgba(255,215,0,0.3); border-radius:15px; width:70px; height:70px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; box-shadow:0 10px 25px rgba(0,0,0,0.4);">
+                    <div style="background:rgba(20,20,20,0.85); backdrop-filter:blur(8px); border:1px solid rgba(255,215,0,0.3); border-radius:15px; width:70px; height:70px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; box-shadow:0 10px 25px rgba(0,0,0,0.4);">
                         <div style="font-size:8px; font-weight:bold; background:rgba(255,215,0,0.8); color:#000; width:100%; text-align:center; position:absolute; top:0; border-radius:14px 14px 0 0; padding:2px 0;">${wp.name.split(' ')[0]}</div>
-                        <span style="font-size:22px; margin-top:8px;">${wp.variant.sky}</span>
-                        <span style="font-size:14px; font-weight:bold; ${wp.variant.temp <= 0 ? 'color:#00d4ff' : 'color:#ff4500'}">${wp.variant.temp}°</span>
+                        <span style="font-size:22px; margin-top:8px;">${wp.variant.sky || '❓'}</span>
+                        <span style="font-size:14px; font-weight:bold;">${tempDisplay}</span>
                     </div>`,
                     iconSize: [70, 70],
                     iconAnchor: [35, 35]
@@ -224,9 +209,9 @@ const WeatherEngine = (function() {
             <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
                 <td style="padding:12px 5px;">${wp.name}</td>
                 <td style="padding:12px 5px; opacity:0.8;">${wp.eta}</td>
-                <td style="padding:12px 5px; font-weight:bold; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
-                <td style="padding:12px 5px; opacity:0.8;">${wp.variant.wind} km/h</td>
-                <td style="padding:12px 5px; opacity:0.8;">${wp.variant.vis} km</td>
+                <td style="padding:12px 5px; font-weight:bold;">${wp.variant.temp}${typeof wp.variant.temp === 'number' ? '°C' : ''}</td>
+                <td style="padding:12px 5px; opacity:0.8;">${wp.variant.wind} ${typeof wp.variant.wind === 'number' ? 'km/h' : ''}</td>
+                <td style="padding:12px 5px; opacity:0.8;">${wp.variant.vis} ${typeof wp.variant.vis === 'number' ? 'km' : ''}</td>
                 <td style="padding:12px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
             </tr>
         `).join('');
