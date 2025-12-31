@@ -14,7 +14,7 @@
       "src": "/engine/(.*).js",
       "headers": { 
         "Cache-Control": "no-store, must-revalidate",
-        "X-Module-Status": "Initialized" 
+        "Service-Worker-Allowed": "/" 
       },
       "continue": true
     },
