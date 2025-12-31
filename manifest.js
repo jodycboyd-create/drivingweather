@@ -1,19 +1,16 @@
 /** * Project: [weong-route] + [weong-bulletin]
- * Logic: L3_FINAL_SYNC_001 (Path-Corrected)
- * Path: /engine/
+ * Logic: L3_FINAL_SYNC_001 (Module-Aware Bootloader)
  */
 var manifestData = {
     "manifest_version": 3,
     "version": "L3_FINAL_SYNC_001",
-    "content_scripts": [
-        {
-            "js": [
-                "engine/route-engine.js",
-                "engine/velocity-widget.js",
-                "engine/weather-engine.js"
-            ]
-        }
-    ]
+    "content_scripts": [{
+        "js": [
+            "engine/route-engine.js",
+            "engine/velocity-widget.js",
+            "engine/weather-engine.js"
+        ]
+    }]
 };
 
 (function() {
@@ -23,12 +20,15 @@ var manifestData = {
     
     scripts.forEach(file => {
         const s = document.createElement('script');
-        // This ensures the browser looks in the /engine/ folder
         s.src = "./" + file + "?v=" + manifestData.version;
+        
+        // FIX: Set type to module to handle 'export' tokens
+        s.type = "module"; 
+        
         s.async = false; 
         document.head.appendChild(s);
         
         s.onload = () => console.log(`%c Success: ${file} loaded.`, 'color: #00ff00;');
-        s.onerror = () => console.error(`%c Failed: ${file} NOT FOUND. Check /engine/ folder.`, 'color: #ff0000;');
+        s.onerror = () => console.error(`%c Failed: ${file} NOT FOUND.`, 'color: #ff0000;');
     });
 })();
