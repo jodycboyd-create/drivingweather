@@ -1,31 +1,44 @@
 /** * Project: [weong-route] + [weong-bulletin]
- * Status: L3 Force-Injection Module
- * Fix: Explicit Window Attachment + Immediate Execution
+ * Status: L3 Force-Direct Injection
+ * Fix: Removed IIFE for direct DOM access via manifest loader
  */
-const VelocityWidget = (function() {
-    const state = { baseSpeed: 100, offset: 0, departureTime: new Date() };
 
-    const createUI = () => {
-        // Prevent double injection
+const VelocityWidget = {
+    state: {
+        baseSpeed: 100,
+        offset: 0,
+        departureTime: new Date()
+    },
+
+    init: function() {
+        console.log("SYSTEM: Velocity Engine Initializing...");
+        // Ensure the body exists before injecting
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            this.createUI();
+        } else {
+            document.addEventListener('DOMContentLoaded', () => this.createUI());
+        }
+    },
+
+    createUI: function() {
         if (document.getElementById('velocity-anchor')) return;
-        
-        console.log("SYSTEM: Injecting Velocity UI...");
+
         const container = document.createElement('div');
         container.id = 'velocity-anchor';
+        // Max z-index to stay above Leaflet layers
         container.style.cssText = `
             position: fixed !important;
             bottom: 30px !important;
             right: 30px !important;
             z-index: 2147483647 !important;
-            display: block !important;
             pointer-events: auto !important;
         `;
-        
+
         container.innerHTML = `
             <div style="background:rgba(0,0,0,0.95); border:2px solid #FFD700; padding:15px; color:#FFD700; min-width:200px; box-shadow: 0 0 25px #000; border-radius:4px; font-family:monospace;">
                 <div style="font-size:10px; opacity:0.7; letter-spacing:1px; border-bottom:1px solid #333; margin-bottom:8px; padding-bottom:4px;">CRUISING VELOCITY</div>
-                <div class="v-speed-val" style="font-size:26px; font-weight:bold; margin-bottom:2px;">100 KM/H</div>
-                <div class="v-time-val" style="font-size:14px; margin-bottom:12px; color:#fff;">--:--</div>
+                <div id="v-speed-val" style="font-size:26px; font-weight:bold; margin-bottom:2px;">100 KM/H</div>
+                <div id="v-time-val" style="font-size:14px; margin-bottom:12px; color:#fff;">--:--</div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
                     <button id="v-spd-minus" style="background:#111; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding:8px; font-weight:bold;">SPD -</button>
                     <button id="v-spd-plus" style="background:#111; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding:8px; font-weight:bold;">SPD +</button>
@@ -33,47 +46,38 @@ const VelocityWidget = (function() {
                     <button id="v-time-plus" style="background:#111; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding:8px; font-weight:bold;">TIME +</button>
                 </div>
             </div>`;
-            
+
         document.body.appendChild(container);
-        setupListeners();
-        render();
-    };
+        this.setupListeners();
+        this.render();
+        console.log("SYSTEM: Velocity UI Injected Successfully.");
+    },
 
-    const render = () => {
-        const speed = state.baseSpeed + state.offset;
-        const timeStr = state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        document.querySelector('.v-speed-val').innerText = `${speed} KM/H`;
-        document.querySelector('.v-time-val').innerText = timeStr;
+    render: function() {
+        const speed = this.state.baseSpeed + this.state.offset;
+        const timeStr = this.state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+        document.getElementById('v-speed-val').innerText = `${speed} KM/H`;
+        document.getElementById('v-time-val').innerText = timeStr;
+
+        // Handshake Globals
         window.currentCruisingSpeed = speed;
-        window.currentDepartureTime = state.departureTime;
-    };
+        window.currentDepartureTime = this.state.departureTime;
+    },
 
-    const setupListeners = () => {
-        document.getElementById('v-spd-plus').onclick = () => { state.offset += 10; render(); };
-        document.getElementById('v-spd-minus').onclick = () => { state.offset -= 10; render(); };
+    setupListeners: function() {
+        document.getElementById('v-spd-plus').onclick = () => { this.state.offset += 10; this.render(); };
+        document.getElementById('v-spd-minus').onclick = () => { this.state.offset -= 10; this.render(); };
         document.getElementById('v-time-plus').onclick = () => { 
-            state.departureTime = new Date(state.departureTime.getTime() + 15 * 60000); 
-            render(); 
+            this.state.departureTime = new Date(this.state.departureTime.getTime() + 15 * 60000); 
+            this.render(); 
         };
         document.getElementById('v-time-minus').onclick = () => { 
-            state.departureTime = new Date(state.departureTime.getTime() - 15 * 60000); 
-            render(); 
+            this.state.departureTime = new Date(this.state.departureTime.getTime() - 15 * 60000); 
+            this.render(); 
         };
-    };
+    }
+};
 
-    return { 
-        init: () => {
-            if (document.readyState === 'loading') {
-                window.addEventListener('DOMContentLoaded', createUI);
-            } else {
-                createUI();
-            }
-        } 
-    };
-})();
-
-// FORCE EXECUTION
+// Execution
 VelocityWidget.init();
-window.VelocityWidget = VelocityWidget;
