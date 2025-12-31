@@ -1,7 +1,6 @@
 /** * Project: [weong-route] + [weong-bulletin]
- * Status: L3 Velocity-Weather Handshake FINAL
+ * Status: L3 Velocity-Weather Handshake [FIXED]
  */
-
 const VelocityWidget = (function() {
     const state = {
         baseSpeed: 100, 
@@ -10,19 +9,15 @@ const VelocityWidget = (function() {
     };
 
     const init = () => {
-        updateGlobals();
+        window.currentCruisingSpeed = state.baseSpeed;
+        window.currentDepartureTime = state.departureTime;
         render();
         setupListeners();
     };
 
-    const updateGlobals = () => {
-        window.currentCruisingSpeed = state.baseSpeed + state.offset;
-        window.currentDepartureTime = new Date(state.departureTime); // Clone to prevent mutation refs
-    };
-
     const render = () => {
         const speed = state.baseSpeed + state.offset;
-        const timeStr = state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        const timeStr = state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         const speedEl = document.querySelector('.speed-value');
         const timeEl = document.querySelector('.time-value');
@@ -30,37 +25,38 @@ const VelocityWidget = (function() {
         if (speedEl) speedEl.innerText = `${speed} KM/H`;
         if (timeEl) timeEl.innerText = timeStr;
 
-        window.dispatchEvent(new CustomEvent('weong:update', { detail: { speed, departure: state.departureTime }}));
+        // CRITICAL FIX: Use CustomEvent to pass the speed/time data directly
+        window.dispatchEvent(new CustomEvent('weong:update', { 
+            detail: { speed: speed, departure: state.departureTime } 
+        }));
     };
 
     const setupListeners = () => {
-        // Time Controls
+        // Time Plus/Minus
         document.getElementById('time-plus')?.addEventListener('click', () => {
-            state.departureTime.setMinutes(state.departureTime.getMinutes() + 30);
-            updateGlobals();
+            state.departureTime.setMinutes(state.departureTime.getMinutes() + 15);
+            window.currentDepartureTime = state.departureTime;
             render();
         });
         document.getElementById('time-minus')?.addEventListener('click', () => {
-            state.departureTime.setMinutes(state.departureTime.getMinutes() - 30);
-            updateGlobals();
+            state.departureTime.setMinutes(state.departureTime.getMinutes() - 15);
+            window.currentDepartureTime = state.departureTime;
             render();
         });
 
-        // Speed Controls
+        // Speed Plus/Minus
         document.getElementById('speed-plus')?.addEventListener('click', () => {
             state.offset += 5;
-            updateGlobals();
+            window.currentCruisingSpeed = state.baseSpeed + state.offset;
             render();
         });
         document.getElementById('speed-minus')?.addEventListener('click', () => {
             state.offset -= 5;
-            if ((state.baseSpeed + state.offset) < 20) state.offset = -80; // Safety floor
-            updateGlobals();
+            window.currentCruisingSpeed = state.baseSpeed + state.offset;
             render();
         });
     };
 
     return { init };
 })();
-
 VelocityWidget.init();
