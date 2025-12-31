@@ -1,5 +1,5 @@
 /** * Project: [weong-bulletin]
- * Logic: UX-Optimized Vertical Hierarchy (Planning -> Metrics -> Speed)
+ * Logic: Compressed nglass Tactical HUD
  * Status: Final Layout Lock-in [cite: 2025-12-31]
  */
 
@@ -23,68 +23,52 @@ const VelocityWidget = {
 
         const widget = document.createElement('div');
         widget.id = 'velocity-widget-container';
+        // nglass aesthetic: blur, transparency, and rounded corners
         widget.style.cssText = `
             position: fixed; bottom: 20px; right: 20px; z-index: 10000;
-            background: #000; border: 2px solid #FFD700; color: #FFD700;
-            padding: 15px; font-family: 'Arial Black', sans-serif;
-            box-shadow: 0 10px 40px rgba(0,0,0,1); width: 360px;
+            background: rgba(15, 15, 15, 0.75); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.25); color: #FFD700;
+            padding: 12px; font-family: 'Segoe UI', sans-serif;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6); border-radius: 16px;
+            width: 440px; display: flex; gap: 15px; align-items: stretch;
         `;
 
         widget.innerHTML = `
-            <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #333;">
-                <div style="font-size: 10px; color: #FFD700; margin-bottom: 8px; letter-spacing: 1px;">SET DEPARTURE TIME</div>
-                <div style="display: flex; align-items: center; justify-content: space-between; background: #111; padding: 10px; border: 1px solid #333;">
-                    <div style="flex: 1;">
-                        <div id="m-dep-time" style="font-size: 24px; color: #fff; line-height: 1;">--:--</div>
-                        <div id="v-day-display" style="font-size: 10px; color: #FFD700; margin-top: 4px;">Dec 31</div>
-                    </div>
-                    <div style="display: flex; gap: 10px;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 8px; color: #888; margin-bottom: 4px;">DAY</div>
-                            <div style="display: flex; gap: 4px;">
-                                <button onclick="VelocityWidget.updateDay(-1)" style="background:#222; color:#fff; border:1px solid #444; width:30px; height:30px; cursor:pointer;">-</button>
-                                <button onclick="VelocityWidget.updateDay(1)" style="background:#222; color:#fff; border:1px solid #444; width:30px; height:30px; cursor:pointer;">+</button>
-                            </div>
-                        </div>
-                        <div style="text-align: center; border-left: 1px solid #333; padding-left: 10px;">
-                            <div style="font-size: 8px; color: #888; margin-bottom: 4px;">15 MIN</div>
-                            <div style="display: flex; gap: 4px;">
-                                <button onclick="VelocityWidget.updateTime(-15)" style="background:#222; color:#fff; border:1px solid #444; width:30px; height:30px; cursor:pointer;">-</button>
-                                <button onclick="VelocityWidget.updateTime(15)" style="background:#222; color:#fff; border:1px solid #444; width:30px; height:30px; cursor:pointer;">+</button>
-                            </div>
-                        </div>
-                    </div>
+            <div style="flex: 1.2; border-right: 1px solid rgba(255,215,0,0.1); padding-right: 10px;">
+                <div style="font-size: 9px; opacity: 0.6; letter-spacing: 1px; margin-bottom: 4px;">DEPARTURE</div>
+                <div id="m-dep-time" style="font-size: 20px; color: #fff; font-weight: bold; line-height: 1;">--:--</div>
+                <div id="v-day-display" style="font-size: 10px; color: #FFD700; margin: 4px 0 8px 0;">Dec 31</div>
+                <div style="display: flex; gap: 4px;">
+                    <button onclick="VelocityWidget.updateTime(-15)" style="background:rgba(255,255,255,0.1); color:#fff; border:none; border-radius:4px; flex:1; cursor:pointer; font-size:10px; padding:4px;">-15m</button>
+                    <button onclick="VelocityWidget.updateTime(15)" style="background:rgba(255,255,255,0.1); color:#fff; border:none; border-radius:4px; flex:1; cursor:pointer; font-size:10px; padding:4px;">+15m</button>
                 </div>
             </div>
 
-            <div style="background: rgba(255, 215, 0, 0.08); border: 1px solid #444; padding: 12px; margin-bottom: 20px;">
-                <div style="font-size: 10px; color: #888; letter-spacing: 2px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 4px;">MISSION METRICS</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div style="flex: 1.5; border-right: 1px solid rgba(255,215,0,0.1); padding-right: 10px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
                     <div>
-                        <span style="font-size: 9px; color: #00CCFF;">EST. ARRIVAL</span>
-                        <div id="m-arr-time" style="font-size: 20px; color: #00CCFF; font-weight: bold;">--:--</div>
+                        <span style="font-size: 9px; color: #00CCFF; opacity: 0.8;">EST. ARRIVAL</span>
+                        <div id="m-arr-time" style="font-size: 18px; color: #00CCFF; font-weight: bold;">--:--</div>
                     </div>
-                    <div style="border-left: 1px solid #333; padding-left: 15px;">
-                        <span style="font-size: 9px; color: #888;">TRAVEL DISTANCE</span>
-                        <div id="m-travel-dist" style="font-size: 18px; color: #fff;">0.0 <small style="font-size:10px;">KM</small></div>
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <span style="font-size: 9px; opacity: 0.6;">DIST:</span>
+                        <span id="m-travel-dist" style="font-size: 12px; color: #fff; font-weight: bold;">0.0 KM</span>
                     </div>
-                </div>
-                <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dotted #444; display: flex; justify-content: space-between; align-items: baseline;">
-                    <span style="font-size: 9px; color: #888;">TOTAL TRAVEL TIME:</span>
-                    <span id="m-travel-dur" style="font-size: 20px; color: #FFD700;">0H 0M</span>
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <span style="font-size: 9px; opacity: 0.6;">DUR:</span>
+                        <span id="m-travel-dur" style="font-size: 14px; color: #FFD700; font-weight: bold;">0H 0M</span>
+                    </div>
                 </div>
             </div>
 
-            <div>
-                <div style="font-size: 10px; color: #FFD700; margin-bottom: 8px; letter-spacing: 1px;">SET TRAVEL SPEED (OFFSET)</div>
-                <div style="display: flex; align-items: center; justify-content: space-between; background: #111; padding: 10px; border: 1px solid #333;">
-                    <button onclick="VelocityWidget.updateSpeed(-5)" style="background:#222; color:#FFD700; border:1px solid #FFD700; width:55px; height:45px; cursor:pointer; font-weight:bold;">-5</button>
-                    <div style="text-align: center;">
-                        <div id="v-speed-off" style="font-size: 30px; color:#fff; font-weight:bold; line-height:1;">+0</div>
-                        <div style="font-size: 8px; color: #555; margin-top:4px;">ADJUSTED KM/H</div>
-                    </div>
-                    <button onclick="VelocityWidget.updateSpeed(5)" style="background:#222; color:#FFD700; border:1px solid #FFD700; width:55px; height:45px; cursor:pointer; font-weight:bold;">+5</button>
+            <div style="flex: 1; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+                <div style="font-size: 9px; opacity: 0.6;">SPEED OFFSET</div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <button onclick="VelocityWidget.updateSpeed(-5)" style="background:none; color:#FFD700; border:1px solid rgba(255,215,0,0.4); border-radius:50%; width:24px; height:24px; cursor:pointer; font-weight:bold;">-</button>
+                    <div id="v-speed-off" style="font-size: 22px; color:#fff; font-weight:bold;">+0</div>
+                    <button onclick="VelocityWidget.updateSpeed(5)" style="background:none; color:#FFD700; border:1px solid rgba(255,215,0,0.4); border-radius:50%; width:24px; height:24px; cursor:pointer; font-weight:bold;">+</button>
                 </div>
+                <div style="font-size: 8px; opacity: 0.4;">ADJ. KM/H</div>
             </div>
         `;
 
@@ -94,11 +78,6 @@ const VelocityWidget = {
 
     updateSpeed: function(delta) {
         this.state.speedAdjustment += delta;
-        this.render();
-    },
-
-    updateDay: function(delta) {
-        this.state.departureTime.setDate(this.state.departureTime.getDate() + delta);
         this.render();
     },
 
@@ -123,14 +102,20 @@ const VelocityWidget = {
         const m = Math.round((travelHours - h) * 60);
         const arrivalDate = new Date(this.state.departureTime.getTime() + (travelHours * 3600000));
 
-        // Update UI
-        document.getElementById('m-dep-time').innerText = this.state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        document.getElementById('m-arr-time').innerText = arrivalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        document.getElementById('m-travel-dur').innerText = `${h}H ${m}M`;
-        document.getElementById('m-travel-dist').innerHTML = `${dist.toFixed(1)} <small style="font-size:10px;">KM</small>`;
-        
-        document.getElementById('v-speed-off').innerText = (this.state.speedAdjustment >= 0 ? "+" : "") + this.state.speedAdjustment;
-        document.getElementById('v-day-display').innerText = this.state.departureTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        // Update UI DOM
+        const depTimeEl = document.getElementById('m-dep-time');
+        const arrTimeEl = document.getElementById('m-arr-time');
+        const durEl = document.getElementById('m-travel-dur');
+        const distEl = document.getElementById('m-travel-dist');
+        const speedOffEl = document.getElementById('v-speed-off');
+        const dayEl = document.getElementById('v-day-display');
+
+        if (depTimeEl) depTimeEl.innerText = this.state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (arrTimeEl) arrTimeEl.innerText = arrivalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (durEl) durEl.innerText = `${h}H ${m}M`;
+        if (distEl) distEl.innerText = `${dist.toFixed(1)} KM`;
+        if (speedOffEl) speedOffEl.innerText = (this.state.speedAdjustment >= 0 ? "+" : "") + this.state.speedAdjustment;
+        if (dayEl) dayEl.innerText = this.state.departureTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
         // Sync Global State
         window.currentCruisingSpeed = finalSpeed;
