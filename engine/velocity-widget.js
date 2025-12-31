@@ -1,56 +1,34 @@
 /** * Project: [weong-route] + [weong-bulletin]
- * Status: L3 Velocity-Weather Handshake (Self-Injecting)
- * Methodology: Stealth-Sync Integration
+ * Status: L3 Velocity-Weather Handshake (Module Build)
  */
-
 const VelocityWidget = (function() {
-    const state = {
-        baseSpeed: 100, 
-        offset: 0,
-        departureTime: new Date()
-    };
+    const state = { baseSpeed: 100, offset: 0, departureTime: new Date() };
 
     const init = () => {
-        // Ensure DOM is ready for injection
-        if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", injectAndStart);
-        } else {
-            injectAndStart();
-        }
-    };
-
-    const injectAndStart = () => {
-        createUI();
-        syncGlobals();
-        setupListeners();
-        render();
-    };
-
-    const syncGlobals = () => {
-        // Essential handshake variables for your WeatherEngine syncCycle
-        window.currentCruisingSpeed = state.baseSpeed + state.offset;
-        window.currentDepartureTime = state.departureTime;
+        // Module safety: wait 100ms for Leaflet layers to settle
+        setTimeout(createUI, 100);
     };
 
     const createUI = () => {
         if (document.getElementById('velocity-anchor')) return;
-
+        
         const html = `
-            <div id="velocity-anchor" style="position:fixed; bottom:20px; right:20px; z-index:99999; font-family:monospace;">
-                <div style="background:rgba(0,0,0,0.9); border:2px solid #FFD700; padding:12px; color:#FFD700; box-shadow:0 0 20px #000; min-width:180px;">
-                    <div style="font-size:9px; letter-spacing:1px; margin-bottom:5px; opacity:0.8; border-bottom:1px solid #333; padding-bottom:3px;">VELOCITY ENGINE</div>
-                    <div class="v-speed-val" style="font-size:22px; font-weight:bold; margin-bottom:2px;">100 KM/H</div>
-                    <div class="v-time-val" style="font-size:13px; margin-bottom:12px; color:#fff;">--:--</div>
-                    
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-                        <button id="v-spd-minus" style="background:#000; color:#FFD700; border:1px solid #FFD700; cursor:pointer; font-weight:bold; padding:4px;">SPD -</button>
-                        <button id="v-spd-plus" style="background:#000; color:#FFD700; border:1px solid #FFD700; cursor:pointer; font-weight:bold; padding:4px;">SPD +</button>
-                        <button id="v-time-minus" style="background:#000; color:#FFD700; border:1px solid #FFD700; cursor:pointer; font-weight:bold; padding:4px;">TIME -</button>
-                        <button id="v-time-plus" style="background:#000; color:#FFD700; border:1px solid #FFD700; cursor:pointer; font-weight:bold; padding:4px;">TIME +</button>
+            <div id="velocity-anchor" style="position:fixed; bottom:30px; right:30px; z-index:999999; font-family:monospace;">
+                <div style="background:rgba(0,0,0,0.95); border:2px solid #FFD700; padding:15px; color:#FFD700; min-width:200px; box-shadow: 0 0 20px #000; border-radius:4px;">
+                    <div style="font-size:10px; opacity:0.7; letter-spacing:1px; border-bottom:1px solid #333; margin-bottom:8px; padding-bottom:4px;">CRUISING VELOCITY</div>
+                    <div class="v-speed-val" style="font-size:26px; font-weight:bold; margin-bottom:2px;">100 KM/H</div>
+                    <div class="v-time-val" style="font-size:14px; margin-bottom:12px; color:#fff;">--:--</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                        <button id="v-spd-minus" style="background:#111; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding:6px; font-weight:bold;">SPD -</button>
+                        <button id="v-spd-plus" style="background:#111; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding:6px; font-weight:bold;">SPD +</button>
+                        <button id="v-time-minus" style="background:#111; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding:6px; font-weight:bold;">TIME -</button>
+                        <button id="v-time-plus" style="background:#111; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding:6px; font-weight:bold;">TIME +</button>
                     </div>
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', html);
+        setupListeners();
+        render();
     };
 
     const render = () => {
@@ -59,31 +37,23 @@ const VelocityWidget = (function() {
         
         const sEl = document.querySelector('.v-speed-val');
         const tEl = document.querySelector('.v-time-val');
-        
         if (sEl) sEl.innerText = `${speed} KM/H`;
         if (tEl) tEl.innerText = timeStr;
 
-        syncGlobals();
-
-        // Forces your WeatherEngine syncCycle to trigger immediately
-        // By clearing the anchorKey, we force the engine to re-render everything
-        if (window.WeatherEngine) {
-            // Note: Since WeatherEngine doesn't expose state, we rely on the 1000ms interval 
-            // to pick up the global window changes we just made.
-        }
+        // Global Handshake for Weather Engine
+        window.currentCruisingSpeed = speed;
+        window.currentDepartureTime = state.departureTime;
     };
 
     const setupListeners = () => {
-        const handle = (id, fn) => document.getElementById(id)?.addEventListener('click', fn);
-
-        handle('v-spd-plus', () => { state.offset += 10; render(); });
-        handle('v-spd-minus', () => { state.offset -= 10; render(); });
-        handle('v-time-plus', () => { 
-            state.departureTime = new Date(state.departureTime.getTime() + 30 * 60000); 
+        document.getElementById('v-spd-plus')?.addEventListener('click', () => { state.offset += 10; render(); });
+        document.getElementById('v-spd-minus')?.addEventListener('click', () => { state.offset -= 10; render(); });
+        document.getElementById('v-time-plus')?.addEventListener('click', () => { 
+            state.departureTime = new Date(state.departureTime.getTime() + 15 * 60000); 
             render(); 
         });
-        handle('v-time-minus', () => { 
-            state.departureTime = new Date(state.departureTime.getTime() - 30 * 60000); 
+        document.getElementById('v-time-minus')?.addEventListener('click', () => { 
+            state.departureTime = new Date(state.departureTime.getTime() - 15 * 60000); 
             render(); 
         });
     };
@@ -91,4 +61,5 @@ const VelocityWidget = (function() {
     return { init };
 })();
 
+// Self-Execute for the manifest loader
 VelocityWidget.init();
