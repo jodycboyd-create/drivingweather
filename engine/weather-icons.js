@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
- * Methodology: [weong-route] L3 Equidistant Snapping
- * Status: Fixed Regression + Guaranteed Peninsula Coverage
+ * Methodology: [weong-route] L3 Equidistant Node Generation
+ * Status: Universal NL Coverage + Community Snapping
  */
 
 const WeatherIcons = (function() {
@@ -11,37 +11,32 @@ const WeatherIcons = (function() {
         communities: []
     };
 
+    // 1. Fetch from your comprehensive Newfoundland dataset
     const loadCommunities = async () => {
         try {
             const res = await fetch('/data/communities.json');
             state.communities = await res.json();
         } catch (e) {
-            // Emergency Fail-safe: Essential NL Waypoints
-            state.communities = [
-                { name: "Deer Lake", lat: 49.17, lng: -57.43, type: "major" },
-                { name: "Port au Choix", lat: 50.71, lng: -57.35, type: "rest" },
-                { name: "St. Anthony", lat: 51.36, lng: -55.57, type: "major" }
-            ];
+            console.error("WEONG-L3: Dataset Load Error");
         }
     };
 
-    const getForecastVariation = (lat, lng, hour) => {
-        const seed = lat + lng + hour;
-        const skyOptions = ["☀️", "🌤️", "☁️", "❄️"];
-        return {
-            temp: Math.round(-5 + (Math.sin(seed) * 3)),
-            wind: Math.round(35 + (Math.cos(seed) * 15)),
-            sky: skyOptions[Math.abs(Math.floor(seed % 4))]
-        };
+    // 2. Universal Snapping: Snaps a path point to the nearest logical hub
+    const snapToData = (lat, lng) => {
+        return state.communities.reduce((prev, curr) => {
+            const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
+            const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
+            return dCurr < dPrev ? curr : prev;
+        });
     };
 
     async function reAnchor() {
         if (state.isLocked || !window.map || state.communities.length === 0) return;
         
-        const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
-        if (!route) return;
+        const routeLayer = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
+        if (!routeLayer) return;
 
-        const coords = route.feature.geometry.coordinates;
+        const coords = routeLayer.feature.geometry.coordinates;
         const currentKey = `${coords[0][0].toFixed(4)}-${coords.length}`;
         
         if (currentKey === state.anchorKey) return;
@@ -49,35 +44,32 @@ const WeatherIcons = (function() {
         state.anchorKey = currentKey;
         state.layer.clearLayers();
 
-        // FIX: Divide route into 5 guaranteed equidistant segments
-        const samplePoints = [0.10, 0.30, 0.50, 0.70, 0.90];
+        // 3. Dynamic Equidistant Sampling
+        // Divides any route into 5 equal geographic segments
+        const sampleRatios = [0.15, 0.35, 0.55, 0.75, 0.95];
         
-        samplePoints.forEach(pct => {
-            const idx = Math.floor((coords.length - 1) * pct);
-            const [lng, lat] = coords[idx];
+        sampleRatios.forEach(ratio => {
+            const index = Math.floor((coords.length - 1) * ratio);
+            const [lng, lat] = coords[index];
 
-            // Snap to the absolute nearest community in the database
-            const nearest = state.communities.reduce((prev, curr) => {
-                const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
-                const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
-                return dCurr < dPrev ? prev : curr;
-            });
+            // 4. Anchor weather data to the nearest community/rest stop
+            const anchorPoint = snapToData(lat, lng);
+            const variant = getForecastVariation(anchorPoint.lat, anchorPoint.lng, new Date().getHours());
 
-            const variant = getForecastVariation(nearest.lat, nearest.lng, new Date().getHours());
-
-            L.marker([nearest.lat, nearest.lng], {
+            L.marker([anchorPoint.lat, anchorPoint.lng], {
                 icon: L.divIcon({
                     className: 'w-node',
                     html: `
-                        <div class="sync-glow" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:70px; height:62px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 10px #000;">
-                            <span style="font-size:8px; font-weight:bold; width:100%; text-align:center; background:#FFD700; color:#000; text-transform:uppercase;">${nearest.name.split(' ')[0]}</span>
+                        <div class="sync-glow" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:72px; height:64px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000;">
+                            <span style="font-size:8px; font-weight:bold; width:100%; text-align:center; background:#FFD700; color:#000; text-transform:uppercase; white-space:nowrap; overflow:hidden;">${anchorPoint.name}</span>
                             <span style="font-size:18px; margin:2px 0;">${variant.sky}</span>
-                            <div style="display:flex; gap:4px; font-size:11px; font-weight:bold;">
+                            <div style="display:flex; gap:4px; font-size:12px; font-weight:bold;">
                                 <span style="${variant.temp <= 0 ? 'color:#00d4ff' : 'color:#ff4500'}">${variant.temp}°</span>
                                 <span style="color:#fff; font-weight:normal;">${variant.wind}k</span>
                             </div>
                         </div>`
-                })
+                }),
+                zIndexOffset: 50000
             }).addTo(state.layer);
         });
 
