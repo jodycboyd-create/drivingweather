@@ -1,101 +1,106 @@
 /** * Project: [weong-bulletin]
- * Strategy: Event-Driven Lead-Time Sync
- * Logic: Trigger on Route/Speed/Time change ONLY.
- * Status: Diagnostic Final
+ * Logic: Autonomous Map Observer + Lead-Time Grid Matcher
+ * Strategy: Zero-Dependency / Event-Driven
+ * Status: L3 Diagnostic Build [cite: 2025-12-31]
  */
 
 const WeatherEngine = (function() {
     const state = {
         layer: L.layerGroup(),
-        nodes: [0, 0.25, 0.5, 0.75, 1.0],
-        isFetching: false
+        nodes: [0.1, 0.3, 0.5, 0.7, 0.9],
+        isBusy: false,
+        lastRouteKey: ""
     };
 
-    const fetchWeatherForRoute = async () => {
-        if (state.isFetching || !window.map) return;
+    const fetchWeather = async () => {
+        if (state.isBusy || !window.map) return;
         
-        // Locate active route layer
+        // 1. Find Route (GeoJSON or Routing Machine)
         const routeLayer = Object.values(window.map._layers).find(l => 
             l.feature?.geometry?.type === "LineString" || (l._latlngs && l._latlngs.length > 0)
         );
         
         if (!routeLayer) return;
-        state.isFetching = true;
+        
+        // Prevent redundant firing
+        const routeKey = routeLayer._leaflet_id + (window.currentCruisingSpeed || 100);
+        if (state.lastRouteKey === routeKey) return;
+        state.lastRouteKey = routeKey;
 
+        state.isBusy = true;
         const coords = routeLayer.feature ? routeLayer.feature.geometry.coordinates.map(c => [c[1], c[0]]) : routeLayer._latlngs;
         const speed = window.currentCruisingSpeed || 100;
-        const departure = window.currentDepartureTime || new Date();
+        const start = window.currentDepartureTime || new Date();
 
-        // Calculate total distance for temporal mapping
+        // 2. Map Distance
         let totalMeters = 0;
         for (let i = 0; i < coords.length - 1; i++) {
             totalMeters += L.latLng(coords[i]).distanceTo(L.latLng(coords[i+1]));
         }
         const totalKm = totalMeters / 1000;
 
-        const tasks = state.nodes.map(async (pct) => {
+        // 3. Parallel Lead-Time Ingestion
+        const results = await Promise.all(state.nodes.map(async (pct) => {
             const idx = Math.floor((coords.length - 1) * pct);
             const pos = coords[idx];
             const lat = pos.lat || pos[0];
             const lng = pos.lng || pos[1];
 
-            const hoursTraveled = (totalKm * pct) / speed;
-            const arrivalTime = new Date(departure.getTime() + (hoursTraveled * 3600000));
-            const targetHour = arrivalTime.getHours();
+            const eta = new Date(start.getTime() + ((totalKm * pct) / speed * 3600000));
+            const hr = eta.getHours();
 
             try {
-                // Precision Point Fetch - MSC GeoMet
+                // Direct Point Fetch from MSC GeoMet
                 const url = `https://api.weather.gc.ca/met/city/v1/coverage/hrdps/point?lat=${lat}&lon=${lng}&format=json`;
                 const res = await fetch(url);
-                const raw = await res.json();
+                const json = await res.json();
                 
-                // Extract matching temporal index
-                const f = raw.forecasts.find(item => new Date(item.time).getHours() === targetHour) || raw.forecasts[0];
+                // Find matching hour in the HRDPS stack
+                const f = json.forecasts.find(it => new Date(it.time).getHours() === hr) || json.forecasts[0];
 
                 return {
                     pos: [lat, lng],
-                    eta: arrivalTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-                    data: {
-                        t: Math.round(f.temperature),
-                        w: Math.round(f.wind_speed),
-                        v: f.visibility,
-                        s: `https://weather.gc.ca/weathericons/${f.icon_code}.gif`,
-                        c: f.condition
-                    }
+                    eta: eta.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+                    t: Math.round(f.temperature),
+                    w: Math.round(f.wind_speed),
+                    v: f.visibility,
+                    s: `https://weather.gc.ca/weathericons/${f.icon_code || '01'}.gif`,
+                    c: f.condition || "Clear"
                 };
             } catch (e) {
-                // L3 Static Fallback if blocked
-                return { pos: [lat, lng], eta: "--:--", data: { t: "--", w: "--", v: "--", s: "", c: "OFFLINE" } };
+                return { pos: [lat, lng], eta: "--:--", t: "--", w: "--", v: "--", s: "", c: "OFFLINE" };
             }
-        });
+        }));
 
-        const results = await Promise.all(tasks);
         render(results);
-        state.isFetching = false;
+        state.isBusy = false;
     };
 
-    const render = (results) => {
+    const render = (data) => {
         state.layer.clearLayers();
         let tableHtml = "";
 
-        results.forEach((r, i) => {
-            L.marker(r.pos, {
+        data.forEach((d, i) => {
+            // Place Map Markers
+            L.marker(d.pos, {
                 icon: L.divIcon({
-                    className: 'w-node',
-                    html: `<div style="background:rgba(15,15,15,0.9); border:1px solid #FFD700; border-radius:8px; width:45px; height:45px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                        <img src="${r.data.s}" style="width:20px; height:20px;" onerror="this.style.opacity=0">
-                        <span style="color:#fff; font-size:10px; font-weight:bold;">${r.data.t}°</span>
-                    </div>`
+                    className: 'weong-icon',
+                    html: `<div style="background:rgba(10,10,10,0.9); border:2px solid #FFD700; border-radius:10px; width:50px; height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 0 15px #000;">
+                        <img src="${d.s}" style="width:22px; height:22px;">
+                        <span style="color:#fff; font-size:11px; font-weight:bold;">${d.t}°</span>
+                    </div>`,
+                    iconSize: [50, 50], iconAnchor: [25, 25]
                 })
             }).addTo(state.layer);
 
-            tableHtml += `<tr style="border-bottom:1px solid rgba(255,215,0,0.15);">
-                <td style="padding:10px 0;">NODE ${i+1}</td>
-                <td style="opacity:0.6;">${r.eta}</td>
-                <td style="color:#FFD700; font-weight:bold;">${r.data.t}°C</td>
-                <td>${r.data.w} km/h</td>
-                <td>${r.data.v} km</td>
-                <td style="font-size:10px;">${r.data.c}</td>
+            // Populate Table Rows
+            tableHtml += `<tr style="border-bottom:1px solid rgba(255,215,0,0.2);">
+                <td style="padding:10px 5px; font-weight:bold;">PT ${i+1}</td>
+                <td style="padding:10px 5px; opacity:0.7;">${d.eta}</td>
+                <td style="padding:10px 5px; color:#FFD700; font-weight:bold;">${d.t}°C</td>
+                <td style="padding:10px 5px;">${d.w} km/h</td>
+                <td style="padding:10px 5px;">${d.v} km</td>
+                <td style="padding:10px 5px; font-size:10px;">${d.c}</td>
             </tr>`;
         });
 
@@ -103,24 +108,31 @@ const WeatherEngine = (function() {
         if (body) body.innerHTML = tableHtml;
     };
 
-    return {
-        init: function(routingControl) {
-            state.layer.addTo(window.map);
-            
-            // Listen for Route Generation
-            if (routingControl) {
-                routingControl.on('routesfound', fetchWeatherForRoute);
-                routingControl.on('waypointschanged', fetchWeatherForRoute);
-            }
+    const initUI = () => {
+        if (document.getElementById('weong-hud')) return;
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="weong-hud" style="position:fixed; top:20px; left:20px; z-index:99999; font-family:monospace; background:rgba(0,0,0,0.9); border:1px solid #FFD700; width:500px; padding:15px; color:#fff; border-radius:12px; box-shadow: 0 0 30px #000;">
+                <div style="color:#FFD700; font-weight:bold; border-bottom:1px solid #FFD700; padding-bottom:10px; margin-bottom:10px; display:flex; justify-content:space-between;">
+                    <span>WEONG HRDPS MATRIX [L3]</span>
+                    <span id="weong-status" style="font-size:9px; opacity:0.5;">AUTONOMOUS</span>
+                </div>
+                <table style="width:100%; text-align:left; font-size:11px; border-collapse:collapse;">
+                    <thead><tr style="color:#FFD700; opacity:0.6;"><th>NODE</th><th>ETA</th><th>TMP</th><th>WIND</th><th>VIS</th><th>SKY</th></tr></thead>
+                    <tbody id="weong-table-body"></tbody>
+                </table>
+            </div>`);
+    };
 
-            // Listen for Manual Triggers (Speed/Time)
-            window.addEventListener('weong-sync', fetchWeatherForRoute);
-            
-            // Initial Load
-            fetchWeatherForRoute();
+    return {
+        start: function() {
+            initUI();
+            state.layer.addTo(window.map);
+            // Passive Observer: Checks for route changes every 3 seconds without polling API
+            setInterval(fetchWeather, 3000);
         }
     };
 })();
 
-// Integration
-WeatherEngine.init(window.control);
+// AUTO-BOOTSTRAP
+if (window.map) WeatherEngine.start();
+else window.addEventListener('load', WeatherEngine.start);
