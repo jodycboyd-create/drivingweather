@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin] + [weong-route]
  * Methodology: L3 Stealth-Sync Unified Engine
- * Status: Absolute Path Hardening + Shared State
+ * Status: Absolute Path Hardening + Shared State [cite: 2025-12-30]
  */
 
 const WeatherEngine = (function() {
@@ -16,17 +16,30 @@ const WeatherEngine = (function() {
 
     const init = async () => {
         try {
-            // Hardened to absolute path to bypass directory confusion
-            const host = window.location.origin;
-            const res = await fetch(`${host}/data/nl/communities.json`);
+            // Updated to the Newfoundland Deep Dive path
+            const res = await fetch('/data/nl/communities.json');
             if (!res.ok) throw new Error("404");
-            state.communities = await res.json();
+            const rawData = await res.json();
+            
+            // Map GeoJSON structure to engine state
+            state.communities = rawData.features.map(f => ({
+                name: f.properties.name,
+                lat: f.geometry.coordinates[1],
+                lng: f.geometry.coordinates[0]
+            }));
+            
             console.log(`System: NL Dataset Active (${state.communities.length} nodes)`);
         } catch (e) {
-            console.warn("WEONG-L3: Network 404. Falling back to Gander.");
-            state.communities = [{ name: "Gander", lat: 48.95, lng: -54.61 }];
+            console.warn("WEONG-L3: Network 404. Falling back to Gander Baseline.");
+            // Hardened fallback to prevent UI freeze
+            state.communities = [
+                { name: "Gander", lat: 48.9578, lng: -54.6122 },
+                { name: "St. John's", lat: 47.5615, lng: -52.7126 },
+                { name: "Corner Brook", lat: 48.9515, lng: -57.9482 }
+            ];
         }
         initUI();
+        state.layer.addTo(window.map);
         setInterval(syncCycle, 1000);
     };
 
@@ -78,6 +91,7 @@ const WeatherEngine = (function() {
 
     const syncCycle = async () => {
         if (state.isLocked || !window.map || state.communities.length === 0) return;
+        
         const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
         if (!route) return;
 
@@ -93,11 +107,14 @@ const WeatherEngine = (function() {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
             const arrival = new Date(depTime.getTime() + (pct * 8) * 3600000);
+            
+            // Logic Fixed: returns the closest community instead of the furthest
             const community = state.communities.reduce((prev, curr) => {
                 const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
                 const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
-                return dCurr < dPrev ? prev : curr;
+                return dCurr < dPrev ? curr : prev;
             });
+
             return {
                 ...community,
                 eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
@@ -125,5 +142,28 @@ const WeatherEngine = (function() {
                             </div>
                         </div>`,
                     iconSize: [75, 65]
-                }),
-                zIndexOffset:
+                })
+            }).addTo(state.layer);
+        });
+    };
+
+    const renderTable = () => {
+        const container = document.getElementById('bulletin-rows');
+        if (!container) return;
+        container.innerHTML = state.activeWaypoints.map(wp => `
+            <tr style="border-bottom:1px solid #222;">
+                <td style="padding:8px 5px;">${wp.name}</td>
+                <td style="padding:8px 5px;">${wp.eta}</td>
+                <td style="padding:8px 5px; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
+                <td style="padding:8px 5px;">${wp.variant.wind} km/h</td>
+                <td style="padding:8px 5px;">${wp.variant.vis} km</td>
+                <td style="padding:8px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
+            </tr>
+        `).join('');
+    };
+
+    return { init };
+})();
+
+// Initialize on load
+WeatherEngine.init();
