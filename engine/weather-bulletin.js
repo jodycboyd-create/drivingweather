@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
- * Methodology: [weong-route] L3 Recovery + Geometry Watcher
- * Status: Finalizing NL Dataset Accuracy [cite: 2025-12-26, 2025-12-30]
+ * Methodology: [weong-route] Mutation-Level Sync
+ * Status: Proxy-Bypass + High-Precision Sticky Icons [cite: 2023-12-23, 2025-12-30]
  */
 
 const WeatherBulletin = (function() {
@@ -9,14 +9,18 @@ const WeatherBulletin = (function() {
         anchorKey: null,
         isLocked: false,
         config: {
-            // Using more reliable proxy endpoints [cite: 2025-12-30]
-            proxies: ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?"],
+            // Added a new "Emergency" proxy channel [cite: 2025-12-30]
+            proxies: [
+                "https://api.allorigins.win/raw?url=",
+                "https://corsproxy.io/?",
+                "https://api.codetabs.com/v1/proxy?quest="
+            ],
             eccc: "https://geo.weather.gc.ca/geomet",
             nodes: [0.15, 0.45, 0.75, 0.92]
         }
     };
 
-    const sanitize = (val, fallback = 0) => {
+    const sanitize = (val, fallback) => {
         const num = parseFloat(val);
         return isNaN(num) ? fallback : num;
     };
@@ -24,27 +28,27 @@ const WeatherBulletin = (function() {
     async function fetchWEONG(url, attempt = 0) {
         if (attempt >= state.config.proxies.length) return null;
         try {
-            // Short timeout to force rapid proxy rotation [cite: 2025-12-30]
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 2000);
-            const res = await fetch(state.config.proxies[attempt] + encodeURIComponent(url), { signal: controller.signal });
-            clearTimeout(id);
+            const res = await fetch(state.config.proxies[attempt] + encodeURIComponent(url), { 
+                signal: AbortSignal.timeout(1800) 
+            });
             const d = await res.json();
-            return d.contents ? JSON.parse(d.contents).features[0].properties : d.features[0].properties;
+            const p = d.contents ? JSON.parse(d.contents).features[0].properties : d.features[0].properties;
+            return p;
         } catch (e) { return fetchWEONG(url, attempt + 1); }
     }
 
-    async function updateHUD() {
+    async function reAnchor() {
         if (state.isLocked || !window.map) return;
 
         const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
-        const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
-        if (!route) return;
+        if (!route || !route._parts || route._parts.length === 0) return;
 
+        const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
         const coords = route.feature.geometry.coordinates;
-        // Watch every 10th coordinate for movement to ensure icons follow pins [cite: 2025-12-30]
-        const geoHash = coords.filter((_, i) => i % 10 === 0).map(c => c[0].toFixed(3)).join('|');
-        const currentKey = `${geoHash}-${depTime.getHours()}`;
+        
+        // NEW: Precision Fingerprint tracks the first and last coord exactly [cite: 2025-12-30]
+        const geoFingerprint = `${coords[0][0]},${coords[0][1]}|${coords[coords.length-1][0]}`;
+        const currentKey = `${geoFingerprint}-${depTime.getTime()}`;
 
         if (currentKey === state.anchorKey) return;
         state.isLocked = true;
@@ -57,50 +61,40 @@ const WeatherBulletin = (function() {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
             
-            // WEONG Lead Time logic [cite: 2025-12-30]
             const forecastTime = new Date(depTime.getTime() + (pct * 8) * 3600000);
             const timeISO = forecastTime.toISOString().substring(0, 13) + ":00:00Z";
 
             const marker = L.marker([lat, lng], {
                 icon: L.divIcon({
                     className: 'w-node',
-                    html: `<div class="sync-glow" style="background:#000; border:2px solid #FFD700; border-radius:4px; width:56px; height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000;">
-                            <span style="font-size:14px; line-height:1;">☁️</span>
-                            <span class="t-val" style="font-size:13px; font-weight:bold; font-family:monospace; margin-top:1px;">...</span>
-                            <span class="w-val" style="font-size:10px; font-family:monospace; color:#aaa; margin-top:-2px;">--</span>
+                    html: `<div class="sync-glow" style="background:rgba(0,0,0,0.9); border:2px solid #FFD700; border-radius:4px; width:56px; height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700; box-shadow:0 0 15px #000; backdrop-filter:blur(2px);">
+                            <span style="font-size:14px;">☁️</span>
+                            <span class="t-val" style="font-size:13px; font-weight:bold; font-family:monospace;">...</span>
+                            <span class="w-val" style="font-size:10px; font-family:monospace; color:#00d4ff;">--</span>
                            </div>`,
                     iconSize: [56, 56]
                 }),
-                zIndexOffset: 35000 
+                zIndexOffset: 40000 // Priority over all UI elements [cite: 2025-12-30]
             }).addTo(state.layer);
 
-            // Detailed Query for Temp and Wind [cite: 2025-12-26]
             const query = `?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo&LAYERS=HRDPS.CONTINENTAL_TT,HRDPS.CONTINENTAL_UU&QUERY_LAYERS=HRDPS.CONTINENTAL_TT,HRDPS.CONTINENTAL_UU&BBOX=${lat-0.01},${lng-0.01},${lat+0.01},${lng+0.01}&INFO_FORMAT=application/json&I=50&J=50&WIDTH=101&HEIGHT=101&CRS=EPSG:4326&TIME=${timeISO}`;
             
             const data = await fetchWEONG(state.config.eccc + query);
             const el = marker.getElement();
             if (el) {
                 const box = el.querySelector('.sync-glow');
-                const tLabel = box.querySelector('.t-val');
-                const wLabel = box.querySelector('.w-val');
-                
-                if (data) {
-                    const temp = sanitize(data['HRDPS.CONTINENTAL_TT'], -2);
-                    const wind = sanitize(data['HRDPS.CONTINENTAL_UU'], 0);
-                    tLabel.innerText = `${Math.round(temp)}°`;
-                    tLabel.style.color = temp <= 0 ? "#00d4ff" : "#FFD700";
-                    wLabel.innerText = `${Math.round(wind)}k`;
-                    box.style.borderStyle = "solid"; // Confirms LIVE data [cite: 2025-12-30]
-                } else {
-                    // Failover model [cite: 2025-12-30]
-                    tLabel.innerText = "-2°";
-                    wLabel.innerText = "OFF"; 
-                    box.style.borderStyle = "dashed";
-                }
+                const temp = sanitize(data ? data['HRDPS.CONTINENTAL_TT'] : null, -2);
+                const wind = sanitize(data ? data['HRDPS.CONTINENTAL_UU'] : null, null);
+
+                box.querySelector('.t-val').innerText = `${Math.round(temp)}°`;
+                // If wind exists, display it; otherwise show "OFF" diagnostic [cite: 2025-12-30]
+                box.querySelector('.w-val').innerText = wind !== null ? `${Math.round(wind)}k` : "OFF";
+                if (!data) box.style.borderStyle = "dashed";
             }
         });
         state.isLocked = false;
     }
 
-    setInterval(updateHUD, 300); // 300ms for high-responsiveness [cite: 2025-12-30]
+    // High-frequency polling to match pin drag speed [cite: 2025-12-30]
+    setInterval(reAnchor, 200);
 })();
