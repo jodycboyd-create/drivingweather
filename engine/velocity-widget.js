@@ -1,18 +1,20 @@
 /** * Project: [weong-route] + [weong-bulletin]
- * Status: L3 Redesign (Unified Overlay Style)
- * Logic: Direct DOM Injection with Handshake Links
+ * Build: L3_FINAL_SYNC_001_REDESIGN
+ * Purpose: Global Navigation Controller & Weather Engine Trigger
  */
 
 const VelocityWidget = {
-    // Core state for the Level 3 Handshake
+    // 1. STATE INITIALIZATION
     state: {
-        currentSpeed: 100,
+        baseSpeed: 100,
+        offset: 0,
         departureTime: new Date()
     },
 
+    // 2. ENTRY POINT
     init: function() {
         console.log("SYSTEM: Velocity Engine Initializing...");
-        // Wait for body to be stable
+        // Ensuring DOM readiness for injection
         if (document.body) {
             this.createUI();
         } else {
@@ -20,13 +22,14 @@ const VelocityWidget = {
         }
     },
 
+    // 3. UI INJECTION (Matches Tabular Forecast Theme)
     createUI: function() {
         if (document.getElementById('velocity-widget-container')) return;
 
         const widget = document.createElement('div');
         widget.id = 'velocity-widget-container';
         
-        // Styled to match your "DETAILED TABULAR FORECAST" UI
+        // Hardened CSS for Absolute Map Overlay
         widget.style.cssText = `
             position: absolute;
             bottom: 20px;
@@ -37,30 +40,32 @@ const VelocityWidget = {
             color: #FFD700;
             padding: 10px;
             font-family: 'Arial Black', sans-serif;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            min-width: 180px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            min-width: 190px;
+            pointer-events: auto;
         `;
 
         widget.innerHTML = `
-            <div style="font-size: 10px; border-bottom: 1px solid #FFD700; margin-bottom: 5px;">VELOCITY CONTROL</div>
-            <div id="v-display-speed" style="font-size: 20px; text-align: center;">100 KM/H</div>
-            <div id="v-display-time" style="font-size: 12px; text-align: center; color: #fff; margin-bottom: 10px;">--:--</div>
+            <div style="font-size: 10px; border-bottom: 1px solid #FFD700; margin-bottom: 5px; letter-spacing: 1px;">VELOCITY CONTROL</div>
+            <div id="v-display-speed" style="font-size: 24px; text-align: center; font-weight: bold;">100 KM/H</div>
+            <div id="v-display-time" style="font-size: 14px; text-align: center; color: #fff; margin-bottom: 10px;">--:--</div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                <button onclick="VelocityWidget.updateSpeed(-10)" style="background:#222; color:#FFD700; border:1px solid #FFD700; cursor:pointer;">SPD -</button>
-                <button onclick="VelocityWidget.updateSpeed(10)" style="background:#222; color:#FFD700; border:1px solid #FFD700; cursor:pointer;">SPD +</button>
-                <button onclick="VelocityWidget.updateTime(-15)" style="background:#222; color:#FFD700; border:1px solid #FFD700; cursor:pointer;">TIME -</button>
-                <button onclick="VelocityWidget.updateTime(15)" style="background:#222; color:#FFD700; border:1px solid #FFD700; cursor:pointer;">TIME +</button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <button onclick="VelocityWidget.updateSpeed(-10)" style="background:#222; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding: 5px; font-weight: bold;">SPD -</button>
+                <button onclick="VelocityWidget.updateSpeed(10)" style="background:#222; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding: 5px; font-weight: bold;">SPD +</button>
+                <button onclick="VelocityWidget.updateTime(-15)" style="background:#222; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding: 5px; font-weight: bold;">TIME -</button>
+                <button onclick="VelocityWidget.updateTime(15)" style="background:#222; color:#FFD700; border:1px solid #FFD700; cursor:pointer; padding: 5px; font-weight: bold;">TIME +</button>
             </div>
         `;
 
         document.body.appendChild(widget);
         this.render();
-        console.log("SYSTEM: Velocity UI Rendered");
+        console.log("SYSTEM: Velocity UI Rendered and Handshake Active.");
     },
 
+    // 4. CONTROL LOGIC
     updateSpeed: function(delta) {
-        this.state.currentSpeed = Math.max(10, this.state.currentSpeed + delta);
+        this.state.offset += delta;
         this.render();
     },
 
@@ -69,24 +74,26 @@ const VelocityWidget = {
         this.render();
     },
 
+    // 5. THE RENDER & HANDSHAKE TRIGGER
     render: function() {
+        const speed = this.state.baseSpeed + this.state.offset;
         const speedEl = document.getElementById('v-display-speed');
         const timeEl = document.getElementById('v-display-time');
         
-        if (speedEl) speedEl.innerText = `${this.state.currentSpeed} KM/H`;
+        if (speedEl) speedEl.innerText = `${speed} KM/H`;
         if (timeEl) timeEl.innerText = this.state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        // CRITICAL HANDSHAKE: Update Global Variables for Weather Engine
-        window.currentCruisingSpeed = this.state.currentSpeed;
+        // EXPORT TO GLOBALS FOR ENGINES
+        window.currentCruisingSpeed = speed;
         window.currentDepartureTime = this.state.departureTime;
         
-        // Trigger Weather Engine Sync if available
+        // TRIGGER WEATHER ENGINE RECALCULATION
         if (window.WeatherEngine && typeof window.WeatherEngine.syncCycle === 'function') {
             window.WeatherEngine.syncCycle();
         }
     }
 };
 
-// Expose to window so onclick handlers can find it
+// 6. GLOBAL EXPOSURE (Required for onclick handlers in modules)
 window.VelocityWidget = VelocityWidget;
 VelocityWidget.init();
