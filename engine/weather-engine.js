@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
- * Methodology: L3 Stealth-Sync Unified Engine + Geometric Anchoring
- * Status: Absolute Path Hardening + Pin-Move Detection
+ * Methodology: L3 Stealth-Sync Unified Engine + Metric Suppression
+ * Status: Absolute Path Hardening + UI Cleanup
  */
 
 const WeatherEngine = (function() {
@@ -39,10 +39,21 @@ const WeatherEngine = (function() {
         initUI();
         state.layer.addTo(window.map);
         
-        // Remove native route metrics flag
+        // --- ROUTE METRIC SUPPRESSION ---
         const styleTag = document.createElement('style');
-        styleTag.innerHTML = `.leaflet-routing-container, .leaflet-routing-alt { display: none !important; }`;
+        styleTag.innerHTML = `
+            .leaflet-routing-container, 
+            .leaflet-routing-alt, 
+            .leaflet-routing-geocoder,
+            .leaflet-routing-error { 
+                display: none !important; 
+                visibility: hidden !important; 
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+        `;
         document.head.appendChild(styleTag);
+        // --------------------------------------------------------
 
         setInterval(syncCycle, 1000);
     };
@@ -179,21 +190,4 @@ const WeatherEngine = (function() {
         if (!container) return;
         container.innerHTML = state.activeWaypoints.map(wp => `
             <tr style="border-bottom:1px solid #222;">
-                <td style="padding:8px 5px;">${wp.name}</td>
-                <td style="padding:8px 5px;">${wp.eta}</td>
-                <td style="padding:8px 5px; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
-                <td style="padding:8px 5px;">${wp.variant.wind} km/h</td>
-                <td style="padding:8px 5px;">${wp.variant.vis} km</td>
-                <td style="padding:8px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
-            </tr>
-        `).join('');
-    };
-
-    return { 
-        init,
-        syncCycle: () => syncCycle(true) 
-    };
-})();
-
-window.WeatherEngine = WeatherEngine;
-WeatherEngine.init();
+                <td style="
