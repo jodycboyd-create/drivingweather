@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
- * Methodology: L3 Stealth-Sync Unified Engine + Metric Suppression
- * Status: Absolute Path Hardening + UI Cleanup [cite: 2025-12-31]
+ * Methodology: L3 Stealth-Sync Unified Engine + Mission Data Export
+ * Status: Metric Suppression + Clipboard Integration [cite: 2025-12-31]
  */
 
 const WeatherEngine = (function() {
@@ -53,9 +53,32 @@ const WeatherEngine = (function() {
             }
         `;
         document.head.appendChild(styleTag);
-        // --------------------------------------------------------
 
         setInterval(syncCycle, 1000);
+    };
+
+    const copyToClipboard = () => {
+        if (state.activeWaypoints.length === 0) return;
+        
+        const header = "NL ROUTE WEATHER MATRIX - " + new Date().toLocaleDateString() + "\n";
+        const subHeader = "COMMUNITY | ETA | TEMP | WIND | VIS | SKY\n" + "-".repeat(50) + "\n";
+        
+        const rows = state.activeWaypoints.map(wp => 
+            `${wp.name.padEnd(20)} | ${wp.eta} | ${wp.variant.temp}°C | ${wp.variant.wind}km/h | ${wp.variant.vis}km | ${wp.variant.skyLabel}`
+        ).join('\n');
+
+        const fullText = header + subHeader + rows;
+        
+        navigator.clipboard.writeText(fullText).then(() => {
+            const btn = document.getElementById('btn-copy-bulletin');
+            const originalText = btn.innerText;
+            btn.innerText = "COPIED!";
+            btn.style.background = "#fff";
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.background = "#FFD700";
+            }, 2000);
+        });
     };
 
     const getForecastVariation = (lat, lng, arrivalTime) => {
@@ -108,6 +131,8 @@ const WeatherEngine = (function() {
             state.isOpen = !state.isOpen;
             document.getElementById('bulletin-modal').style.display = state.isOpen ? 'block' : 'none';
         };
+
+        document.getElementById('btn-copy-bulletin').onclick = copyToClipboard;
     };
 
     const syncCycle = async (forceUpdate = false) => {
@@ -120,14 +145,12 @@ const WeatherEngine = (function() {
         const currentSpeed = window.currentCruisingSpeed || 100;
         const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
 
-        // 1. PRECISION DISTANCE CALCULATION [cite: 2025-12-31]
         let totalKm = 0;
         for (let i = 0; i < coords.length - 1; i++) {
             totalKm += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0])) / 1000;
         }
         window.currentRouteDistance = totalKm;
 
-        // 2. GEOMETRIC ANCHOR: Detects coordinate count and physical distance change [cite: 2025-12-31]
         const currentKey = `${coords[0][0].toFixed(4)}-${totalKm.toFixed(2)}-${currentSpeed}-${depTime.getTime()}`;
         if (currentKey === state.anchorKey && !forceUpdate) return;
 
@@ -157,7 +180,6 @@ const WeatherEngine = (function() {
         renderIcons();
         renderTable();
 
-        // 3. WIDGET HANDSHAKE: Update Velocity Widget numbers [cite: 2025-12-31]
         if (window.VelocityWidget && typeof window.VelocityWidget.render === 'function') {
             window.VelocityWidget.render();
         }
