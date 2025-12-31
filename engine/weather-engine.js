@@ -1,7 +1,6 @@
 /** * Project: [weong-bulletin]
- * Methodology: Proactive Global Data Discovery (Zero Config)
- * Status: Mechanical Data Pipe - Auto-Connect [cite: 2025-12-31]
- * Logic: Scan all window variables -> Match hour -> Display.
+ * Methodology: Simple 1:1 HRDPS Data Ingestor
+ * Status: Restoration - L3 Alignment [cite: 2025-12-31]
  */
 
 const WeatherEngine = (function() {
@@ -19,68 +18,61 @@ const WeatherEngine = (function() {
         nodes: [0.15, 0.35, 0.55, 0.75, 0.95]
     };
 
-    /**
-     * AUTO-DISCOVERY ENGINE
-     * Scans the window object for any variable containing forecast data.
-     */
-    const findDataInGlobalNamespace = (hour) => {
-        const potentialKeys = ['weongForecastData', 'hrdpsData', 'weongHRDPS', 'forecast', 'weatherData'];
-        
-        for (let key of potentialKeys) {
-            if (window[key] && window[key][hour]) return window[key][hour];
-        }
-
-        // Deep Scan: Look for any object that has a numeric key matching our hour
-        for (let key in window) {
-            if (typeof window[key] === 'object' && window[key] !== null && window[key][hour]) {
-                if (window[key][hour].temp !== undefined) return window[key][hour];
+    // PURE FETCH: Loads external HRDPS data into the global window
+    const fetchHrdpsData = async () => {
+        try {
+            // Update this path to your actual HRDPS JSON source
+            const response = await fetch('/data/weong-hrps-current.json');
+            if (response.ok) {
+                window.weongForecastData = await response.json();
+                console.log("WEONG: HRDPS Data Ingested Successfully.");
             }
+        } catch (e) {
+            console.error("WEONG: Fetch failed. Check data source path.");
         }
-        return null;
     };
 
-    const syncCycle = async (force = false) => {
-        if (state.isLocked || !window.map) return;
+    const getGridValue = (arrivalTime) => {
+        const hour = arrivalTime.getHours();
+        const data = window.weongForecastData;
         
-        const routeLayer = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
-        if (!routeLayer) return;
+        if (data && data[hour]) {
+            return {
+                temp: data[hour].temp ?? "--",
+                wind: data[hour].wind ?? "--",
+                vis:  data[hour].vis ?? "--",
+                sky:  data[hour].icon || "☁️",
+                label: data[hour].condition || "HRDPS"
+            };
+        }
+        return { temp: "--", wind: "--", vis: "--", sky: "❓", label: "NO DATA" };
+    };
 
-        const coords = routeLayer.feature.geometry.coordinates;
+    const syncCycle = async () => {
+        if (state.isLocked || !window.map) return;
+        const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
+        if (!route) return;
+
+        const coords = route.feature.geometry.coordinates;
         const speed = window.currentCruisingSpeed || 100;
-        const startTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
+        const start = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
 
         let totalKm = 0;
         for (let i = 0; i < coords.length - 1; i++) {
             totalKm += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0])) / 1000;
         }
 
-        const currentKey = `${totalKm.toFixed(2)}-${speed}-${startTime.getTime()}`;
-        if (currentKey === state.anchorKey && !force) return;
-
         state.isLocked = true;
-        state.anchorKey = currentKey;
-
         const waypoints = state.nodes.map(pct => {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
-            const eta = new Date(startTime.getTime() + ((totalKm * pct) / speed * 3600000));
-            
+            const eta = new Date(start.getTime() + ((totalKm * pct) / speed * 3600000));
             const anchor = state.communities.reduce((prev, curr) => 
                 Math.hypot(lat - curr.lat, lng - curr.lng) < Math.hypot(lat - prev.lat, lng - prev.lng) ? curr : prev
             );
+            const weather = getGridValue(eta);
 
-            const raw = findDataInGlobalNamespace(eta.getHours());
-
-            return {
-                name: anchor.name,
-                lat, lng,
-                eta: eta.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                temp: raw ? `${raw.temp}°C` : "--°C",
-                wind: raw ? `${raw.wind} km/h` : "-- km/h",
-                vis:  raw ? `${raw.vis} km` : "-- km",
-                sky:  raw ? (raw.icon || "☁️") : "❓",
-                label: raw ? (raw.condition || "HRDPS") : "FETCHING..."
-            };
+            return { name: anchor.name, lat, lng, eta: eta.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), ...weather };
         });
 
         render(waypoints);
@@ -96,7 +88,7 @@ const WeatherEngine = (function() {
                     html: `<div style="background:rgba(0,0,0,0.85); border:1px solid #FFD700; border-radius:12px; width:65px; height:65px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff;">
                         <div style="font-size:7px; background:#FFD700; color:#000; width:100%; text-align:center; position:absolute; top:0; border-radius:11px 11px 0 0;">${wp.name}</div>
                         <span style="font-size:22px; margin-top:5px;">${wp.sky}</span>
-                        <span style="font-size:14px; font-weight:bold;">${wp.temp}</span>
+                        <span style="font-size:14px; font-weight:bold;">${wp.temp}${wp.temp !== "--" ? '°' : ''}</span>
                     </div>`,
                     iconSize: [65, 65], iconAnchor: [32, 32]
                 })
@@ -111,30 +103,14 @@ const WeatherEngine = (function() {
                 <td style="padding:10px 5px;">${wp.sky} ${wp.label}</td>
             </tr>`;
         });
-
-        const tableBody = document.getElementById('bulletin-rows');
-        if (tableBody) tableBody.innerHTML = rows.join('');
+        const target = document.getElementById('bulletin-rows');
+        if (target) target.innerHTML = rows.join('');
     };
 
     const init = () => {
-        const style = document.createElement('style');
-        style.innerHTML = `.leaflet-routing-container { display: none !important; }`;
-        document.head.appendChild(style);
-
-        if(!document.getElementById('bulletin-widget')) {
-            document.body.insertAdjacentHTML('beforeend', `
-                <div id="bulletin-widget" style="position:fixed; top:20px; left:20px; z-index:9999; font-family:monospace;">
-                    <button onclick="const m=document.getElementById('bulletin-modal'); m.style.display=m.style.display==='none'?'block':'none'" style="background:#000; color:#FFD700; border:1px solid #FFD700; padding:8px 15px; cursor:pointer; border-radius:5px;">WEONG HUD</button>
-                    <div id="bulletin-modal" style="display:none; margin-top:10px; background:rgba(10,10,10,0.95); border:1px solid #FFD700; width:550px; padding:15px; color:#fff; border-radius:10px; box-shadow:0 0 30px #000;">
-                        <table style="width:100%; text-align:left; font-size:11px;">
-                            <thead><tr style="color:#FFD700;"><th>Waypoint</th><th>ETA</th><th>TMP</th><th>WND</th><th>VIS</th><th>SKY</th></tr></thead>
-                            <tbody id="bulletin-rows"></tbody>
-                        </table>
-                    </div>
-                </div>`);
-        }
+        fetchHrdpsData(); // Trigger the fetch immediately
         state.layer.addTo(window.map);
-        setInterval(syncCycle, 1000);
+        setInterval(syncCycle, 2000);
     };
 
     return { init };
