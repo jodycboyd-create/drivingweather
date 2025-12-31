@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
  * Methodology: L3 Stealth-Sync Unified Engine + Metric Suppression
- * Status: Absolute Path Hardening + UI Cleanup
+ * Status: Absolute Path Hardening + UI Cleanup [cite: 2025-12-31]
  */
 
 const WeatherEngine = (function() {
@@ -120,14 +120,14 @@ const WeatherEngine = (function() {
         const currentSpeed = window.currentCruisingSpeed || 100;
         const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
 
-        // 1. PRECISION DISTANCE CALCULATION
+        // 1. PRECISION DISTANCE CALCULATION [cite: 2025-12-31]
         let totalKm = 0;
         for (let i = 0; i < coords.length - 1; i++) {
             totalKm += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0])) / 1000;
         }
         window.currentRouteDistance = totalKm;
 
-        // 2. GEOMETRIC ANCHOR: Detects coordinate count and physical distance change
+        // 2. GEOMETRIC ANCHOR: Detects coordinate count and physical distance change [cite: 2025-12-31]
         const currentKey = `${coords[0][0].toFixed(4)}-${totalKm.toFixed(2)}-${currentSpeed}-${depTime.getTime()}`;
         if (currentKey === state.anchorKey && !forceUpdate) return;
 
@@ -157,7 +157,7 @@ const WeatherEngine = (function() {
         renderIcons();
         renderTable();
 
-        // 3. WIDGET HANDSHAKE: Update Velocity Widget numbers
+        // 3. WIDGET HANDSHAKE: Update Velocity Widget numbers [cite: 2025-12-31]
         if (window.VelocityWidget && typeof window.VelocityWidget.render === 'function') {
             window.VelocityWidget.render();
         }
@@ -190,4 +190,21 @@ const WeatherEngine = (function() {
         if (!container) return;
         container.innerHTML = state.activeWaypoints.map(wp => `
             <tr style="border-bottom:1px solid #222;">
-                <td style="
+                <td style="padding:8px 5px;">${wp.name}</td>
+                <td style="padding:8px 5px;">${wp.eta}</td>
+                <td style="padding:8px 5px; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
+                <td style="padding:8px 5px;">${wp.variant.wind} km/h</td>
+                <td style="padding:8px 5px;">${wp.variant.vis} km</td>
+                <td style="padding:8px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
+            </tr>
+        `).join('');
+    };
+
+    return { 
+        init,
+        syncCycle: () => syncCycle(true) 
+    };
+})();
+
+window.WeatherEngine = WeatherEngine;
+WeatherEngine.init();
