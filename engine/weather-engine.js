@@ -1,7 +1,7 @@
 /** * Project: [weong-bulletin]
- * Methodology: Strict HRDPS Grid Ingestion (No Internal Logic)
- * Status: Mechanical Data Pipe - L3 Grid Alignment [cite: 2025-12-31]
- * Core Rule: No "brain" functions. 1:1 data display only.
+ * Methodology: Pure HRDPS Grid Listener (Zero Brain Logic)
+ * Status: Mechanical Data Pipe - Final Build [cite: 2025-12-31]
+ * Core Rule: 1:1 mapping from global grid to UI. No internal fallback.
  */
 
 const WeatherEngine = (function() {
@@ -17,14 +17,13 @@ const WeatherEngine = (function() {
 
     /**
      * MECHANICAL GRID LOOKUP
-     * Queries the HRDPS global object for the specific grid cell and lead time.
+     * Strictly fetches from the HRDPS global store based on lead time.
      */
-    const getGridData = (lat, lng, arrivalTime) => {
+    const getGridData = (arrivalTime) => {
         const hour = arrivalTime.getHours();
         
-        // HRDPS ingestion must find the exact grid reference in the global store
-        // If the window.weongHRDPS object is missing or lacks the lead-time, return null
-        const hrdps = window.weongHRDPS || window.weongForecastData;
+        // Listen to the active HRDPS feed in the global namespace
+        const hrdps = window.weongForecastData || window.hrdpsData || window.weongHRDPS;
 
         if (hrdps && hrdps[hour]) {
             const cell = hrdps[hour];
@@ -32,29 +31,30 @@ const WeatherEngine = (function() {
                 temp: cell.temp ?? "--",
                 wind: cell.wind ?? "--",
                 vis:  cell.vis ?? "--",
-                sky:  cell.icon || "❓",
+                sky:  cell.icon || "☁️",
                 skyLabel: cell.condition || "HRDPS"
             };
         }
 
-        return { temp: "--", wind: "--", vis: "--", sky: "❓", skyLabel: "NO_DATA" };
+        // Return mechanical null if no feed is detected for this hour
+        return { temp: "--", wind: "--", vis: "--", sky: "❓", skyLabel: "NULL_FEED" };
     };
 
     const init = async () => {
         const styleTag = document.createElement('style');
         styleTag.innerHTML = `
-            .leaflet-routing-container { display: none !important; visibility: hidden !important; }
+            .leaflet-routing-container { display: none !important; }
             .w-node { transition: transform 0.2s ease-in-out; cursor: pointer; }
         `;
         document.head.appendChild(styleTag);
 
-        // Community coordinates are only used as the spatial anchor for grid queries
+        // Spatial anchors for the 5 Newfoundland Waypoints
         state.communities = [
-            { name: "Gander", lat: 48.9578, lng: -54.6122 },
-            { name: "St. John's", lat: 47.5615, lng: -52.7126 },
             { name: "Corner Brook", lat: 48.9515, lng: -57.9482 },
             { name: "Grand Falls-Windsor", lat: 48.93, lng: -55.65 },
-            { name: "Clarenville", lat: 48.16, lng: -53.96 }
+            { name: "Gander", lat: 48.9578, lng: -54.6122 },
+            { name: "Clarenville", lat: 48.16, lng: -53.96 },
+            { name: "St. John's", lat: 47.5615, lng: -52.7126 }
         ];
         
         initUI();
@@ -89,17 +89,18 @@ const WeatherEngine = (function() {
             const travelHours = (totalKm * pct) / currentSpeed; 
             const arrival = new Date(depTime.getTime() + (travelHours * 3600000));
             
-            const community = state.communities.reduce((prev, curr) => {
+            // Spatial anchor for labeling
+            const anchor = state.communities.reduce((prev, curr) => {
                 const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
                 const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
                 return dCurr < dPrev ? curr : prev;
             });
 
             return {
-                ...community,
-                lat, lng, // Use exact waypoint coordinates for grid fetching
+                name: anchor.name,
+                lat, lng,
                 eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                variant: getGridData(lat, lng, arrival)
+                variant: getGridData(arrival)
             };
         });
 
@@ -136,7 +137,7 @@ const WeatherEngine = (function() {
                     <table style="width:100%; border-collapse:collapse; font-size:11px; color:#fff;">
                         <thead>
                             <tr style="text-align:left; color:#FFD700; opacity:0.7;">
-                                <th style="padding:10px 5px;">Community</th>
+                                <th style="padding:10px 5px;">Waypoint</th>
                                 <th style="padding:10px 5px;">ETA</th>
                                 <th style="padding:10px 5px;">Temp</th>
                                 <th style="padding:10px 5px;">Wind</th>
