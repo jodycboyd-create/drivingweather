@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
- * Logic: Floating Top-Right nglass HUD + Day/Time/Now Controls
- * Status: UX Finalized [cite: 2025-12-31]
+ * Logic: Floating nglass HUD - Balanced Mission Metrics
+ * Status: UX Real-Estate Optimization [cite: 2025-12-31]
  */
 
 const VelocityWidget = {
@@ -23,27 +23,27 @@ const VelocityWidget = {
 
         const widget = document.createElement('div');
         widget.id = 'velocity-widget-container';
-        // Repositioned to Top-Right with nglass styling
         widget.style.cssText = `
             position: fixed; top: 20px; right: 20px; z-index: 10000;
             background: rgba(15, 15, 15, 0.75); backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 215, 0, 0.25); color: #FFD700;
             padding: 12px; font-family: 'Segoe UI', sans-serif;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 16px;
-            width: 460px; display: flex; gap: 12px; align-items: stretch;
+            width: 480px; display: flex; gap: 12px; align-items: stretch;
         `;
 
         widget.innerHTML = `
-            <div style="flex: 1.4; border-right: 1px solid rgba(255,215,0,0.1); padding-right: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <span style="font-size: 9px; opacity: 0.6; letter-spacing: 1px;">DEPARTURE</span>
-                    <button onclick="VelocityWidget.syncNow()" style="background:#FFD700; color:#000; border:none; border-radius:3px; font-size:8px; font-weight:bold; padding:1px 5px; cursor:pointer;">NOW</button>
+            <div style="flex: 1.2; border-right: 1px solid rgba(255,215,0,0.1); padding-right: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-size: 9px; opacity: 0.6; letter-spacing: 1px;">DEPARTURE</span>
+                        <button onclick="VelocityWidget.syncNow()" style="background:#FFD700; color:#000; border:none; border-radius:3px; font-size:8px; font-weight:bold; padding:1px 5px; cursor:pointer;">NOW</button>
+                    </div>
+                    <div id="m-dep-time" style="font-size: 22px; color: #fff; font-weight: bold; line-height: 1;">--:--</div>
+                    <div id="v-day-display" style="font-size: 11px; color: #FFD700; margin-top: 4px; font-weight: bold;">Dec 31</div>
                 </div>
                 
-                <div id="m-dep-time" style="font-size: 20px; color: #fff; font-weight: bold; line-height: 1;">--:--</div>
-                <div id="v-day-display" style="font-size: 11px; color: #FFD700; margin: 4px 0 8px 0; font-weight: bold;">Dec 31</div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px;">
                     <div style="display: flex; flex-direction: column; gap: 2px;">
                         <span style="font-size: 7px; opacity: 0.5; text-align: center;">DAY</span>
                         <div style="display: flex; gap: 2px;">
@@ -61,25 +61,23 @@ const VelocityWidget = {
                 </div>
             </div>
 
-            <div style="flex: 1.5; border-right: 1px solid rgba(255,215,0,0.1); padding-right: 10px;">
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <div>
-                        <span style="font-size: 8px; color: #00CCFF; opacity: 0.8; letter-spacing: 0.5px;">EST. ARRIVAL</span>
-                        <div id="m-arr-time" style="font-size: 18px; color: #00CCFF; font-weight: bold;">--:--</div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <span style="font-size: 9px; opacity: 0.6;">DIST:</span>
-                        <span id="m-travel-dist" style="font-size: 12px; color: #fff; font-weight: bold;">0.0 KM</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <span style="font-size: 9px; opacity: 0.6;">DUR:</span>
-                        <span id="m-travel-dur" style="font-size: 14px; color: #FFD700; font-weight: bold;">0H 0M</span>
-                    </div>
+            <div style="flex: 1.8; border-right: 1px solid rgba(255,215,0,0.1); padding-right: 10px; display: flex; flex-direction: column; justify-content: center; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 10px; opacity: 0.7; font-weight: bold;">EST. ARRIVAL:</span>
+                    <span id="m-arr-time" style="font-size: 18px; color: #00CCFF; font-weight: bold;">--:--</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 10px; opacity: 0.7; font-weight: bold;">TOTAL DIST:</span>
+                    <span id="m-travel-dist" style="font-size: 18px; color: #FFFFFF; font-weight: bold;">0.0 KM</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 10px; opacity: 0.7; font-weight: bold;">MISSION DUR:</span>
+                    <span id="m-travel-dur" style="font-size: 18px; color: #FFD700; font-weight: bold;">0H 0M</span>
                 </div>
             </div>
 
-            <div style="flex: 1; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
-                <div style="font-size: 9px; opacity: 0.6; letter-spacing: 0.5px;">SPEED ADJ</div>
+            <div style="flex: 0.8; text-align: center; display: flex; flex-direction: column; justify-content: center; gap: 8px;">
+                <div style="font-size: 9px; opacity: 0.6; letter-spacing: 0.5px;">SPD ADJ</div>
                 <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
                     <button onclick="VelocityWidget.updateSpeed(-5)" style="background:none; color:#FFD700; border:1px solid rgba(255,215,0,0.4); border-radius:50%; width:22px; height:22px; cursor:pointer; font-weight:bold; font-size:12px;">-</button>
                     <div id="v-speed-off" style="font-size: 20px; color:#fff; font-weight:bold;">+0</div>
