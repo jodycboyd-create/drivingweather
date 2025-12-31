@@ -1,46 +1,34 @@
 /** * Project: [weong-route] + [weong-bulletin]
- * Logic: L3_FINAL_SYNC_001 (Reverted to Working Baseline)
+ * Logic: L3_FINAL_SYNC_001 (Path-Corrected)
+ * Path: /engine/
  */
 var manifestData = {
     "manifest_version": 3,
-    "name": "WEonG Unified Engine",
     "version": "L3_FINAL_SYNC_001",
-    "description": "Integrated Velocity, Route, and ECCC Weather Engine for NL",
-    "engine_config": {
-        "priority": "Level 3",
-        "lock_point": "2025-12-31"
-    },
     "content_scripts": [
         {
-            "matches": ["<all_urls>"],
             "js": [
-                "route-engine.js",
-                "velocity-widget.js",
-                "weather-engine.js"
-            ],
-            "run_at": "document_end"
-        }
-    ],
-    "web_accessible_resources": [
-        {
-            "resources": ["data/nl/communities.json"],
-            "matches": ["<all_urls>"]
+                "engine/route-engine.js",
+                "engine/velocity-widget.js",
+                "engine/weather-engine.js"
+            ]
         }
     ]
 };
 
-// Auto-bootloader trigger for index.html integration
 (function() {
-    console.log(`%c SYSTEM: INITIALIZING UNIFIED ENGINE (${manifestData.version}) `, 'background: #000; color: #FFD700; font-weight: bold;');
+    console.log(`%c SYSTEM: INITIALIZING UNIFIED ENGINE `, 'background: #000; color: #FFD700; font-weight: bold;');
     
     const scripts = manifestData.content_scripts[0].js;
     
     scripts.forEach(file => {
         const s = document.createElement('script');
-        s.src = file + "?v=" + manifestData.version;
-        s.async = false; // Preserves execution order to prevent handshake failure
+        // This ensures the browser looks in the /engine/ folder
+        s.src = "./" + file + "?v=" + manifestData.version;
+        s.async = false; 
         document.head.appendChild(s);
         
-        s.onload = () => console.log(`%c Success: /engine/${file} ready. `, 'color: #00ff00;');
+        s.onload = () => console.log(`%c Success: ${file} loaded.`, 'color: #00ff00;');
+        s.onerror = () => console.error(`%c Failed: ${file} NOT FOUND. Check /engine/ folder.`, 'color: #ff0000;');
     });
 })();
