@@ -1,7 +1,7 @@
 /** * Project: [weong-bulletin]
- * Methodology: Pure HRDPS Grid Listener (Zero Brain Logic)
- * Status: Mechanical Data Pipe - Final Build [cite: 2025-12-31]
- * Core Rule: 1:1 mapping from global grid to UI. No internal fallback.
+ * Methodology: Reactive HRDPS Grid Mapping
+ * Status: Mechanical Data Pipe - RESTORED
+ * Logic: Wait for data -> Map 1:1 -> Display. No brain.
  */
 
 const WeatherEngine = (function() {
@@ -10,169 +10,149 @@ const WeatherEngine = (function() {
         anchorKey: null,
         isLocked: false,
         isOpen: false,
-        communities: [],
-        activeWaypoints: [],
-        nodes: [0.15, 0.35, 0.55, 0.75, 0.95]
-    };
-
-    /**
-     * MECHANICAL GRID LOOKUP
-     * Strictly fetches from the HRDPS global store based on lead time.
-     */
-    const getGridData = (arrivalTime) => {
-        const hour = arrivalTime.getHours();
-        
-        // Listen to the active HRDPS feed in the global namespace
-        const hrdps = window.weongForecastData || window.hrdpsData || window.weongHRDPS;
-
-        if (hrdps && hrdps[hour]) {
-            const cell = hrdps[hour];
-            return {
-                temp: cell.temp ?? "--",
-                wind: cell.wind ?? "--",
-                vis:  cell.vis ?? "--",
-                sky:  cell.icon || "☁️",
-                skyLabel: cell.condition || "HRDPS"
-            };
-        }
-
-        // Return mechanical null if no feed is detected for this hour
-        return { temp: "--", wind: "--", vis: "--", sky: "❓", skyLabel: "NULL_FEED" };
-    };
-
-    const init = async () => {
-        const styleTag = document.createElement('style');
-        styleTag.innerHTML = `
-            .leaflet-routing-container { display: none !important; }
-            .w-node { transition: transform 0.2s ease-in-out; cursor: pointer; }
-        `;
-        document.head.appendChild(styleTag);
-
-        // Spatial anchors for the 5 Newfoundland Waypoints
-        state.communities = [
+        communities: [
             { name: "Corner Brook", lat: 48.9515, lng: -57.9482 },
             { name: "Grand Falls-Windsor", lat: 48.93, lng: -55.65 },
             { name: "Gander", lat: 48.9578, lng: -54.6122 },
             { name: "Clarenville", lat: 48.16, lng: -53.96 },
             { name: "St. John's", lat: 47.5615, lng: -52.7126 }
-        ];
-        
-        initUI();
-        state.layer.addTo(window.map);
-        setInterval(syncCycle, 1000);
+        ],
+        activeWaypoints: [],
+        nodes: [0.15, 0.35, 0.55, 0.75, 0.95]
     };
 
-    const syncCycle = async (forceUpdate = false) => {
-        if (state.isLocked || !window.map || state.communities.length === 0) return;
+    // PURE MECHANICAL FETCH
+    const getHrdpsGridValue = (arrivalTime) => {
+        const hour = arrivalTime.getHours();
+        // The core data anchor we are looking for
+        const feed = window.weongForecastData || window.hrdpsData || window.weongHRDPS;
+
+        if (feed && feed[hour]) {
+            const cell = feed[hour];
+            return {
+                temp: cell.temp ?? "--",
+                wind: cell.wind ?? "--",
+                vis:  cell.vis ?? "--",
+                sky:  cell.icon || "❓",
+                label: cell.condition || "HRDPS"
+            };
+        }
+        return null; // Return null to signal "no data yet"
+    };
+
+    const syncCycle = async (force = false) => {
+        if (state.isLocked || !window.map) return;
         
-        const route = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
-        if (!route) return;
+        const routeLayer = Object.values(window.map._layers).find(l => l.feature?.geometry?.type === "LineString");
+        if (!routeLayer) return;
 
-        const coords = route.feature.geometry.coordinates;
-        const currentSpeed = window.currentCruisingSpeed || 100;
-        const depTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
+        const coords = routeLayer.feature.geometry.coordinates;
+        const speed = window.currentCruisingSpeed || 100;
+        const startTime = window.currentDepartureTime instanceof Date ? window.currentDepartureTime : new Date();
 
+        // Calculate Route Distance for ETA mapping
         let totalKm = 0;
         for (let i = 0; i < coords.length - 1; i++) {
             totalKm += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0])) / 1000;
         }
 
-        const currentKey = `${totalKm.toFixed(2)}-${currentSpeed}-${depTime.getTime()}`;
-        if (currentKey === state.anchorKey && !forceUpdate) return;
+        const currentKey = `${totalKm.toFixed(2)}-${speed}-${startTime.getTime()}`;
+        if (currentKey === state.anchorKey && !force) return;
 
         state.isLocked = true;
         state.anchorKey = currentKey;
-        
+
         state.activeWaypoints = state.nodes.map(pct => {
             const idx = Math.floor((coords.length - 1) * pct);
             const [lng, lat] = coords[idx];
-            const travelHours = (totalKm * pct) / currentSpeed; 
-            const arrival = new Date(depTime.getTime() + (travelHours * 3600000));
+            const travelHours = (totalKm * pct) / speed; 
+            const eta = new Date(startTime.getTime() + (travelHours * 3600000));
             
-            // Spatial anchor for labeling
             const anchor = state.communities.reduce((prev, curr) => {
-                const dPrev = Math.hypot(lat - prev.lat, lng - prev.lng);
-                const dCurr = Math.hypot(lat - curr.lat, lng - curr.lng);
-                return dCurr < dPrev ? curr : prev;
+                return Math.hypot(lat - curr.lat, lng - curr.lng) < Math.hypot(lat - prev.lat, lng - prev.lng) ? curr : prev;
             });
+
+            const gridData = getHrdpsGridValue(eta);
 
             return {
                 name: anchor.name,
                 lat, lng,
-                eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                variant: getGridData(arrival)
+                timeLabel: eta.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                data: gridData || { temp: "--", wind: "--", vis: "--", sky: "❓", label: "WAITING..." }
             };
         });
 
-        renderIcons();
-        renderTable();
+        render();
         state.isLocked = false;
     };
 
-    const renderIcons = () => {
+    const render = () => {
         state.layer.clearLayers();
+        const rows = [];
+
         state.activeWaypoints.forEach(wp => {
-            const tempVal = typeof wp.variant.temp === 'number' ? `${wp.variant.temp}°` : wp.variant.temp;
+            // Map Marker
             L.marker([wp.lat, wp.lng], {
                 icon: L.divIcon({
                     className: 'w-node',
                     html: `
-                    <div style="background:rgba(20,20,20,0.85); backdrop-filter:blur(8px); border:1px solid rgba(255,215,0,0.3); border-radius:15px; width:70px; height:70px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; box-shadow:0 10px 25px rgba(0,0,0,0.4);">
-                        <div style="font-size:8px; font-weight:bold; background:rgba(255,215,0,0.8); color:#000; width:100%; text-align:center; position:absolute; top:0; border-radius:14px 14px 0 0; padding:2px 0;">${wp.name.split(' ')[0]}</div>
-                        <span style="font-size:22px; margin-top:8px;">${wp.variant.sky}</span>
-                        <span style="font-size:14px; font-weight:bold;">${tempVal}</span>
+                    <div style="background:rgba(10,10,10,0.9); border:1px solid rgba(255,215,0,0.4); border-radius:12px; width:65px; height:65px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; box-shadow:0 8px 20px rgba(0,0,0,0.6);">
+                        <div style="font-size:7px; font-weight:bold; background:#FFD700; color:#000; width:100%; text-align:center; position:absolute; top:0; border-radius:11px 11px 0 0; padding:1px 0;">${wp.name.split(' ')[0]}</div>
+                        <span style="font-size:20px; margin-top:5px;">${wp.data.sky}</span>
+                        <span style="font-size:13px; font-weight:bold;">${wp.data.temp}${wp.data.temp !== "--" ? '°' : ''}</span>
                     </div>`,
-                    iconSize: [70, 70],
-                    iconAnchor: [35, 35]
+                    iconSize: [65, 65],
+                    iconAnchor: [32, 32]
                 })
             }).addTo(state.layer);
+
+            // Table Row
+            rows.push(`
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:10px 5px;">${wp.name}</td>
+                    <td style="padding:10px 5px; opacity:0.6;">${wp.timeLabel}</td>
+                    <td style="padding:10px 5px; font-weight:bold; color:#FFD700;">${wp.data.temp}°C</td>
+                    <td style="padding:10px 5px;">${wp.data.wind} km/h</td>
+                    <td style="padding:10px 5px;">${wp.data.vis} km</td>
+                    <td style="padding:10px 5px;">${wp.data.sky} ${wp.data.label}</td>
+                </tr>
+            `);
         });
-    };
 
-    const initUI = () => {
-        const widgetHTML = `
-            <div id="bulletin-widget" style="position:fixed; top:20px; left:20px; z-index:70000; font-family:sans-serif;">
-                <button id="btn-open-bulletin" style="background:rgba(0,0,0,0.8); backdrop-filter:blur(10px); color:#FFD700; border:1px solid rgba(255,215,0,0.3); padding:10px 20px; cursor:pointer; font-weight:bold; border-radius:12px; font-size:12px;">TABULAR FORECAST</button>
-                <div id="bulletin-modal" style="display:none; margin-top:10px; background:rgba(15,15,15,0.95); backdrop-filter:blur(15px); border:1px solid rgba(255,215,0,0.2); width:600px; padding:20px; color:#FFD700; border-radius:20px;">
-                    <table style="width:100%; border-collapse:collapse; font-size:11px; color:#fff;">
-                        <thead>
-                            <tr style="text-align:left; color:#FFD700; opacity:0.7;">
-                                <th style="padding:10px 5px;">Waypoint</th>
-                                <th style="padding:10px 5px;">ETA</th>
-                                <th style="padding:10px 5px;">Temp</th>
-                                <th style="padding:10px 5px;">Wind</th>
-                                <th style="padding:10px 5px;">Vis</th>
-                                <th style="padding:10px 5px;">Sky</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bulletin-rows"></tbody>
-                    </table>
-                </div>
-            </div>`;
-        if(!document.getElementById('bulletin-widget')) document.body.insertAdjacentHTML('beforeend', widgetHTML);
-        document.getElementById('btn-open-bulletin').onclick = () => {
-            state.isOpen = !state.isOpen;
-            document.getElementById('bulletin-modal').style.display = state.isOpen ? 'block' : 'none';
-        };
-    };
-
-    const renderTable = () => {
         const container = document.getElementById('bulletin-rows');
-        if (!container) return;
-        container.innerHTML = state.activeWaypoints.map(wp => `
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                <td style="padding:12px 5px;">${wp.name}</td>
-                <td style="padding:12px 5px;">${wp.eta}</td>
-                <td style="padding:12px 5px; font-weight:bold;">${wp.variant.temp}${typeof wp.variant.temp === 'number' ? '°C' : ''}</td>
-                <td style="padding:12px 5px;">${wp.variant.wind} ${typeof wp.variant.wind === 'number' ? 'km/h' : ''}</td>
-                <td style="padding:12px 5px;">${wp.variant.vis} ${typeof wp.variant.vis === 'number' ? 'km' : ''}</td>
-                <td style="padding:12px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
-            </tr>
-        `).join('');
+        if (container) container.innerHTML = rows.join('');
     };
 
-    return { init, syncCycle: () => syncCycle(true) };
+    const init = () => {
+        const style = document.createElement('style');
+        style.innerHTML = `.leaflet-routing-container { display: none !important; }`;
+        document.head.appendChild(style);
+
+        // UI Initialization
+        if(!document.getElementById('bulletin-widget')) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="bulletin-widget" style="position:fixed; top:20px; left:20px; z-index:9999; font-family:monospace;">
+                    <button onclick="document.getElementById('bulletin-modal').style.display='block'" style="background:#000; color:#FFD700; border:1px solid #FFD700; padding:8px 15px; cursor:pointer; font-weight:bold; border-radius:5px;">WEONG HUD</button>
+                    <div id="bulletin-modal" style="display:none; margin-top:10px; background:rgba(0,0,0,0.9); border:1px solid #FFD700; width:550px; padding:15px; color:#fff; border-radius:10px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <span style="color:#FFD700;">HRDPS WEONG GRID FEED [L3]</span>
+                            <button onclick="document.getElementById('bulletin-modal').style.display='none'" style="background:none; border:none; color:#FFD700; cursor:pointer;">[X]</button>
+                        </div>
+                        <table style="width:100%; text-align:left; font-size:11px;">
+                            <thead><tr style="color:#FFD700; opacity:0.7;"><th>Waypoint</th><th>ETA</th><th>TMP</th><th>WND</th><th>VIS</th><th>SKY</th></tr></thead>
+                            <tbody id="bulletin-rows"></tbody>
+                        </table>
+                    </div>
+                </div>`);
+        }
+
+        state.layer.addTo(window.map);
+        setInterval(syncCycle, 1500); // Check every 1.5s for route/data changes
+    };
+
+    return { init };
 })();
 
-window.WeatherEngine = WeatherEngine;
-WeatherEngine.init();
+// AUTO-START
+if (window.map) WeatherEngine.init();
+else window.addEventListener('load', () => WeatherEngine.init());
