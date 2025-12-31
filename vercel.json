@@ -1,23 +1,4 @@
 {
-  "version": 2,
-  "name": "weong-bulletin-l3",
   "cleanUrls": true,
-  "builds": [
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "engine/*.js", "use": "@vercel/static" },
-    { "src": "data/nl/communities.json", "use": "@vercel/static" }
-  ],
-  "routes": [
-    {
-      "src": "/data/communities.json",
-      "dest": "/data/nl/communities.json"
-    },
-    {
-      "src": "/engine/(.*)",
-      "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" },
-      "continue": true
-    },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+  "trailingSlash": false
 }
