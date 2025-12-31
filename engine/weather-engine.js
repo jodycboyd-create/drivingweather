@@ -33,8 +33,16 @@ const WeatherEngine = (function() {
                 lng: f.geometry.coordinates[0]
             }));
         } catch (e) { console.error("Data Load Failed."); }
+        
         initUI();
         state.layer.addTo(window.map);
+
+        // --- VELOCITY HANDSHAKE SNIPPET ---
+        window.addEventListener('weong:update', () => {
+            syncCycle(); 
+        });
+        // ----------------------------------
+
         setInterval(syncCycle, 1000);
     };
 
@@ -128,23 +136,4 @@ const WeatherEngine = (function() {
         state.layer.clearLayers();
         let tableHTML = "";
         state.activeWaypoints.forEach(wp => {
-            L.marker([wp.lat, wp.lng], {
-                icon: L.divIcon({
-                    className: 'w-node',
-                    html: `<div style="background:rgba(0,0,0,0.8); border:1px solid #FFD700; width:50px; height:45px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#FFD700;">
-                            <span style="font-size:18px;">${wp.variant.sky}</span>
-                            <span style="font-weight:bold; color:${wp.variant.color}">${wp.variant.temp}°</span>
-                           </div>`,
-                    iconSize: [50, 45]
-                })
-            }).addTo(state.layer);
-
-            tableHTML += `<tr style="border-bottom:1px solid #333;"><td>${wp.name}</td><td>${wp.eta}</td><td style="color:${wp.variant.color}">${wp.variant.temp}°C</td><td>${wp.variant.sky} ${wp.variant.label}</td></tr>`;
-        });
-        document.getElementById('bulletin-rows').innerHTML = tableHTML;
-    };
-
-    return { init };
-})();
-
-WeatherEngine.init();
+            L.marker([wp.lat, wp.lng
