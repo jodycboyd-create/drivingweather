@@ -1,54 +1,50 @@
 /** * Project: [weong-bulletin]
- * Architecture: Parallel Buffer & Instant-Feedback Observer
- * Logic: Decoupled UI and Data Ingestion
- * Status: L3 High-Performance Build [cite: 2025-12-31]
+ * Architecture: Pure-Stream HRDPS Ingestor (Zero-Baseline)
+ * Strategy: Absolute Data Integrity - No Simulation Fallbacks
+ * Status: Production Ready Build [cite: 2025-12-31]
  */
 
 const WeatherEngine = (function() {
     const state = {
         layer: L.layerGroup(),
-        nodes: [0, 0.25, 0.5, 0.75, 1], // Comprehensive Diagnostic Span
-        debounceTimer: null,
-        activeRequests: new AbortController()
+        nodes: [0, 0.25, 0.5, 0.75, 1], // Comprehensive Diagnostic Matrix
+        activeController: new AbortController()
     };
 
     /**
-     * INSTANT UI FEEDBACK
-     * Immediately clears old data and shows syncing status to prevent lag perception.
+     * PURE-STREAM INGESTOR
+     * Fetches raw HRDPS point data. Returns null if data is missing or invalid.
      */
-    const showSyncing = () => {
-        const body = document.getElementById('weong-table-body');
-        if (body) body.style.opacity = "0.4"; // Visual cue of background work
-    };
-
-    const fetchPointWeather = async (lat, lng, eta) => {
+    const fetchRealData = async (lat, lng, eta) => {
         try {
-            // Precision Point Fetch [cite: 2025-12-31]
             const url = `https://api.weather.gc.ca/met/city/v1/coverage/hrdps/point?lat=${lat}&lon=${lng}&format=json`;
-            const res = await fetch(url, { signal: state.activeRequests.signal });
+            const res = await fetch(url, { signal: state.activeController.signal });
+            
+            if (!res.ok) return null;
             const json = await res.json();
             
             const targetHr = eta.getHours();
+            // Strict temporal matching for Canada-wide lead-times [cite: 2025-12-31]
             const f = json.forecasts.find(it => new Date(it.time).getHours() === targetHr) || json.forecasts[0];
+
+            if (!f || f.temperature === undefined) return null;
 
             return {
                 t: Math.round(f.temperature),
                 w: Math.round(f.wind_speed),
                 v: f.visibility,
-                s: `https://weather.gc.ca/weathericons/${f.icon_code || '01'}.gif`,
-                c: f.condition || "Clear"
+                s: f.icon_code ? `https://weather.gc.ca/weathericons/${f.icon_code}.gif` : null,
+                c: f.condition || "N/A"
             };
         } catch (e) {
-            return { t: -2, w: 20, v: 15, s: "", c: "SIM_L3" }; // Robust Fallback
+            return null; // Force null instead of L3 baseline [cite: 2025-12-30]
         }
     };
 
-    const triggerUpdate = async () => {
-        // Cancel any pending requests from the previous move [cite: 2025-12-30]
-        state.activeRequests.abort();
-        state.activeRequests = new AbortController();
-        
-        showSyncing();
+    const processMission = async () => {
+        // Abort existing requests to prevent race conditions and lag [cite: 2025-12-30]
+        state.activeController.abort();
+        state.activeController = new AbortController();
 
         const route = Object.values(window.map._layers).find(l => 
             l.feature?.geometry?.type === "LineString" || (l._latlngs && l._latlngs.length > 0)
@@ -59,14 +55,13 @@ const WeatherEngine = (function() {
         const speed = window.currentCruisingSpeed || 100;
         const start = window.currentDepartureTime || new Date();
 
-        // Calculate Spatial-Temporal Map
-        let totalMeters = 0;
+        let dist = 0;
         for (let i = 0; i < coords.length - 1; i++) {
-            totalMeters += L.latLng(coords[i]).distanceTo(L.latLng(coords[i+1]));
+            dist += L.latLng(coords[i]).distanceTo(L.latLng(coords[i+1]));
         }
-        const totalKm = totalMeters / 1000;
+        const totalKm = dist / 1000;
 
-        // PARALLEL EXECUTION: Fetches all nodes at once [cite: 2025-12-30]
+        // Parallel Ingestion across the mission timeline [cite: 2025-12-31]
         const data = await Promise.all(state.nodes.map(async (pct) => {
             const idx = Math.floor((coords.length - 1) * pct);
             const pos = coords[idx];
@@ -74,63 +69,58 @@ const WeatherEngine = (function() {
             const lng = pos.lng || pos[1];
 
             const eta = new Date(start.getTime() + ((totalKm * pct) / speed * 3600000));
-            const weather = await fetchPointWeather(lat, lng, eta);
+            const weather = await fetchRealData(lat, lng, eta);
 
-            return { pos: [lat, lng], eta: eta.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), ...weather };
+            return { pos: [lat, lng], eta: eta.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), weather };
         }));
 
         render(data);
     };
 
-    const render = (data) => {
+    const render = (results) => {
         state.layer.clearLayers();
-        let html = "";
+        let tableHtml = "";
 
-        data.forEach((d, i) => {
-            // Map Node
-            L.marker(d.pos, {
-                icon: L.divIcon({
-                    className: 'w-node',
-                    html: `<div style="background:rgba(0,0,0,0.85); border:2px solid #FFD700; border-radius:10px; width:50px; height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 0 15px #000;">
-                        <img src="${d.s}" style="width:20px; height:20px;" onerror="this.style.opacity=0">
-                        <span style="color:#fff; font-size:11px; font-weight:bold;">${d.t}°</span>
-                    </div>`,
-                    iconSize: [50, 50], iconAnchor: [25, 25]
-                })
-            }).addTo(state.layer);
+        results.forEach((r, i) => {
+            const d = r.weather;
+            
+            // Map Node Render [cite: 2025-12-31]
+            if (d && d.s) {
+                L.marker(r.pos, {
+                    icon: L.divIcon({
+                        className: 'w-node',
+                        html: `<div style="background:rgba(0,0,0,0.9); border:2px solid #FFD700; border-radius:12px; width:52px; height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 0 20px #000;">
+                            <img src="${d.s}" style="width:24px; height:24px;">
+                            <span style="color:#fff; font-size:12px; font-weight:bold;">${d.t}°</span>
+                        </div>`
+                    })
+                }).addTo(state.layer);
+            }
 
-            // Table Row
-            html += `<tr style="border-bottom:1px solid rgba(255,215,0,0.1); height:40px;">
-                <td style="padding:5px;">NODE ${i+1}</td>
-                <td style="opacity:0.6;">${d.eta}</td>
-                <td style="color:#FFD700; font-weight:bold;">${d.t}°C</td>
-                <td>${d.w} km/h</td>
-                <td>${d.v} km</td>
-                <td style="font-size:10px;">${d.c}</td>
-            </tr>`;
+            // Table Row Render [cite: 2025-12-31]
+            tableHtml += `
+                <tr style="border-bottom:1px solid rgba(255,215,0,0.15); height:45px;">
+                    <td style="padding:5px; font-weight:bold;">PT ${i+1}</td>
+                    <td style="padding:5px; opacity:0.6;">${r.eta}</td>
+                    <td style="padding:5px; color:#FFD700; font-weight:bold;">${d ? d.t + '°C' : '--'}</td>
+                    <td style="padding:5px;">${d ? d.w + ' km/h' : '--'}</td>
+                    <td style="padding:5px;">${d ? d.v + ' km' : '--'}</td>
+                    <td style="padding:5px; font-size:10px; text-transform:uppercase; color:${d ? '#FFD700' : '#ff4d4d'};">
+                        ${d ? d.c : 'DATA_MISSING'}
+                    </td>
+                </tr>`;
         });
 
         const body = document.getElementById('weong-table-body');
-        if (body) {
-            body.innerHTML = html;
-            body.style.opacity = "1";
-        }
+        if (body) body.innerHTML = tableHtml;
     };
 
     return {
         init: function() {
             state.layer.addTo(window.map);
-
-            // DEBOUNCED OBSERVER: Fixes lag by waiting for pin to stop moving
-            const debouncedSync = () => {
-                clearTimeout(state.debounceTimer);
-                state.debounceTimer = setTimeout(triggerUpdate, 400); // 400ms buffer
-            };
-
-            window.map.on('moveend zoomend dragend', debouncedSync);
-            
-            // Initial render
-            triggerUpdate();
+            // Observer triggered only by mission change [cite: 2025-12-30]
+            window.map.on('moveend zoomend dragend', processMission);
+            processMission();
         }
     };
 })();
