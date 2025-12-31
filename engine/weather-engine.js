@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
  * Methodology: L3 Glassmorphism UI + Pure Data Pass-Through
- * Status: Final Professional HUD
+ * Status: Final Professional HUD [cite: 2025-12-31]
  */
 
 const WeatherEngine = (function() {
@@ -166,4 +166,52 @@ const WeatherEngine = (function() {
             });
             return {
                 ...community,
-                eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2
+                eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                variant: getForecastVariation(community.lat, community.lng, arrival)
+            };
+        });
+
+        renderIcons();
+        renderTable();
+        state.isLocked = false;
+    };
+
+    const renderIcons = () => {
+        state.layer.clearLayers();
+        state.activeWaypoints.forEach(wp => {
+            L.marker([wp.lat, wp.lng], {
+                icon: L.divIcon({
+                    className: 'w-node',
+                    html: `
+                    <div style="background:rgba(20,20,20,0.75); backdrop-filter:blur(8px); border:1px solid rgba(255,215,0,0.3); border-radius:15px; width:70px; height:70px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; box-shadow:0 10px 25px rgba(0,0,0,0.4);">
+                        <div style="font-size:8px; font-weight:bold; background:rgba(255,215,0,0.8); color:#000; width:100%; text-align:center; position:absolute; top:0; border-radius:14px 14px 0 0; padding:2px 0;">${wp.name.split(' ')[0]}</div>
+                        <span style="font-size:22px; margin-top:8px;">${wp.variant.sky}</span>
+                        <span style="font-size:14px; font-weight:bold; ${wp.variant.temp <= 0 ? 'color:#00d4ff' : 'color:#ff4500'}">${wp.variant.temp}°</span>
+                    </div>`,
+                    iconSize: [70, 70],
+                    iconAnchor: [35, 35]
+                })
+            }).addTo(state.layer);
+        });
+    };
+
+    const renderTable = () => {
+        const container = document.getElementById('bulletin-rows');
+        if (!container) return;
+        container.innerHTML = state.activeWaypoints.map(wp => `
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                <td style="padding:12px 5px;">${wp.name}</td>
+                <td style="padding:12px 5px; opacity:0.8;">${wp.eta}</td>
+                <td style="padding:12px 5px; font-weight:bold; color:${wp.variant.temp <= 0 ? '#00d4ff' : '#ff4500'}">${wp.variant.temp}°C</td>
+                <td style="padding:12px 5px; opacity:0.8;">${wp.variant.wind} km/h</td>
+                <td style="padding:12px 5px; opacity:0.8;">${wp.variant.vis} km</td>
+                <td style="padding:12px 5px;">${wp.variant.skyLabel} ${wp.variant.sky}</td>
+            </tr>
+        `).join('');
+    };
+
+    return { init, syncCycle: () => syncCycle(true) };
+})();
+
+window.WeatherEngine = WeatherEngine;
+WeatherEngine.init();
