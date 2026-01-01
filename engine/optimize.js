@@ -1,5 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Mission: 1:1 Icon Correlation & Black-Out Initialization
+ * Mission: 1:1 Icon Parity (Engine Integration)
+ * Logic: Pulls exact icon mapping from WeatherEngine.getIcon(code)
  */
 
 (function() {
@@ -30,12 +31,12 @@
                     <div id="time-scale" style="display:flex; margin-bottom:5px; font-weight:bold; border-bottom:1px solid #222;">
                         ${timeLabels}
                     </div>
-                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:28px; background:#000; padding:3px; border:1px solid #444;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center; border:1px solid #111; font-size:14px; transition: 0.2s;"></div>`).join('')}
+                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:32px; background:#000; padding:3px; border:1px solid #444;">
+                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center; border:1px solid #111; transition: 0.2s;"></div>`).join('')}
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">48H PRECIPITATION INDEX</span>
-                        <span id="opt-status" style="color:#00FF00; font-size:9px;">SYNCING...</span>
+                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">PRECIPITATION HAZARD SYNC</span>
+                        <span id="opt-status" style="color:#00FF00; font-size:9px;">SCANNING...</span>
                     </div>
                 </div>`;
             container.children[0].insertAdjacentHTML('afterbegin', html);
@@ -55,7 +56,7 @@
                 const result = await this.checkPrecip(samples, i * 2);
                 this.applyColor(cells[i], result.level, result.code);
             }
-            document.getElementById('opt-status').innerText = "SYSTEM SYNCED";
+            document.getElementById('opt-status').innerText = "1:1 SYNC ACTIVE";
         },
 
         async checkPrecip(points, offset) {
@@ -71,10 +72,11 @@
                     if (idx === -1) return;
                     const code = d.hourly.weather_code[idx];
                     let L = 0;
+                    // STRICT HAZARD MAPPING
                     if (code === 65 || code === 75 || code >= 95) L = 4; // RED
                     else if (code === 63 || code === 73) L = 3; // ORANGE
                     else if (code === 61 || code === 71) L = 2; // YELLOW
-                    else if (code >= 51 && code <= 55) L = 1; // LIME
+                    else if (code >= 51 && code <= 55) L = 1; // LIME (Drizzle)
                     
                     if (L > maxLevel) { maxLevel = L; triggerCode = code; }
                 });
@@ -85,12 +87,12 @@
         applyColor(el, level, code) {
             const neon = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
             el.style.backgroundColor = neon[level];
-            el.style.boxShadow = level > 0 ? `0 0 10px ${neon[level]}77` : 'none';
             
-            // 1:1 Icon Correlation
-            const isSnow = (code >= 71 && code <= 75) || code >= 85;
+            // 1:1 SYSTEM ICON INTEGRATION
             if (level >= 2) {
-                el.innerHTML = isSnow ? "❄️" : "🌧️";
+                // Pulls the same icon asset used in the Matrix
+                const iconPath = window.WeatherEngine ? window.WeatherEngine.getIcon(code) : '';
+                el.innerHTML = `<img src="${iconPath}" style="width:20px; height:20px; filter: drop-shadow(0 0 2px #000);">`;
             } else {
                 el.innerHTML = "";
             }
