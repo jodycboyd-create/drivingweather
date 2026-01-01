@@ -1,5 +1,5 @@
 /** * Project: [weong-route] | MODULE: metro-logic.js
- * Feature: METRo Road Surface Intelligence Table
+ * Feature: High-Contrast UI Overlay for METRo Table
  */
 
 const MetroTable = {
@@ -14,31 +14,51 @@ const MetroTable = {
         const matrix = document.getElementById('matrix-ui');
         if (!matrix || document.getElementById(this.containerId)) return;
 
+        // Container styled for maximum contrast over map layers
         const html = `
-            <div id="${this.containerId}" style="margin-top:20px; border-top: 1px solid #00FFFF; padding-top:10px; font-family:monospace;">
-                <div style="color:#00FFFF; font-size:10px; font-weight:bold; margin-bottom:8px; letter-spacing:1px;">
-                    > METRo ROAD SURFACE INTELLIGENCE (L3 SYNC)
+            <div id="${this.containerId}" style="
+                margin-top: 15px; 
+                background: rgba(5, 5, 5, 0.92); 
+                backdrop-filter: blur(8px);
+                border: 1px solid #333;
+                border-left: 3px solid #00FFFF;
+                padding: 12px; 
+                border-radius: 4px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                font-family: 'Roboto Mono', monospace;
+            ">
+                <div style="
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                    margin-bottom: 10px;
+                    border-bottom: 1px solid #222;
+                    padding-bottom: 5px;
+                ">
+                    <span style="color: #00FFFF; font-size: 11px; font-weight: 900; letter-spacing: 1.5px;">
+                        SYSTEM: METRo SURFACE ANALYTICS
+                    </span>
+                    <span style="color: #444; font-size: 8px;">REFRESH_RATE: 5M</span>
                 </div>
-                <table style="width:100%; border-collapse:collapse; color:#FFF; font-size:9px; text-align:left;">
+                <table style="width: 100%; border-collapse: collapse; color: #FFF; font-size: 10px;">
                     <thead>
-                        <tr style="color:#888; border-bottom:1px solid #333;">
-                            <th style="padding:4px;">HUB</th>
-                            <th>RST</th>
-                            <th>AIR Δ</th>
-                            <th>SURFACE STATE</th>
-                            <th>GRIP</th>
+                        <tr style="color: #666; text-transform: uppercase; font-size: 8px; text-align: left;">
+                            <th style="padding-bottom: 8px;">Waypoint Hub</th>
+                            <th style="padding-bottom: 8px;">RST (Road)</th>
+                            <th style="padding-bottom: 8px;">Δ Air</th>
+                            <th style="padding-bottom: 8px;">Surface Condition</th>
                         </tr>
                     </thead>
                     <tbody id="metro-body">
                         </tbody>
                 </table>
             </div>`;
+        
         matrix.insertAdjacentHTML('beforeend', html);
     },
 
     async updateTable() {
         const body = document.getElementById('metro-body');
-        const hubs = ["Corner Brook", "Grand Falls", "Clarenville", "Whitbourne", "St. John's"];
         const samples = [
             { name: "Corner Brook", lat: 48.95, lng: -57.95, rst: -2.1 },
             { name: "Grand Falls", lat: 48.93, lng: -55.65, rst: -0.5 },
@@ -49,38 +69,34 @@ const MetroTable = {
 
         let rows = "";
         for (const hub of samples) {
-            // Fetch live forecast for the hub
             const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${hub.lat}&longitude=${hub.lng}&current_weather=true&hourly=precipitation`);
             const data = await res.json();
             const airTemp = data.current_weather.temperature;
             const precip = data.hourly.precipitation[0];
             
-            // Determine Road State
-            let state = "DRY";
-            let color = "#888";
-            let grip = "OPTIMAL";
-
+            // Logic for State & Grip
+            let state = "DRY / CLEAR";
+            let stateColor = "#00FF00";
             if (precip > 0) {
-                if (hub.rst > 0.5) { 
-                    state = "WET"; color = "#00BFFF"; grip = "REDUCED";
-                } else if (hub.rst <= 0.5 && hub.rst >= -1.0) {
-                    state = "SLUSH"; color = "#FFFF00"; grip = "POOR";
-                } else {
-                    state = "ICE/SNOW"; color = "#FF0000"; grip = "CRITICAL";
-                }
+                if (hub.rst > 0.5) { state = "WET / SPRAY"; stateColor = "#00BFFF"; }
+                else if (hub.rst <= 0.5 && hub.rst >= -1.0) { state = "SLUSH / HEAVY"; stateColor = "#FFFF00"; }
+                else { state = "ICE / PACKED"; stateColor = "#FF0000"; }
             } else if (hub.rst < 0 && airTemp > 0) {
-                state = "FROST RISK"; color = "#00FFFF"; grip = "CAUTION";
+                state = "FROST POTENTIAL"; stateColor = "#00FFFF";
             }
 
             const delta = (hub.rst - airTemp).toFixed(1);
 
             rows += `
-                <tr style="border-bottom:1px solid #222;">
-                    <td style="padding:6px; color:#00FFFF; font-weight:bold;">${hub.name.toUpperCase()}</td>
-                    <td>${hub.rst.toFixed(1)}°C</td>
-                    <td style="color:${delta < 0 ? '#FF4500' : '#00FF00'}">${delta > 0 ? '+' : ''}${delta}</td>
-                    <td style="color:${color}; font-weight:bold;">${state}</td>
-                    <td style="font-size:8px; opacity:0.8;">${grip}</td>
+                <tr style="border-bottom: 1px solid #1a1a1a; transition: background 0.2s;">
+                    <td style="padding: 8px 0; color: #FFF; font-weight: 500;">${hub.name}</td>
+                    <td style="color: #FFF; font-weight: bold;">${hub.rst.toFixed(1)}°C</td>
+                    <td style="color: ${delta < 0 ? '#FF5555' : '#55FF55'}; font-size: 9px;">
+                        ${delta > 0 ? '+' : ''}${delta}
+                    </td>
+                    <td style="color: ${stateColor}; font-weight: 900; letter-spacing: 0.5px; text-shadow: 1px 1px 2px #000;">
+                        ${state}
+                    </td>
                 </tr>`;
         }
         body.innerHTML = rows;
