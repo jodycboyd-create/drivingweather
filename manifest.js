@@ -6,6 +6,7 @@ var manifestData = {
     "version": "L3_FINAL_SYNC_001",
     "content_scripts": [{
         "js": [
+            "engine/data-transfer.js",
             "engine/route-engine.js",
             "engine/velocity-widget.js",
             "engine/weather-engine.js",
