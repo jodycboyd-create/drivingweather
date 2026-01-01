@@ -1,6 +1,5 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Mission: Black-Init + Day/Date Scale + Dynamic Precipitation Icons
- * Logic: Icons appear ONLY for Level 2 (Yellow) and Level 3 (Orange).
+ * Mission: 1:1 Icon Correlation & Black-Out Initialization
  */
 
 (function() {
@@ -20,7 +19,7 @@
                 const dayStr = d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
                 const hour = d.getHours();
                 const ampm = hour >= 12 ? 'PM' : 'AM';
-                return `<div style="width: calc(100% / 12); text-align:center;">
+                return `<div style="width: calc(100% / 12); text-align:center; border-left:1px solid #333;">
                             <div style="font-size:7px; color:#666;">${dayStr}</div>
                             <div style="font-size:9px; color:#AAA;">${hour % 12 || 12}${ampm}</div>
                         </div>`;
@@ -28,15 +27,15 @@
 
             const html = `
                 <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #FFD700; padding-bottom:15px; font-family:monospace;">
-                    <div id="time-scale" style="display:flex; margin-bottom:5px; font-weight:bold; border-bottom:1px solid #222; padding-bottom:4px;">
+                    <div id="time-scale" style="display:flex; margin-bottom:5px; font-weight:bold; border-bottom:1px solid #222;">
                         ${timeLabels}
                     </div>
                     <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:28px; background:#000; padding:3px; border:1px solid #444;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center; transition: 0.2s; border:1px solid #111; font-size:14px;"></div>`).join('')}
+                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center; border:1px solid #111; font-size:14px; transition: 0.2s;"></div>`).join('')}
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">DEPARTURE HAZARD INDEX</span>
-                        <span id="opt-status" style="color:#AAA; font-size:9px;">INITIALIZING SCAN...</span>
+                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">48H PRECIPITATION INDEX</span>
+                        <span id="opt-status" style="color:#00FF00; font-size:9px;">SYNCING...</span>
                     </div>
                 </div>`;
             container.children[0].insertAdjacentHTML('afterbegin', html);
@@ -54,15 +53,15 @@
 
             for (let i = 0; i < 24; i++) {
                 const result = await this.checkPrecip(samples, i * 2);
-                this.applyColor(cells[i], result.level, result.isSnow);
+                this.applyColor(cells[i], result.level, result.code);
             }
             document.getElementById('opt-status').innerText = "SYSTEM SYNCED";
         },
 
         async checkPrecip(points, offset) {
             const time = new Date(Date.now() + offset * 3600000).toISOString().split(':')[0];
-            let max = 0;
-            let isSnow = false;
+            let maxLevel = 0;
+            let triggerCode = 0;
             try {
                 const res = await Promise.all(points.map(p => 
                     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=weather_code&timezone=auto`).then(r => r.json())
@@ -77,22 +76,20 @@
                     else if (code === 61 || code === 71) L = 2; // YELLOW
                     else if (code >= 51 && code <= 55) L = 1; // LIME
                     
-                    if (L > max) {
-                        max = L;
-                        isSnow = (code >= 71 && code <= 75) || code >= 85;
-                    }
+                    if (L > maxLevel) { maxLevel = L; triggerCode = code; }
                 });
-            } catch (e) { return {level: 0, isSnow: false}; }
-            return {level: max, isSnow: isSnow};
+            } catch (e) { return {level: 0, code: 0}; }
+            return {level: maxLevel, code: triggerCode};
         },
 
-        applyColor(el, level, isSnow) {
+        applyColor(el, level, code) {
             const neon = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
             el.style.backgroundColor = neon[level];
-            el.style.boxShadow = `0 0 10px ${neon[level]}55`;
+            el.style.boxShadow = level > 0 ? `0 0 10px ${neon[level]}77` : 'none';
             
-            // Icon Logic for Yellow (2) and Orange (3)
-            if (level === 2 || level === 3) {
+            // 1:1 Icon Correlation
+            const isSnow = (code >= 71 && code <= 75) || code >= 85;
+            if (level >= 2) {
                 el.innerHTML = isSnow ? "❄️" : "🌧️";
             } else {
                 el.innerHTML = "";
