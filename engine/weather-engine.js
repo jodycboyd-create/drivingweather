@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 052
- * Core Logic: Percentage Samples + Real-Time Registry Snapping
- * Fix: Eliminates hub misplacement by using the nearest actual community.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 053
+ * Core Logic: Explicit Percentage Samples + Direct Registry Snapping
+ * Restoration: Full Patch 013 Methodology with Universal Community Support.
  */
 
 (function() {
@@ -14,7 +14,7 @@
         }
         .glass-header {
             background: #FFD700; color: #000; font-size: 10px; font-weight: 900;
-            text-align: center; padding: 4px 0; text-transform: uppercase; overflow: hidden;
+            text-align: center; padding: 4px 0; text-transform: uppercase;
         }
         .glass-body { display: flex; align-items: center; justify-content: center; padding: 6px; gap: 8px; }
         .glass-temp-val { font-size: 19px; font-weight: 900; color: #FFD700; }
@@ -31,14 +31,14 @@
         };
 
         const getSky = (code) => {
-            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 51:"🌦️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
+            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
             return map[code] || "☁️";
         };
 
         const refresh = async () => {
             if (state.isSyncing || !window.map) return;
 
-            // Load full Newfoundland community dataset if not present
+            // Load community database for universal snapping
             if (state.registry.length === 0) {
                 try {
                     const res = await fetch('/data/nl/communities.json');
@@ -55,12 +55,13 @@
             const dist = window.currentRouteDistance || 0;
             const depTime = window.currentDepartureTime || new Date();
 
-            const signature = `${coords[0].lat}-${coords[coords.length-1].lat}-${speed}-${depTime.getTime()}`;
+            const signature = `${coords[0].lat}-${coords.length}-${speed}-${depTime.getTime()}`;
             if (signature === state.lastSignature) return;
 
             state.isSyncing = true;
             state.lastSignature = signature;
 
+            // Strict Weong-Route Sample Logic (Patch 013)
             const samples = [0, 0.25, 0.5, 0.75, 0.99]; 
             const usedNames = new Set();
 
@@ -69,20 +70,20 @@
                 const p = coords[idx];
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
-                // DYNAMIC SNAPPING: Find the closest community in the entire NL registry
-                let closest = state.registry
+                // Find nearest community for THIS specific segment (Universal Logic)
+                let nearest = state.registry
                     .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
                     .filter(c => !usedNames.has(c.name))
                     .sort((a,b) => a.d - b.d)[0];
                 
-                const label = closest ? closest.name : `K-POS ${Math.round(pct*100)}%`;
-                if (closest) usedNames.add(closest.name);
+                const label = nearest ? nearest.name : `WP-${Math.round(pct*100)}`;
+                if (nearest) usedNames.add(nearest.name);
 
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
                     const data = await res.json();
-                    const timeStr = arrival.toISOString().split(':')[0] + ":00";
-                    const i = Math.max(0, data.hourly.time.findIndex(t => t.startsWith(timeStr.substring(0,13))));
+                    const tStr = arrival.toISOString().split(':')[0] + ":00";
+                    const i = Math.max(0, data.hourly.time.findIndex(t => t.startsWith(tStr.substring(0,13))));
                     
                     return {
                         name: label, lat: p.lat, lng: p.lng, order: idx,
@@ -103,19 +104,15 @@
             state.layer.clearLayers();
             let rows = "";
             data.forEach(d => {
-                // High-clearance anchor [57, 80] to avoid overlapping route markers
                 L.marker([d.lat, d.lng], {
                     icon: L.divIcon({
                         className: '',
                         html: `<div class="glass-node">
                                 <div class="glass-header">${d.name}</div>
-                                <div class="glass-body">
-                                    <span>${d.sky}</span>
-                                    <span class="glass-temp-val">${d.temp}°</span>
-                                </div>
+                                <div class="glass-body"><span>${d.sky}</span><span class="glass-temp-val">${d.temp}°</span></div>
                                 <div class="glass-meta-sub">${d.wind}KMH | ${d.vis}KM</div>
                                </div>`,
-                        iconSize: [115, 70], iconAnchor: [57, 80]
+                        iconSize: [115, 70], iconAnchor: [57, 85]
                     })
                 }).addTo(state.layer);
 
@@ -125,7 +122,7 @@
                     <td style="color:#FFD700; font-weight:bold;">${d.temp}°C</td>
                     <td>${d.wind} KM/H</td>
                     <td>${d.vis} KM</td>
-                    <td style="text-align:right; font-size:14px;">${d.sky}</td>
+                    <td style="text-align:right;">${d.sky}</td>
                 </tr>`;
             });
             const matrixBody = document.getElementById('matrix-body');
