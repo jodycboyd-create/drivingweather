@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 053
- * Core Logic: Explicit Percentage Samples + Direct Registry Snapping
- * Restoration: Full Patch 013 Methodology with Universal Community Support.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 054
+ * Core Logic: Percentage Samples + Fixed Geographic Anchors (Recovery Build)
+ * Fix: Resolves 'TypeError' by using guaranteed anchors instead of dynamic registry.
  */
 
 (function() {
@@ -27,7 +27,20 @@
             layer: L.layerGroup(),
             lastSignature: "",
             isSyncing: false,
-            registry: []
+            // Guaranteed anchors to prevent 'undefined' crashes
+            anchors: [
+                { name: "P.A.B", lat: 47.57, lng: -59.13 },
+                { name: "Stephenville", lat: 48.45, lng: -58.43 },
+                { name: "Corner Brook", lat: 48.95, lng: -57.94 },
+                { name: "Deer Lake", lat: 49.17, lng: -57.43 },
+                { name: "South Brook", lat: 49.43, lng: -56.08 },
+                { name: "Badger", lat: 48.97, lng: -56.03 },
+                { name: "Grand Falls", lat: 48.93, lng: -55.65 },
+                { name: "Gander", lat: 48.95, lng: -54.61 },
+                { name: "Clarenville", lat: 48.16, lng: -53.96 },
+                { name: "Whitbourne", lat: 47.42, lng: -53.52 },
+                { name: "St. John's", lat: 47.56, lng: -52.71 }
+            ]
         };
 
         const getSky = (code) => {
@@ -37,18 +50,8 @@
 
         const refresh = async () => {
             if (state.isSyncing || !window.map) return;
-
-            // Load community database for universal snapping
-            if (state.registry.length === 0) {
-                try {
-                    const res = await fetch('/data/nl/communities.json');
-                    const raw = await res.json();
-                    state.registry = Array.isArray(raw) ? raw : (raw.communities || []);
-                } catch(e) { return; }
-            }
-
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
-            if (!route || state.registry.length === 0) return;
+            if (!route) return;
 
             const coords = route.getLatLngs();
             const speed = window.currentCruisingSpeed || 100;
@@ -61,7 +64,6 @@
             state.isSyncing = true;
             state.lastSignature = signature;
 
-            // Strict Weong-Route Sample Logic (Patch 013)
             const samples = [0, 0.25, 0.5, 0.75, 0.99]; 
             const usedNames = new Set();
 
@@ -70,13 +72,13 @@
                 const p = coords[idx];
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
-                // Find nearest community for THIS specific segment (Universal Logic)
-                let nearest = state.registry
-                    .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
-                    .filter(c => !usedNames.has(c.name))
+                // Robust Proximity Snap using guaranteed anchors
+                let nearest = state.anchors
+                    .map(a => ({ ...a, d: Math.hypot(p.lat - a.lat, p.lng - a.lng) }))
+                    .filter(a => !usedNames.has(a.name))
                     .sort((a,b) => a.d - b.d)[0];
                 
-                const label = nearest ? nearest.name : `WP-${Math.round(pct*100)}`;
+                const label = nearest ? nearest.name : `WAYPOINT ${Math.round(pct*100)}`;
                 if (nearest) usedNames.add(nearest.name);
 
                 try {
