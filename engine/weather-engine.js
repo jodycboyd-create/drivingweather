@@ -1,11 +1,24 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 030
- * Fix: Centralized Loading Status + Absolute Name Snapping
- * Logic: Name = Registry Primary | Weather = Route GPS Truth
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 032
+ * Status: Full Restoration + Instant Central Sync + Absolute Name Snap
+ * UI: Zebra-Stripe Matrix + Glassmorph Nodes + Central Loader
  */
 
 (function() {
     const style = document.createElement('style');
     style.innerHTML = `
+        /* Central Sync Overlay */
+        #central-sync-overlay {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 99999; background: rgba(0,0,0,0.95); padding: 25px;
+            border: 2px solid #FFD700; border-radius: 12px; width: 320px;
+            text-align: center; display: none; pointer-events: none;
+            box-shadow: 0 0 60px rgba(0,0,0,1);
+        }
+        .sync-text { color: #FFD700; font-size: 11px; font-weight: 900; letter-spacing: 3px; margin-bottom: 12px; }
+        .sync-bar-full { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+        #sync-progress-bar { width: 0%; height: 100%; background: #FFD700; transition: width 0.1s ease; }
+
+        /* Map Nodes */
         .glass-node {
             background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 215, 0, 0.5); border-radius: 8px;
@@ -20,22 +33,13 @@
         .glass-body { display: flex; align-items: center; justify-content: space-evenly; padding: 8px 2px; }
         .glass-temp-val { font-size: 18px; font-weight: 900; color: #FFD700; }
         
-        #central-sync-overlay {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            z-index: 20000; background: rgba(0,0,0,0.9); padding: 20px;
-            border: 1px solid #FFD700; border-radius: 10px; width: 300px;
-            text-align: center; display: none; pointer-events: none;
-            box-shadow: 0 0 50px rgba(0,0,0,1);
-        }
-        .sync-text { color: #FFD700; font-size: 10px; font-weight: 900; letter-spacing: 2px; margin-bottom: 10px; }
-        .sync-bar-full { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-        #sync-progress-bar { width: 0%; height: 100%; background: #FFD700; transition: width 0.2s ease; }
-
+        /* Mission Matrix */
         #matrix-ui-container {
             position: fixed; bottom: 25px; left: 25px; z-index: 10000;
             background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 215, 0, 0.5); border-radius: 12px;
             width: 620px; padding: 20px; pointer-events: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.9);
         }
         .matrix-table { width: 100%; color: #fff; font-size: 11px; text-align: left; border-collapse: collapse; }
         .matrix-table tr:nth-child(even) { background: rgba(255,255,255,0.05); }
@@ -60,7 +64,7 @@
         };
 
         const getSkyText = (code) => {
-            const map = { 0:"CLEAR", 1:"P.CLOUDY", 2:"M.CLOUDY", 3:"OVC", 45:"FOG", 61:"RAIN", 71:"SNOW", 95:"TSORM" };
+            const map = { 0:"CLEAR", 1:"P.CLOUDY", 2:"M.CLOUDY", 3:"OVC", 45:"FOG", 61:"RAIN", 71:"SNOW", 95:"T-STORM" };
             return map[code] || "CLOUDY";
         };
 
@@ -76,7 +80,7 @@
             if (bar) bar.style.width = pct + "%";
         };
 
-        const refresh = async () => {
+        const refresh = async (force = false) => {
             if (state.isSyncing || !window.map) return;
 
             if (state.communityData.length === 0) {
@@ -96,7 +100,7 @@
             const depTime = window.currentDepartureTime || new Date();
             const signature = `${coords[0].lat}-${coords.length}-${speed}`;
 
-            if (signature === state.lastSignature) return;
+            if (!force && signature === state.lastSignature) return;
 
             state.isSyncing = true;
             state.lastSignature = signature;
@@ -111,6 +115,7 @@
                 const roadPoint = coords[idx]; 
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
+                // ABSOLUTE COMMUNITY LOCK (Forces name from your registry)
                 let sorted = state.communityData
                     .map(c => ({ ...c, d: Math.hypot(roadPoint.lat - c.lat, roadPoint.lng - c.lng) }))
                     .sort((a,b) => a.d - b.d);
@@ -127,8 +132,7 @@
                     updateSyncUI(10 + (completed / samples.length) * 90, true);
 
                     return {
-                        name: nearest ? nearest.name : "STATION",
-                        lat: roadPoint.lat, lng: roadPoint.lng,
+                        name: nearest.name, lat: roadPoint.lat, lng: roadPoint.lng,
                         temp: Math.round(d.hourly.temperature_2m[i]),
                         wind: Math.round(d.hourly.wind_speed_10m[i]),
                         windDir: getWindDir(d.hourly.wind_direction_10m[i]),
@@ -196,6 +200,11 @@
                         </div>
                     `);
                 }
+                
+                // Pin Move Listeners
+                window.map.on('dragstart', () => updateSyncUI(10, true));
+                window.map.on('moveend', () => refresh(true));
+                
                 setInterval(refresh, 5000);
             },
             copy: () => {
@@ -203,6 +212,7 @@
                     Array.from(tr.cells).map(td => td.innerText).join(' | ')
                 ).join('\n');
                 navigator.clipboard.writeText("MISSION WEATHER MATRIX\n" + rows);
+                alert("Copied.");
             }
         };
     })();
