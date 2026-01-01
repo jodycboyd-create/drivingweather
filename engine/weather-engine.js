@@ -1,20 +1,20 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 051
- * Core Logic: Percentage Samples + Corridor-Validated Hubs
- * Fix: Corrects hub misplacement and overlapping markers.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 052
+ * Core Logic: Percentage Samples + Real-Time Registry Snapping
+ * Fix: Eliminates hub misplacement by using the nearest actual community.
  */
 
 (function() {
     const style = document.createElement('style');
     style.innerHTML = `
         .glass-node {
-            background: rgba(15, 15, 15, 0.92); backdrop-filter: blur(12px);
+            background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 215, 0, 0.8); border-radius: 6px;
-            display: flex; flex-direction: column; width: 110px; color: #fff;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 500;
+            display: flex; flex-direction: column; width: 115px; color: #fff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 1000;
         }
         .glass-header {
             background: #FFD700; color: #000; font-size: 10px; font-weight: 900;
-            text-align: center; padding: 4px 0; text-transform: uppercase;
+            text-align: center; padding: 4px 0; text-transform: uppercase; overflow: hidden;
         }
         .glass-body { display: flex; align-items: center; justify-content: center; padding: 6px; gap: 8px; }
         .glass-temp-val { font-size: 19px; font-weight: 900; color: #FFD700; }
@@ -27,18 +27,7 @@
             layer: L.layerGroup(),
             lastSignature: "",
             isSyncing: false,
-            // Sequential Geographic Anchors (West to East)
-            hubs: [
-                { name: "P.A.B", lat: 47.57, lng: -59.13 },
-                { name: "Stephenville", lat: 48.45, lng: -58.43 },
-                { name: "Corner Brook", lat: 48.95, lng: -57.94 },
-                { name: "Deer Lake", lat: 49.17, lng: -57.43 },
-                { name: "Grand Falls", lat: 48.93, lng: -55.65 },
-                { name: "Gander", lat: 48.95, lng: -54.61 },
-                { name: "Clarenville", lat: 48.16, lng: -53.96 },
-                { name: "Whitbourne", lat: 47.42, lng: -53.52 },
-                { name: "St. John's", lat: 47.56, lng: -52.71 }
-            ]
+            registry: []
         };
 
         const getSky = (code) => {
@@ -48,8 +37,18 @@
 
         const refresh = async () => {
             if (state.isSyncing || !window.map) return;
+
+            // Load full Newfoundland community dataset if not present
+            if (state.registry.length === 0) {
+                try {
+                    const res = await fetch('/data/nl/communities.json');
+                    const raw = await res.json();
+                    state.registry = Array.isArray(raw) ? raw : (raw.communities || []);
+                } catch(e) { return; }
+            }
+
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
-            if (!route) return;
+            if (!route || state.registry.length === 0) return;
 
             const coords = route.getLatLngs();
             const speed = window.currentCruisingSpeed || 100;
@@ -70,13 +69,14 @@
                 const p = coords[idx];
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
-                // CORRIDOR VALIDATION: Find closest hub that isn't too far from the point
-                let closestHub = state.hubs
-                    .map(h => ({ ...h, d: window.map.distance([p.lat, p.lng], [h.lat, h.lng]) }))
-                    .sort((a,b) => a.d - b.d)
-                    .find(h => !usedNames.has(h.name)) || { name: `WP-${Math.round(pct*100)}` };
+                // DYNAMIC SNAPPING: Find the closest community in the entire NL registry
+                let closest = state.registry
+                    .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
+                    .filter(c => !usedNames.has(c.name))
+                    .sort((a,b) => a.d - b.d)[0];
                 
-                usedNames.add(closestHub.name);
+                const label = closest ? closest.name : `K-POS ${Math.round(pct*100)}%`;
+                if (closest) usedNames.add(closest.name);
 
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
@@ -85,7 +85,7 @@
                     const i = Math.max(0, data.hourly.time.findIndex(t => t.startsWith(timeStr.substring(0,13))));
                     
                     return {
-                        name: closestHub.name, lat: p.lat, lng: p.lng, order: idx,
+                        name: label, lat: p.lat, lng: p.lng, order: idx,
                         temp: Math.round(data.hourly.temperature_2m[i]),
                         wind: Math.round(data.hourly.wind_speed_10m[i]),
                         vis: Math.round(data.hourly.visibility[i] / 1000),
@@ -103,7 +103,7 @@
             state.layer.clearLayers();
             let rows = "";
             data.forEach(d => {
-                // OFFSET RENDERING: Anchor at [55, 75] to float node above the route marker
+                // High-clearance anchor [57, 80] to avoid overlapping route markers
                 L.marker([d.lat, d.lng], {
                     icon: L.divIcon({
                         className: '',
@@ -113,9 +113,9 @@
                                     <span>${d.sky}</span>
                                     <span class="glass-temp-val">${d.temp}°</span>
                                 </div>
-                                <div class="glass-meta-sub">${d.wind}kmh | ${d.vis}km</div>
+                                <div class="glass-meta-sub">${d.wind}KMH | ${d.vis}KM</div>
                                </div>`,
-                        iconSize: [110, 65], iconAnchor: [55, 75]
+                        iconSize: [115, 70], iconAnchor: [57, 80]
                     })
                 }).addTo(state.layer);
 
@@ -125,7 +125,7 @@
                     <td style="color:#FFD700; font-weight:bold;">${d.temp}°C</td>
                     <td>${d.wind} KM/H</td>
                     <td>${d.vis} KM</td>
-                    <td style="text-align:right;">${d.sky}</td>
+                    <td style="text-align:right; font-size:14px;">${d.sky}</td>
                 </tr>`;
             });
             const matrixBody = document.getElementById('matrix-body');
@@ -138,11 +138,11 @@
                 if (!document.getElementById('matrix-ui')) {
                     document.body.insertAdjacentHTML('beforeend', `
                         <div id="matrix-ui" style="position:fixed; bottom:30px; left:30px; z-index:10000; font-family:monospace; pointer-events:none;">
-                            <div style="background:rgba(10,10,10,0.96); border:1px solid #FFD700; width:640px; padding:20px; border-radius:4px; pointer-events:auto; box-shadow: 0 0 40px rgba(0,0,0,0.9);">
-                                <div style="color:#FFD700; font-weight:bold; margin-bottom:12px; letter-spacing:2px; border-bottom:1px solid rgba(255,215,0,0.4); padding-bottom:8px;">MISSION WEATHER MATRIX</div>
-                                <table style="width:100%; color:#fff; font-size:11px; text-align:left;">
+                            <div style="background:rgba(10,10,10,0.96); border:1px solid #FFD700; width:650px; padding:20px; border-radius:4px; pointer-events:auto; box-shadow: 0 0 50px rgba(0,0,0,0.95);">
+                                <div style="color:#FFD700; font-weight:900; margin-bottom:15px; letter-spacing:3px; border-bottom:1px solid rgba(255,215,0,0.4); padding-bottom:10px;">MISSION WEATHER MATRIX</div>
+                                <table style="width:100%; color:#fff; font-size:11px; text-align:left; border-collapse:collapse;">
                                     <thead><tr style="color:#666; text-transform:uppercase; font-size:9px;">
-                                        <th>Hub</th><th>ETA</th><th>Temp</th><th>Wind</th><th>Vis</th><th style="text-align:right;">Sky</th>
+                                        <th>Location</th><th>ETA</th><th>Temp</th><th>Wind</th><th>Vis</th><th style="text-align:right;">Sky</th>
                                     </tr></thead>
                                     <tbody id="matrix-body"></tbody>
                                 </table>
@@ -150,7 +150,7 @@
                         </div>
                     `);
                 }
-                setInterval(refresh, 4000);
+                setInterval(refresh, 5000);
                 refresh();
             }
         };
