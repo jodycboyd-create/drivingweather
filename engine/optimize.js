@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Mission: Time Scale Header + Stabilized Precipitation Triggers
- * Logic: Event Delegation + Neon Scale (Strictly 0-3/45 = Green)
+ * Mission: Black-init + Day/Time Header + Strict Orange Gating
+ * Logic: Strictly codes 51-99 trigger color. 0-45 = Neon Green.
  */
 
 (function() {
@@ -17,22 +17,26 @@
             const now = new Date();
             const timeLabels = Array(12).fill(0).map((_, i) => {
                 const d = new Date(now.getTime() + (i * 4) * 3600000);
+                const dayStr = d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
                 const hour = d.getHours();
                 const ampm = hour >= 12 ? 'PM' : 'AM';
-                return `<span style="width: calc(100% / 12); text-align:center;">${hour % 12 || 12}${ampm}</span>`;
+                return `<div style="width: calc(100% / 12); text-align:center;">
+                            <div style="font-size:7px; color:#666;">${dayStr}</div>
+                            <div style="font-size:9px; color:#AAA;">${hour % 12 || 12}${ampm}</div>
+                        </div>`;
             }).join('');
 
             const html = `
                 <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #FFD700; padding-bottom:15px; font-family:monospace;">
-                    <div id="time-scale" style="display:flex; color:#AAA; font-size:9px; margin-bottom:5px; font-weight:bold;">
+                    <div id="time-scale" style="display:flex; margin-bottom:5px; font-weight:bold; border-bottom:1px solid #222; padding-bottom:4px;">
                         ${timeLabels}
                     </div>
-                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:22px; background:#000; padding:2px; border:1px solid #444;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#00FF00; cursor:pointer; transition: 0.3s; border-radius:1px;"></div>`).join('')}
+                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:24px; background:#000; padding:3px; border:1px solid #444;">
+                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; transition: 0.2s; border:1px solid #111;"></div>`).join('')}
                     </div>
-                    <div style="display:flex; justify-content:space-between; margin-top:8px;">
-                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">DEPARTURE PRECIPITATION INDEX</span>
-                        <span id="opt-status" style="color:#00FF00; font-size:9px;">SYNCED</span>
+                    <div style="display:flex; justify-content:space-between; margin-top:10px;">
+                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">HAZARD: PRECIPITATION</span>
+                        <span id="opt-status" style="color:#AAA; font-size:9px;">INITIALIZING SCAN...</span>
                     </div>
                 </div>`;
             container.children[0].insertAdjacentHTML('afterbegin', html);
@@ -52,6 +56,7 @@
                 const level = await this.checkPrecip(samples, i * 2);
                 this.applyColor(cells[i], level);
             }
+            document.getElementById('opt-status').innerText = "ISLAND SCAN COMPLETE";
         },
 
         async checkPrecip(points, offset) {
@@ -66,12 +71,13 @@
                     if (idx === -1) return;
                     const code = d.hourly.weather_code[idx];
                     
-                    // STRICT PRECIPITATION MAPPING (Ignore codes 0, 1, 2, 3, 45)
+                    // STRICT NEON SCALE: ONLY FALLING PRECIP TRIGGERS COLOR
                     let L = 0;
-                    if (code === 65 || code === 75 || code >= 95) L = 4; // RED: Heavy
-                    else if (code === 63 || code === 73) L = Math.max(L, 3); // ORANGE: Moderate
-                    else if (code === 61 || code === 71 || code === 55) L = Math.max(L, 2); // YELLOW: Light
-                    else if (code === 51 || code === 53) L = Math.max(L, 1); // LIME: Drizzle
+                    if (code === 65 || code === 75 || code >= 95) L = 4; // VIVID RED
+                    else if (code === 63 || code === 73) L = Math.max(L, 3); // VIVID ORANGE
+                    else if (code === 61 || code === 71 || code === 55) L = Math.max(L, 2); // VIVID YELLOW
+                    else if (code === 51 || code === 53) L = Math.max(L, 1); // VIVID LIME
+                    // CODES 0-3, 45 (Fog/Overcast) = L=0 (Neon Green)
                     if (L > max) max = L;
                 });
             } catch (e) { return 0; }
@@ -79,9 +85,10 @@
         },
 
         applyColor(el, level) {
-            const neon = ["#00FF00", "#AAFF00", "#FFFF00", "#FF8C00", "#FF0000"];
+            const neon = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
             el.style.backgroundColor = neon[level];
-            el.style.boxShadow = level > 0 ? `0 0 8px ${neon[level]}` : 'none';
+            el.style.boxShadow = `0 0 10px ${neon[level]}`; 
+            el.style.border = `1px solid rgba(255,255,255,0.2)`;
         },
 
         shiftTime(hours, target) {
