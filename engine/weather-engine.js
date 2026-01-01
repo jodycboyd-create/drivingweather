@@ -1,10 +1,9 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 041
- * Fix: Uncaught TypeError (name undefined) + 100km Linear Interval Logic
- * Constraint: Retain all UI features (HUD, Matrix, Glass Nodes).
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 042
+ * Fix: Uncaught TypeError + Empty Matrix Data
+ * Logic: 100km Linear Intervals snapped to Registry Communities.
  */
 
 (function() {
-    // CSS RESTORATION - NO COMPRESSION
     const style = document.createElement('style');
     style.innerHTML = `
         #central-sync-overlay {
@@ -66,7 +65,6 @@
         const refresh = async (force = false) => {
             if (state.isSyncing || !window.map) return;
 
-            // Registry Safety check
             if (state.communityData.length === 0) {
                 try {
                     const res = await fetch('/data/nl/communities.json');
@@ -76,7 +74,7 @@
             }
 
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
-            if (!route) return;
+            if (!route || state.communityData.length === 0) return;
 
             const coords = route.getLatLngs();
             const signature = `${coords[0].lat}-${coords.length}`;
@@ -86,7 +84,7 @@
             state.lastSignature = signature;
             updateSyncUI(10, true);
 
-            // 1. DISTANCE MAPPING (100KM INTERVALS)
+            // 1. Calculate intervals along polyline
             let cumulativeDist = 0;
             let distMap = coords.map((p, i) => {
                 if (i === 0) return 0;
@@ -100,33 +98,33 @@
                 let closestIdx = distMap.findIndex(m => m >= d);
                 if (closestIdx !== -1) targetPoints.push(coords[closestIdx]);
             }
-            if (cumulativeDist % intervalM > 25000) targetPoints.push(coords[coords.length-1]);
+            if (cumulativeDist % intervalM > 30000) targetPoints.push(coords[coords.length-1]);
 
-            // 2. COMMUNITY SNAPPING WITH ERROR PROTECTION
-            let finalWaypoints = [];
+            // 2. Safe Community Snapping
+            let finalSelection = [];
             targetPoints.forEach(pt => {
                 let nearest = state.communityData
                     .map(c => ({ ...c, d: window.map.distance([pt.lat, pt.lng], [c.lat, c.lng]) }))
                     .sort((a, b) => a.d - b.d)[0];
                 
-                if (nearest && !finalWaypoints.some(w => w.name === nearest.name)) {
-                    finalWaypoints.push(nearest);
+                if (nearest && nearest.name && !finalSelection.some(s => s.name === nearest.name)) {
+                    finalSelection.push(nearest);
                 }
             });
 
-            // 3. FETCH DATA & BUILD MATRIX
-            let waypoints = await Promise.all(finalWaypoints.map(async (town, idx) => {
+            // 3. Weather Fetch
+            let waypoints = await Promise.all(finalSelection.map(async (town, idx) => {
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${town.lat}&longitude=${town.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
                     const d = await res.json();
-                    updateSyncUI(10 + (idx / finalWaypoints.length) * 90, true);
+                    updateSyncUI(15 + (idx / finalSelection.length) * 85, true);
 
                     return {
                         name: town.name, lat: town.lat, lng: town.lng,
                         temp: Math.round(d.hourly.temperature_2m[0]),
                         wind: Math.round(d.hourly.wind_speed_10m[0]),
                         vis: Math.round(d.hourly.visibility[0] / 1000),
-                        skyIcon: (c => {
+                        sky: (c => {
                             const m = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
                             return m[c] || "☁️";
                         })(d.hourly.weather_code[0])
@@ -136,14 +134,14 @@
 
             state.layer.clearLayers();
             let rows = "";
-            waypoints.filter(w => w).forEach(d => {
+            waypoints.filter(w => w !== null).forEach(d => {
                 L.marker([d.lat, d.lng], {
                     icon: L.divIcon({
                         className: '',
                         html: `<div class="glass-node">
                                 <div class="glass-header">${d.name}</div>
                                 <div class="glass-body">
-                                    <span>${d.skyIcon}</span>
+                                    <span>${d.sky}</span>
                                     <span class="glass-temp-val">${d.temp}°</span>
                                 </div>
                                </div>`,
@@ -156,7 +154,7 @@
                     <td style="color:#FFD700;">${d.temp}°C</td>
                     <td>${d.wind} KM/H</td>
                     <td>${d.vis} KM</td>
-                    <td style="text-align:right; font-size:16px;">${d.skyIcon}</td>
+                    <td style="text-align:right;">${d.sky}</td>
                 </tr>`;
             });
             
