@@ -1,10 +1,9 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 057
- * Mission: Restore Matrix Table + Fix Highway Waypoint Labels
- * Rule: 0.25 must be South Brook/Badger (West) or Gambo/Glovertown (East).
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 058
+ * Core Logic: Hard-Coded Geographic Anchors (Zero External Dependencies)
+ * Status: LOCKED - UI Restoration + Highway Integrity
  */
 
 (function() {
-    // 1. RE-ESTABLISH STYLES (No Compression)
     const style = document.createElement('style');
     style.innerHTML = `
         .glass-node {
@@ -28,16 +27,21 @@
             layer: L.layerGroup(),
             lastSignature: "",
             isSyncing: false,
-            // Hard-Locked Anchors to ensure correct highway labeling
-            anchors: [
-                { name: "P.A.B", lat: 47.57, lng: -59.13 },
+            // DIRECT IN-SCRIPT REGISTRY (No Fetching)
+            registry: [
+                { name: "Port aux Basques", lat: 47.57, lng: -59.13 },
+                { name: "Stephenville", lat: 48.45, lng: -58.43 },
+                { name: "Corner Brook", lat: 48.95, lng: -57.94 },
+                { name: "Deer Lake", lat: 49.17, lng: -57.43 },
                 { name: "South Brook", lat: 49.43, lng: -56.08 },
                 { name: "Badger", lat: 48.97, lng: -56.03 },
                 { name: "Grand Falls", lat: 48.93, lng: -55.65 },
+                { name: "Bishop's Falls", lat: 49.01, lng: -55.48 },
+                { name: "Gander", lat: 48.95, lng: -54.61 },
                 { name: "Gambo", lat: 48.74, lng: -54.21 },
                 { name: "Glovertown", lat: 48.67, lng: -54.03 },
-                { name: "Gander", lat: 48.95, lng: -54.61 },
                 { name: "Clarenville", lat: 48.16, lng: -53.96 },
+                { name: "Goobies", lat: 47.93, lng: -53.93 },
                 { name: "Whitbourne", lat: 47.42, lng: -53.52 },
                 { name: "St. John's", lat: 47.56, lng: -52.71 }
             ]
@@ -59,7 +63,6 @@
             state.isSyncing = true;
             state.lastSignature = signature;
 
-            // Strict Sample Points: 0, 25%, 50%, 75%, 99%
             const samples = [0, 0.25, 0.5, 0.75, 0.99]; 
             const usedNames = new Set();
 
@@ -68,14 +71,14 @@
                 const p = coords[idx];
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
-                // Find nearest anchor - ensuring we don't pick 'undefined'
-                let nearest = state.anchors
-                    .map(a => ({ ...a, d: Math.hypot(p.lat - a.lat, p.lng - a.lng) }))
-                    .filter(a => !usedNames.has(a.name))
+                // Find nearest hard-coded community
+                let nearest = state.registry
+                    .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
+                    .filter(c => c.d < 25000 && !usedNames.has(c.name)) // 25km corridor
                     .sort((a,b) => a.d - b.d)[0];
                 
-                const label = (nearest && nearest.d < 0.8) ? nearest.name : `WAYPOINT ${Math.round(pct*100)}%`;
-                if (nearest && nearest.d < 0.8) usedNames.add(nearest.name);
+                let label = nearest ? nearest.name : `TCH KM-${Math.round(pct * dist)}`;
+                if (nearest) usedNames.add(nearest.name);
 
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
@@ -83,15 +86,13 @@
                     const tStr = arrival.toISOString().split(':')[0] + ":00";
                     const i = Math.max(0, data.hourly.time.findIndex(t => t.startsWith(tStr.substring(0,13))));
                     
+                    const m = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 51:"🌦️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
                     return {
                         name: label, lat: p.lat, lng: p.lng, order: idx,
                         temp: Math.round(data.hourly.temperature_2m[i]),
                         wind: Math.round(data.hourly.wind_speed_10m[i]),
                         vis: Math.round(data.hourly.visibility[i] / 1000),
-                        sky: (code => {
-                            const m = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 51:"🌦️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
-                            return m[code] || "☁️";
-                        })(data.hourly.weather_code[i]),
+                        sky: m[data.hourly.weather_code[i]] || "☁️",
                         eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                     };
                 } catch (e) { return null; }
@@ -126,8 +127,12 @@
                     <td style="text-align:right;">${d.sky}</td>
                 </tr>`;
             });
-            const matrixBody = document.getElementById('matrix-body');
-            if (matrixBody) matrixBody.innerHTML = rows;
+
+            const ui = document.getElementById('matrix-ui');
+            if (ui) {
+                const matrixBody = document.getElementById('matrix-body');
+                if (matrixBody) matrixBody.innerHTML = rows;
+            }
         };
 
         return {
