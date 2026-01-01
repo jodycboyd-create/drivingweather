@@ -1,10 +1,10 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 040
- * Fix: Full Code Restoration + 100km Community Interval Logic
- * Constraint: No "TCH Milestones", no compression, no coastal drift.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 041
+ * Fix: Uncaught TypeError (name undefined) + 100km Linear Interval Logic
+ * Constraint: Retain all UI features (HUD, Matrix, Glass Nodes).
  */
 
 (function() {
-    // 1. STYLESHEET RESTORATION
+    // CSS RESTORATION - NO COMPRESSION
     const style = document.createElement('style');
     style.innerHTML = `
         #central-sync-overlay {
@@ -27,7 +27,6 @@
         .glass-header {
             background: #FFD700; color: #000; font-size: 10px; font-weight: 900;
             text-align: center; padding: 8px; text-transform: uppercase;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .glass-body { display: flex; align-items: center; justify-content: space-evenly; padding: 12px 6px; }
         .glass-temp-val { font-size: 26px; font-weight: 900; color: #FFD700; }
@@ -67,6 +66,7 @@
         const refresh = async (force = false) => {
             if (state.isSyncing || !window.map) return;
 
+            // Registry Safety check
             if (state.communityData.length === 0) {
                 try {
                     const res = await fetch('/data/nl/communities.json');
@@ -86,7 +86,7 @@
             state.lastSignature = signature;
             updateSyncUI(10, true);
 
-            // 1. MAP DISTANCE INTERVALS (100KM)
+            // 1. DISTANCE MAPPING (100KM INTERVALS)
             let cumulativeDist = 0;
             let distMap = coords.map((p, i) => {
                 if (i === 0) return 0;
@@ -94,31 +94,32 @@
                 return cumulativeDist;
             });
 
-            const totalRouteKM = cumulativeDist / 1000;
-            const intervalM = 100000; // 100KM
+            const intervalM = 100000; // 100km
             let targetPoints = [];
-
             for (let d = 0; d <= cumulativeDist; d += intervalM) {
                 let closestIdx = distMap.findIndex(m => m >= d);
                 if (closestIdx !== -1) targetPoints.push(coords[closestIdx]);
             }
-            if (cumulativeDist % intervalM > 20000) targetPoints.push(coords[coords.length - 1]);
+            if (cumulativeDist % intervalM > 25000) targetPoints.push(coords[coords.length-1]);
 
-            // 2. SNAP TO NEAREST REGISTERED COMMUNITY
-            let selectedCommunities = targetPoints.map(pt => {
-                return state.communityData
+            // 2. COMMUNITY SNAPPING WITH ERROR PROTECTION
+            let finalWaypoints = [];
+            targetPoints.forEach(pt => {
+                let nearest = state.communityData
                     .map(c => ({ ...c, d: window.map.distance([pt.lat, pt.lng], [c.lat, c.lng]) }))
                     .sort((a, b) => a.d - b.d)[0];
-            }).filter((v, i, a) => a.findIndex(t => t.name === v.name) === i);
+                
+                if (nearest && !finalWaypoints.some(w => w.name === nearest.name)) {
+                    finalWaypoints.push(nearest);
+                }
+            });
 
-            // 3. FETCH & RENDER
-            let completed = 0;
-            let waypoints = await Promise.all(selectedCommunities.map(async (town) => {
+            // 3. FETCH DATA & BUILD MATRIX
+            let waypoints = await Promise.all(finalWaypoints.map(async (town, idx) => {
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${town.lat}&longitude=${town.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
                     const d = await res.json();
-                    completed++;
-                    updateSyncUI(10 + (completed / selectedCommunities.length) * 90, true);
+                    updateSyncUI(10 + (idx / finalWaypoints.length) * 90, true);
 
                     return {
                         name: town.name, lat: town.lat, lng: town.lng,
@@ -158,10 +159,8 @@
                     <td style="text-align:right; font-size:16px;">${d.skyIcon}</td>
                 </tr>`;
             });
-
-            const body = document.getElementById('matrix-body');
-            if (body) body.innerHTML = rows;
             
+            document.getElementById('matrix-body').innerHTML = rows;
             setTimeout(() => updateSyncUI(0, false), 800);
             state.isSyncing = false;
         };
