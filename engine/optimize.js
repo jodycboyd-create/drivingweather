@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Mission: Refine Hazard Gradient (Fix False Red Positives)
- * Logic: Red = Precipitation/Low Vis ONLY. Blue = Cold/Clear.
+ * Mission: Fix False-Red Logic with Stepped Hazard Gating
+ * Logic: 5-Point Scan + Stringent Severity Filters.
  */
 
 (function() {
@@ -18,7 +18,7 @@
                 <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #FFD700; padding-bottom:15px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                         <span style="color:#FFD700; font-weight:900; font-size:11px; letter-spacing:2px;">48H DEPARTURE HAZARD INDEX</span>
-                        <span id="opt-status" style="color:#666; font-size:10px; font-family:monospace;">SCANNING...</span>
+                        <span id="opt-status" style="color:#666; font-size:10px; font-family:monospace;">READY</span>
                     </div>
                     <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:16px;">
                         ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#111; border:1px solid #333; cursor:pointer;"></div>`).join('')}
@@ -40,44 +40,44 @@
                 const hazard = await this.checkHazard(samples, hourOffset);
                 this.applyColor(cells[i], hazard);
             }
-            document.getElementById('opt-status').innerText = "ISLAND SCAN COMPLETE";
+            document.getElementById('opt-status').innerText = "SCAN COMPLETE";
         },
 
         async checkHazard(points, offset) {
             const time = new Date(Date.now() + offset * 3600000).toISOString().split(':')[0];
-            let worstState = 1; // 1:Green, 2:Blue(Cold), 3:Amber, 4:Red
+            let maxLevel = 1; // Default: Green
 
             try {
-                const data = await Promise.all(points.map(p => 
+                const res = await Promise.all(points.map(p => 
                     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,visibility&timezone=auto`).then(r => r.json())
                 ));
 
-                data.forEach(d => {
+                res.forEach(d => {
                     const idx = d.hourly.time.findIndex(t => t.startsWith(time));
                     if (idx === -1) return;
                     const code = d.hourly.weather_code[idx];
-                    const vis = d.hourly.visibility[idx] || 10000;
+                    const vis = (d.hourly.visibility[idx] || 10000) / 1000; // km
                     const temp = d.hourly.temperature_2m[idx];
 
-                    // RED: Actual Hazards (Precipitation or Fog)
-                    if (code >= 71 || (code >= 61 && code <= 65) || vis < 1500) {
-                        worstState = Math.max(worstState, 4);
-                    } 
-                    // AMBER: Light rain or deteriorating visibility
-                    else if (code >= 51 || vis < 4000) {
-                        worstState = Math.max(worstState, 3);
+                    // 4: RED (Critical Hazard Only)
+                    if (code >= 75 || code === 65 || code >= 95 || vis < 0.5) {
+                        maxLevel = Math.max(maxLevel, 4);
                     }
-                    // BLUE: Cold but Clear (Safe driving)
-                    else if (temp <= 0) {
-                        worstState = Math.max(worstState, 2);
+                    // 3: ORANGE (Caution)
+                    else if (code >= 71 || code === 63 || vis < 2) {
+                        maxLevel = Math.max(maxLevel, 3);
+                    }
+                    // 2: BLUE (Cold/Clear)
+                    else if (temp <= 0 && code < 51) {
+                        maxLevel = Math.max(maxLevel, 2);
                     }
                 });
             } catch (e) { return 0; }
-            return worstState;
+            return maxLevel;
         },
 
         applyColor(el, level) {
-            const colors = { 0:"#111", 1:"#1a4422", 2:"#003366", 3:"#b8860b", 4:"#8b0000" };
+            const colors = ["#111", "#1a4422", "#003366", "#b8860b", "#8b0000"];
             el.style.backgroundColor = colors[level];
         },
 
