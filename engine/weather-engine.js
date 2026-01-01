@@ -1,49 +1,27 @@
-/** * Project: [weong-bulletin]
- * Logic: RESTORED ORIGINAL STABLE SNAPPING
- * Status: L3 Level 3 Trigger Active
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 013
+ * Core Logic: Explicit Origin/Destination Waypoints + Proximity-Weighted Hubs
+ * Fix: Reinstates Tabular Matrix and prevents Atlantic drifting.
  */
 
 (function() {
     const style = document.createElement('style');
     style.innerHTML = `
-        #central-sync-overlay {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            z-index: 99999; background: rgba(10, 10, 10, 0.98); padding: 30px;
-            border: 2px solid #FFD700; border-radius: 12px; width: 340px;
-            text-align: center; display: none; pointer-events: none;
-            box-shadow: 0 0 100px rgba(0,0,0,1);
-        }
-        .sync-text { color: #FFD700; font-size: 12px; font-weight: 900; letter-spacing: 5px; margin-bottom: 15px; }
-        .sync-bar-full { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
-        #sync-progress-bar { width: 0%; height: 100%; background: #FFD700; transition: width 0.1s ease; }
-
         .glass-node {
-            background: rgba(10, 10, 10, 0.9); backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 215, 0, 0.7); border-radius: 10px;
-            display: flex; flex-direction: column; width: 125px; color: #fff;
-            box-shadow: 0 15px 45px rgba(0,0,0,0.8); overflow: hidden;
+            background: rgba(15, 15, 15, 0.9); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.7); border-radius: 6px;
+            display: flex; flex-direction: column; width: 110px; color: #fff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
         .glass-header {
-            background: #FFD700; color: #000; font-size: 10px; font-weight: 900;
-            text-align: center; padding: 8px; text-transform: uppercase;
+            background: #FFD700; color: #000; font-size: 9px; font-weight: 900;
+            text-align: center; padding: 3px 0; text-transform: uppercase;
         }
-        .glass-body { display: flex; align-items: center; justify-content: space-evenly; padding: 12px 6px; }
-        .glass-temp-val { font-size: 26px; font-weight: 900; color: #FFD700; }
-        
-        #matrix-ui-container {
-            position: fixed; bottom: 30px; left: 30px; z-index: 10000;
-            background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 215, 0, 0.5); border-radius: 12px;
-            width: 650px; padding: 25px; pointer-events: auto;
+        .glass-body {
+            display: flex; align-items: center; justify-content: center;
+            padding: 6px; gap: 8px;
         }
-        .matrix-table { width: 100%; color: #fff; font-size: 12px; text-align: left; border-collapse: collapse; }
-        .matrix-table tr { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .matrix-table th { color: #666; text-transform: uppercase; font-size: 10px; padding-bottom: 15px; }
-        .matrix-table td { padding: 12px 0; }
-        .copy-btn {
-            background: #FFD700; color: #000; border: none; padding: 8px 16px;
-            border-radius: 4px; font-size: 11px; font-weight: 900; cursor: pointer; float: right;
-        }
+        .glass-temp-val { font-size: 18px; font-weight: 900; color: #FFD700; }
+        .glass-meta-sub { font-size: 9px; color: #ccc; text-align: center; padding-bottom: 4px; }
     `;
     document.head.appendChild(style);
 
@@ -52,72 +30,81 @@
             layer: L.layerGroup(),
             lastSignature: "",
             isSyncing: false,
-            communityData: []
+            // Permanent Geographic Anchors
+            hubs: [
+                { name: "P.A.B", lat: 47.57, lng: -59.13 },
+                { name: "Stephenville", lat: 48.45, lng: -58.43 },
+                { name: "Corner Brook", lat: 48.95, lng: -57.94 },
+                { name: "Grand Falls", lat: 48.93, lng: -55.65 },
+                { name: "Gander", lat: 48.95, lng: -54.61 },
+                { name: "Clarenville", lat: 48.16, lng: -53.96 },
+                { name: "Whitbourne", lat: 47.42, lng: -53.52 },
+                { name: "St. John's", lat: 47.56, lng: -52.71 }
+            ]
         };
 
-        const updateSyncUI = (pct, show) => {
-            const overlay = document.getElementById('central-sync-overlay');
-            const bar = document.getElementById('sync-progress-bar');
-            if (overlay) overlay.style.display = show ? 'block' : 'none';
-            if (bar) bar.style.width = pct + "%";
+        const getSky = (code) => {
+            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️" };
+            return map[code] || "☁️";
         };
 
-        const refresh = async (force = false) => {
+        const refresh = async () => {
             if (state.isSyncing || !window.map) return;
-
-            if (state.communityData.length === 0) {
-                const res = await fetch('/data/nl/communities.json');
-                const raw = await res.json();
-                state.communityData = Array.isArray(raw) ? raw : (raw.communities || []);
-            }
-
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
             if (!route) return;
 
             const coords = route.getLatLngs();
-            const signature = `${coords[0].lat}-${coords.length}`;
-            if (!force && signature === state.lastSignature) return;
+            const speed = window.currentCruisingSpeed || 100;
+            const dist = window.currentRouteDistance || 0;
+            const depTime = window.currentDepartureTime || new Date();
+
+            const signature = `${coords[0].lat}-${coords[coords.length-1].lat}-${speed}-${depTime.getTime()}`;
+            if (signature === state.lastSignature) return;
 
             state.isSyncing = true;
             state.lastSignature = signature;
-            updateSyncUI(10, true);
 
-            // ORIGINAL SNAP LOGIC: Selection at 75-150km intervals
-            let selectedCommunities = [];
-            const interval = Math.floor(coords.length / 5);
-            
-            for (let i = 0; i < coords.length; i += interval) {
-                let pt = coords[i];
-                let nearest = state.communityData
-                    .map(c => ({ ...c, d: window.map.distance([pt.lat, pt.lng], [c.lat, c.lng]) }))
-                    .sort((a, b) => a.d - b.d)[0];
+            // NEW WAYPOINT STRATEGY: 1. Origin, 2. Mid-1, 3. Mid-2, 4. Mid-3, 5. Destination
+            const samples = [0, 0.25, 0.5, 0.75, 0.99]; 
+            const usedNames = new Set();
+
+            let waypoints = await Promise.all(samples.map(async (pct) => {
+                const idx = Math.floor((coords.length - 1) * pct);
+                const p = coords[idx];
+                const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
+
+                // Find closest hub name for the waypoint, but don't reuse names
+                let closestHub = state.hubs
+                    .map(h => ({ ...h, d: Math.hypot(p.lat - h.lat, p.lng - h.lng) }))
+                    .sort((a,b) => a.d - b.d)
+                    .find(h => !usedNames.has(h.name)) || { name: `WP-${Math.round(pct*100)}` };
                 
-                if (nearest && !selectedCommunities.some(s => s.name === nearest.name)) {
-                    selectedCommunities.push(nearest);
-                }
-            }
+                usedNames.add(closestHub.name);
 
-            let waypoints = await Promise.all(selectedCommunities.map(async (town, idx) => {
                 try {
-                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${town.lat}&longitude=${town.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
-                    const d = await res.json();
-                    updateSyncUI(15 + (idx / selectedCommunities.length) * 85, true);
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
+                    const data = await res.json();
+                    const i = Math.max(0, data.hourly.time.indexOf(arrival.toISOString().split(':')[0] + ":00"));
+                    
                     return {
-                        name: town.name, lat: town.lat, lng: town.lng,
-                        temp: Math.round(d.hourly.temperature_2m[0]),
-                        wind: Math.round(d.hourly.wind_speed_10m[0]),
-                        vis: Math.round(d.hourly.visibility[0] / 1000),
-                        sky: (c => {
-                            const m = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
-                            return m[c] || "☁️";
-                        })(d.hourly.weather_code[0])
+                        name: closestHub.name, lat: p.lat, lng: p.lng, order: idx,
+                        temp: Math.round(data.hourly.temperature_2m[i]),
+                        wind: Math.round(data.hourly.wind_speed_10m[i]),
+                        vis: Math.round(data.hourly.visibility[i] / 1000),
+                        sky: getSky(data.hourly.weather_code[i]),
+                        eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                     };
                 } catch (e) { return null; }
             }));
 
+            render(waypoints.filter(w => w).sort((a,b) => a.order - b.order));
+            state.isSyncing = false;
+        };
+
+        const render = (data) => {
             state.layer.clearLayers();
             let rows = "";
-            waypoints.filter(w => w).forEach(d => {
+            data.forEach(d => {
                 L.marker([d.lat, d.lng], {
                     icon: L.divIcon({
                         className: '',
@@ -127,56 +114,45 @@
                                     <span>${d.sky}</span>
                                     <span class="glass-temp-val">${d.temp}°</span>
                                 </div>
+                                <div class="glass-meta-sub">${d.wind}kmh | ${d.vis}km</div>
                                </div>`,
-                        iconSize: [125, 70], iconAnchor: [62, 35]
+                        iconSize: [110, 60], iconAnchor: [55, 30]
                     })
                 }).addTo(state.layer);
 
                 rows += `<tr>
-                    <td style="font-weight:900; color:#FFD700;">${d.name}</td>
-                    <td style="color:#FFD700;">${d.temp}°C</td>
-                    <td>${d.wind} KM/H</td>
-                    <td>${d.vis} KM</td>
-                    <td style="text-align:right;">${d.sky}</td>
+                    <td style="padding:8px; border-bottom:1px solid #333;">${d.name}</td>
+                    <td>${d.eta}</td>
+                    <td style="color:#FFD700; font-weight:bold;">${d.temp}°C</td>
+                    <td>${d.wind} km/h</td>
+                    <td>${d.vis} km</td>
+                    <td>${d.sky}</td>
                 </tr>`;
             });
-
             document.getElementById('matrix-body').innerHTML = rows;
-            setTimeout(() => updateSyncUI(0, false), 800);
-            state.isSyncing = false;
         };
 
         return {
             init: () => {
                 state.layer.addTo(window.map);
-                if(!document.getElementById('matrix-ui-container')) {
-                    document.body.insertAdjacentHTML('beforeend', `
-                        <div id="central-sync-overlay">
-                            <div class="sync-text">SYNCING MISSION DATA</div>
-                            <div class="sync-bar-full"><div id="sync-progress-bar"></div></div>
-                        </div>
-                        <div id="matrix-ui-container">
-                            <button class="copy-btn" onclick="WeatherEngine.copy()">Copy Matrix</button>
-                            <div style="color:#FFD700; font-size:12px; font-weight:900; margin-bottom:20px; letter-spacing:3px; text-transform:uppercase;">Mission Weather Matrix</div>
-                            <table class="matrix-table">
-                                <thead><tr>
-                                    <th>Location</th><th>Temp</th><th>Wind</th><th>Vis</th><th style="text-align:right;">Sky</th>
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div id="matrix-ui" style="position:fixed; bottom:30px; left:30px; z-index:10000; font-family:monospace; pointer-events:none;">
+                        <div style="background:rgba(10,10,10,0.95); border:1px solid #FFD700; width:600px; padding:15px; border-radius:4px; pointer-events:auto;">
+                            <div style="color:#FFD700; font-weight:bold; margin-bottom:10px; letter-spacing:2px; border-bottom:1px solid #FFD700;">MISSION WEATHER MATRIX</div>
+                            <table style="width:100%; color:#fff; font-size:11px; text-align:left;">
+                                <thead><tr style="color:#888; text-transform:uppercase; font-size:9px;">
+                                    <th>Hub</th><th>ETA</th><th>Temp</th><th>Wind</th><th>Vis</th><th>Sky</th>
                                 </tr></thead>
                                 <tbody id="matrix-body"></tbody>
                             </table>
                         </div>
-                    `);
-                }
-                window.map.on('moveend', () => refresh(true));
-                refresh();
-            },
-            copy: () => {
-                const rows = Array.from(document.querySelectorAll('#matrix-body tr')).map(tr => 
-                    Array.from(tr.cells).map(td => td.innerText).join(' | ')
-                ).join('\n');
-                navigator.clipboard.writeText("MISSION WEATHER MATRIX\n" + rows);
+                    </div>
+                `);
+                setInterval(refresh, 3000);
             }
         };
     })();
+
+    window.WeatherEngine = WeatherEngine;
     WeatherEngine.init();
 })();
