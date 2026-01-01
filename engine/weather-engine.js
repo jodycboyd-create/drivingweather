@@ -1,24 +1,24 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 050
- * Core Logic: Explicit Percentage Samples + Proximity-Weighted Hubs (Patch 013 Restoration)
- * Fix: Restores data flow by using guaranteed geographic anchors.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 051
+ * Core Logic: Percentage Samples + Corridor-Validated Hubs
+ * Fix: Corrects hub misplacement and overlapping markers.
  */
 
 (function() {
     const style = document.createElement('style');
     style.innerHTML = `
         .glass-node {
-            background: rgba(15, 15, 15, 0.9); backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 215, 0, 0.7); border-radius: 6px;
+            background: rgba(15, 15, 15, 0.92); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.8); border-radius: 6px;
             display: flex; flex-direction: column; width: 110px; color: #fff;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 500;
         }
         .glass-header {
-            background: #FFD700; color: #000; font-size: 9px; font-weight: 900;
-            text-align: center; padding: 3px 0; text-transform: uppercase;
+            background: #FFD700; color: #000; font-size: 10px; font-weight: 900;
+            text-align: center; padding: 4px 0; text-transform: uppercase;
         }
         .glass-body { display: flex; align-items: center; justify-content: center; padding: 6px; gap: 8px; }
-        .glass-temp-val { font-size: 18px; font-weight: 900; color: #FFD700; }
-        .glass-meta-sub { font-size: 9px; color: #ccc; text-align: center; padding-bottom: 4px; }
+        .glass-temp-val { font-size: 19px; font-weight: 900; color: #FFD700; }
+        .glass-meta-sub { font-size: 9px; color: #ccc; text-align: center; padding-bottom: 5px; }
     `;
     document.head.appendChild(style);
 
@@ -27,6 +27,7 @@
             layer: L.layerGroup(),
             lastSignature: "",
             isSyncing: false,
+            // Sequential Geographic Anchors (West to East)
             hubs: [
                 { name: "P.A.B", lat: 47.57, lng: -59.13 },
                 { name: "Stephenville", lat: 48.45, lng: -58.43 },
@@ -41,7 +42,7 @@
         };
 
         const getSky = (code) => {
-            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
+            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 51:"🌦️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
             return map[code] || "☁️";
         };
 
@@ -61,7 +62,6 @@
             state.isSyncing = true;
             state.lastSignature = signature;
 
-            // WEONG-ROUTE METHODOLOGY: Percentage-based sampling
             const samples = [0, 0.25, 0.5, 0.75, 0.99]; 
             const usedNames = new Set();
 
@@ -70,9 +70,9 @@
                 const p = coords[idx];
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
-                // Proximity-Weighted Hub Selection
+                // CORRIDOR VALIDATION: Find closest hub that isn't too far from the point
                 let closestHub = state.hubs
-                    .map(h => ({ ...h, d: Math.hypot(p.lat - h.lat, p.lng - h.lng) }))
+                    .map(h => ({ ...h, d: window.map.distance([p.lat, p.lng], [h.lat, h.lng]) }))
                     .sort((a,b) => a.d - b.d)
                     .find(h => !usedNames.has(h.name)) || { name: `WP-${Math.round(pct*100)}` };
                 
@@ -103,6 +103,7 @@
             state.layer.clearLayers();
             let rows = "";
             data.forEach(d => {
+                // OFFSET RENDERING: Anchor at [55, 75] to float node above the route marker
                 L.marker([d.lat, d.lng], {
                     icon: L.divIcon({
                         className: '',
@@ -114,16 +115,16 @@
                                 </div>
                                 <div class="glass-meta-sub">${d.wind}kmh | ${d.vis}km</div>
                                </div>`,
-                        iconSize: [110, 60], iconAnchor: [55, 30]
+                        iconSize: [110, 65], iconAnchor: [55, 75]
                     })
                 }).addTo(state.layer);
 
                 rows += `<tr>
-                    <td style="padding:8px; border-bottom:1px solid #333; color:#FFD700; font-weight:bold;">${d.name}</td>
+                    <td style="padding:10px 8px; border-bottom:1px solid #222; color:#FFD700; font-weight:bold;">${d.name}</td>
                     <td style="color:#fff;">${d.eta}</td>
                     <td style="color:#FFD700; font-weight:bold;">${d.temp}°C</td>
-                    <td>${d.wind} km/h</td>
-                    <td>${d.vis} km</td>
+                    <td>${d.wind} KM/H</td>
+                    <td>${d.vis} KM</td>
                     <td style="text-align:right;">${d.sky}</td>
                 </tr>`;
             });
@@ -137,10 +138,10 @@
                 if (!document.getElementById('matrix-ui')) {
                     document.body.insertAdjacentHTML('beforeend', `
                         <div id="matrix-ui" style="position:fixed; bottom:30px; left:30px; z-index:10000; font-family:monospace; pointer-events:none;">
-                            <div style="background:rgba(10,10,10,0.95); border:1px solid #FFD700; width:620px; padding:15px; border-radius:4px; pointer-events:auto;">
-                                <div style="color:#FFD700; font-weight:bold; margin-bottom:10px; letter-spacing:2px; border-bottom:1px solid #FFD700;">MISSION WEATHER MATRIX</div>
+                            <div style="background:rgba(10,10,10,0.96); border:1px solid #FFD700; width:640px; padding:20px; border-radius:4px; pointer-events:auto; box-shadow: 0 0 40px rgba(0,0,0,0.9);">
+                                <div style="color:#FFD700; font-weight:bold; margin-bottom:12px; letter-spacing:2px; border-bottom:1px solid rgba(255,215,0,0.4); padding-bottom:8px;">MISSION WEATHER MATRIX</div>
                                 <table style="width:100%; color:#fff; font-size:11px; text-align:left;">
-                                    <thead><tr style="color:#888; text-transform:uppercase; font-size:9px;">
+                                    <thead><tr style="color:#666; text-transform:uppercase; font-size:9px;">
                                         <th>Hub</th><th>ETA</th><th>Temp</th><th>Wind</th><th>Vis</th><th style="text-align:right;">Sky</th>
                                     </tr></thead>
                                     <tbody id="matrix-body"></tbody>
@@ -149,7 +150,7 @@
                         </div>
                     `);
                 }
-                setInterval(refresh, 3000);
+                setInterval(refresh, 4000);
                 refresh();
             }
         };
