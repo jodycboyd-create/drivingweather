@@ -1,6 +1,5 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Mission: Amalgamated Consensus Logic
- * Logic: Average intensity across 5 waypoints determines final color/icon.
+ * Mission: Lowered Consensus + Icon-on-Detection Logic
  */
 
 (function() {
@@ -9,7 +8,6 @@
             rain: `<svg viewBox="0 0 30 30" width="20"><path d="M10,12 Q15,5 20,12 T25,18 T15,22 T5,18 T10,12" fill="#00BFFF"/><rect x="12" y="20" width="2" height="4" fill="#00BFFF" rx="1"/></svg>`,
             snow: `<svg viewBox="0 0 30 30" width="20"><circle cx="15" cy="15" r="2" fill="white"/><path d="M15,5 V25 M5,15 H25 M8,8 L22,22 M22,8 L8,22" stroke="white" stroke-width="2"/></svg>`
         },
-        milestones: ["Way-0", "Way-25", "Way-50", "Way-75", "Way-100"],
 
         async init() {
             const container = document.getElementById('matrix-ui');
@@ -23,11 +21,9 @@
             const now = new Date();
             const timeLabels = Array(12).fill(0).map((_, i) => {
                 const d = new Date(now.getTime() + (i * 4) * 3600000);
-                const day = d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
-                const hr = d.getHours();
                 return `<div style="width: calc(100% / 12); text-align:center; border-left:1px solid #222;">
-                            <div style="font-size:7px; color:#444;">${day}</div>
-                            <div style="font-size:9px; color:#888;">${hr % 12 || 12}${hr >= 12 ? 'PM' : 'AM'}</div>
+                            <div style="font-size:7px; color:#444;">${d.toLocaleDateString('en-CA', { weekday: 'short' })}</div>
+                            <div style="font-size:9px; color:#888;">${d.getHours() % 12 || 12}${d.getHours() >= 12 ? 'PM' : 'AM'}</div>
                         </div>`;
             }).join('');
 
@@ -38,15 +34,12 @@
                         ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center;"></div>`).join('')}
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-top:8px;">
-                        <span id="opt-consensus" style="color:#FFD700; font-weight:900; font-size:9px; letter-spacing:1px;">CALCULATING AMALGAMATED...</span>
-                        <span id="opt-status" style="color:#00FF00; font-size:9px;">CONSENSUS SYNC</span>
+                        <span id="opt-consensus" style="color:#FFD700; font-weight:900; font-size:9px; letter-spacing:1px;">MONITORING...</span>
+                        <span id="opt-count" style="color:#00FF00; font-size:9px;">0/5 WAYPOINTS ACTIVE</span>
                     </div>
                 </div>`;
             container.children[0].insertAdjacentHTML('afterbegin', html);
-            document.getElementById('heat-grid').onclick = (e) => {
-                const cell = e.target.closest('.heat-cell');
-                if (cell) this.shiftTime(cell.dataset.h, cell);
-            };
+            document.getElementById('heat-grid').onclick = (e) => this.shiftTime(e.target.closest('.heat-cell')?.dataset.h, e.target.closest('.heat-cell'));
         },
 
         async runScan(route) {
@@ -56,56 +49,59 @@
 
             for (let i = 0; i < 24; i++) {
                 const res = await this.getAmalgamatedIndex(samples, i * 2);
-                this.applyConsensusColor(cells[i], res.avgLevel, res.isSnow);
+                this.applySensitiveColor(cells[i], res);
                 if (i === 0) { 
-                    document.getElementById('opt-consensus').innerText = res.avgLevel > 0 ? `AMALGAMATED HAZARD: ${res.trend}` : "ROUTE CONSENSUS: CLEAR";
+                    document.getElementById('opt-consensus').innerText = res.precipDetected ? `PRECIP DETECTED: ${res.dominantType}` : "NO PRECIPITATION";
+                    document.getElementById('opt-count').innerText = `${res.activeCount}/5 WAYPOINTS AFFECTED`;
                 }
             }
         },
 
         async getAmalgamatedIndex(points, offset) {
             const time = new Date(Date.now() + offset * 3600000).toISOString().split(':')[0];
-            let totalLevel = 0, snowCount = 0, precipPoints = 0;
+            let totalL = 0, snowC = 0, precipC = 0;
             try {
                 const res = await Promise.all(points.map(p => 
                     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=weather_code&timezone=auto`).then(r => r.json())
                 ));
                 res.forEach(d => {
-                    const idx = d.hourly.time.findIndex(t => t.startsWith(time));
-                    if (idx === -1) return;
-                    const code = d.hourly.weather_code[idx];
+                    const code = d.hourly.weather_code[d.hourly.time.findIndex(t => t.startsWith(time))];
                     let L = 0;
-                    if (code === 63 || code === 73) L = 3; 
-                    else if (code === 61 || code === 71) L = 2;
-                    else if (code >= 51 && code <= 55) L = 1;
-
-                    if (L > 0) precipPoints++;
-                    totalLevel += L;
-                    if ((code >= 71 && code <= 75) || code >= 85) snowCount++;
+                    if (code >= 61 && code <= 99) { // Any falling precip
+                        precipC++;
+                        L = (code === 63 || code === 73) ? 3 : (code >= 65 || code >= 75) ? 4 : 2;
+                    } else if (code >= 51 && code <= 55) { L = 1; precipC++; }
+                    
+                    totalL += L;
+                    if ((code >= 71 && code <= 75) || code >= 85) snowC++;
                 });
-            } catch (e) { return {avgLevel: 0, isSnow: false, trend: "ERROR"}; }
+            } catch (e) { return {avgL: 0, precipDetected: false}; }
             
-            // Calculate Arithmetic Mean
-            const avg = Math.round(totalLevel / points.length);
             return {
-                avgLevel: avg,
-                isSnow: snowCount > (points.length / 2),
-                trend: precipPoints > 2 ? "CONSISTENT PRECIP" : "LOCALIZED PATCHES"
+                avgL: totalL / points.length,
+                activeCount: precipC,
+                precipDetected: precipC > 0,
+                isSnow: snowC > 0, // Show snow icon if ANY point reports snow
+                dominantType: snowC >= (precipC / 2) ? "SNOW" : "RAIN"
             };
         },
 
-        applyConsensusColor(el, level, isSnow) {
+        applySensitiveColor(el, data) {
             const neon = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
-            el.style.backgroundColor = neon[level];
-            // Only show icon if the amalgamated hazard is significant
-            if (level >= 2) {
-                el.innerHTML = isSnow ? this.svgs.snow : this.svgs.rain;
+            // Threshold lowered: avg > 0.5 = Yellow, avg > 2.2 = Orange
+            let colorIdx = data.avgL > 2.2 ? 3 : data.avgL > 0.5 ? 2 : data.avgL > 0.1 ? 1 : 0;
+            el.style.backgroundColor = neon[colorIdx];
+            
+            // Icon Rule: If detected at ANY waypoint, display it
+            if (data.precipDetected) {
+                el.innerHTML = data.isSnow ? this.svgs.snow : this.svgs.rain;
             } else {
                 el.innerHTML = "";
             }
         },
 
         shiftTime(hours, target) {
+            if (!hours) return;
             window.currentDepartureTime = new Date(Date.now() + parseInt(hours) * 3600000);
             if (window.WeatherEngine?.refresh) window.WeatherEngine.refresh();
             document.querySelectorAll('.heat-cell').forEach(c => c.style.outline = "none");
