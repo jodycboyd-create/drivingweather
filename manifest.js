@@ -9,7 +9,9 @@ var manifestData = {
             "engine/route-engine.js",
             "engine/velocity-widget.js",
             "engine/weather-engine.js",
-            "engine/optimize.js"
+            "engine/optimize.js",
+            "engine/radar.js",
+            "engine/rwis.js"
         ]
     }]
 };
