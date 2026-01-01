@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 066
- * Mission: Final Logic Lock + Icon Fix + Strict JSON Matching
- * Logic: No Hallucinations. No Highway Labels. Communities ONLY.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 067
+ * Mission: Fix Sync Crash + Restore Table Data + Persistent Loader
+ * Logic: Robust route detection + Strict communities.json mapping.
  */
 
 (function() {
@@ -53,7 +53,15 @@
 
         const refresh = async () => {
             if (state.isSyncing || !window.map) return;
-            const routeLayer = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
+            
+            // IMPROVED ROUTE SCANNER
+            let routeLayer = null;
+            window.map.eachLayer(l => {
+                if (l instanceof L.Polyline && l._latlngs && l._latlngs.length > 20) {
+                    routeLayer = l;
+                }
+            });
+
             if (!routeLayer) return;
 
             const coords = routeLayer.getLatLngs();
@@ -62,13 +70,19 @@
 
             state.isSyncing = true;
             toggleLoader(true);
-            state.lastSignature = sig;
 
+            // DATA FETCH LOCK
             if (state.communities.length === 0) {
                 try {
                     const res = await fetch('communities.json');
+                    if (!res.ok) throw new Error("File not found");
                     state.communities = await res.json();
-                } catch(e) { console.error("JSON Fetch Failed"); }
+                } catch(e) { 
+                    console.error("Critical: communities.json missing");
+                    state.isSyncing = false;
+                    toggleLoader(false);
+                    return;
+                }
             }
 
             const samples = [0, 0.25, 0.5, 0.75, 0.99];
@@ -77,24 +91,23 @@
             const depTime = window.currentDepartureTime || new Date();
             const used = new Set();
 
-            let waypoints = await Promise.all(samples.map(async (pct) => {
-                const idx = Math.floor((coords.length - 1) * pct);
-                const p = coords[idx];
-                
-                // Find ONLY literal matches from the communities.json
-                let match = state.communities
-                    .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
-                    .filter(c => c.d < 15000 && !used.has(c.name))
-                    .sort((a,b) => a.d - b.d)[0];
+            try {
+                let waypoints = await Promise.all(samples.map(async (pct) => {
+                    const idx = Math.floor((coords.length - 1) * pct);
+                    const p = coords[idx];
+                    
+                    let match = state.communities
+                        .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
+                        .filter(c => c.d < 15000 && !used.has(c.name))
+                        .sort((a,b) => a.d - b.d)[0];
 
-                if (!match) return null;
-                used.add(match.name);
+                    if (!match) return null;
+                    used.add(match.name);
 
-                const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
-
-                try {
+                    const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${match.lat}&longitude=${match.lng}&hourly=temperature_2m,weather_code&timezone=auto`);
                     const data = await res.json();
+                    
                     const tStr = arrival.toISOString().split(':')[0] + ":00";
                     const i = Math.max(0, data.hourly.time.findIndex(t => t.startsWith(tStr.substring(0,13))));
                     const m = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
@@ -105,12 +118,19 @@
                         sky: m[data.hourly.weather_code[i]] || "☁️",
                         eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                     };
-                } catch(e) { return null; }
-            }));
+                }));
 
-            render(waypoints.filter(w => w));
-            state.isSyncing = false;
-            toggleLoader(false);
+                const validWaypoints = waypoints.filter(w => w);
+                if (validWaypoints.length > 0) {
+                    render(validWaypoints);
+                    state.lastSignature = sig;
+                }
+            } catch (err) {
+                console.error("Sync Cycle Failed", err);
+            } finally {
+                state.isSyncing = false;
+                toggleLoader(false);
+            }
         };
 
         const render = (data) => {
@@ -124,7 +144,7 @@
                                 <div class="glass-header">${d.name}</div>
                                 <div class="glass-body"><span>${d.sky}</span><span class="glass-temp-val">${d.temp}°</span></div>
                                </div>`,
-                        iconSize: [110, 55], iconAnchor: [55, 160] // Float clear of pins
+                        iconSize: [110, 55], iconAnchor: [55, 160]
                     })
                 }).addTo(state.layer);
 
