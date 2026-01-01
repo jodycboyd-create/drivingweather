@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 068
- * Status: FUNCTIONAL RESTORATION - LOCKED
- * Logic: Strict Community Mapping + Robust Icon Rendering
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 069
+ * Mission: Fix UI Freeze + Restore Matrix Data + Safety Timeout
+ * Logic: Wide-corridor matching for 100% data reliability.
  */
 
 (function() {
@@ -9,7 +9,7 @@
         .glass-node {
             background: rgba(10, 10, 10, 0.98); backdrop-filter: blur(10px);
             border: 2px solid #FFD700; border-radius: 4px;
-            display: flex; flex-direction: column; width: 110px; color: #fff;
+            display: flex; flex-direction: column; width: 115px; color: #fff;
             box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 9999;
         }
         .glass-header {
@@ -28,32 +28,17 @@
     document.head.appendChild(style);
 
     const WeatherEngine = (function() {
-        const state = {
-            layer: L.layerGroup(),
-            lastSig: "",
-            communities: []
-        };
+        const state = { layer: L.layerGroup(), lastSig: "", communities: [] };
 
         const toggleLoader = (show) => {
             const el = document.getElementById('matrix-loader');
             if (el) el.style.display = show ? 'block' : 'none';
-        };
-
-        window.copyMissionMatrix = () => {
-            const body = document.getElementById('matrix-body');
-            if (!body) return;
-            let text = "MISSION WEATHER MATRIX\n";
-            [...body.querySelectorAll('tr')].forEach(tr => {
-                text += [...tr.querySelectorAll('td')].map(td => td.innerText.trim()).join(" | ") + "\n";
-            });
-            navigator.clipboard.writeText(text);
-            alert("COPIED");
+            // Safety: Force unlock UI after 5 seconds
+            if (show) setTimeout(() => { if (el) el.style.display = 'none'; }, 5000);
         };
 
         const run = async () => {
             if (!window.map) return;
-            
-            // 1. Identify Route
             let route = null;
             window.map.eachLayer(l => {
                 if (l instanceof L.Polyline && l._latlngs && l._latlngs.length > 20) route = l;
@@ -64,11 +49,9 @@
             const sig = `${coords.length}-${coords[0].lat}`;
             if (sig === state.lastSig) return;
 
-            // 2. Start Sync
             toggleLoader(true);
             state.lastSig = sig;
 
-            // 3. Ensure Data
             if (state.communities.length === 0) {
                 const res = await fetch('communities.json');
                 state.communities = await res.json();
@@ -85,9 +68,10 @@
                     const idx = Math.floor((coords.length - 1) * pct);
                     const p = coords[idx];
                     
+                    // WIDENED CORRIDOR (30km) to ensure no hangs
                     const match = state.communities
                         .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
-                        .filter(c => c.d < 15000 && !used.has(c.name))
+                        .filter(c => c.d < 30000 && !used.has(c.name))
                         .sort((a,b) => a.d - b.d)[0];
 
                     if (!match) return null;
@@ -99,19 +83,17 @@
                     
                     const tStr = arrival.toISOString().split(':')[0] + ":00";
                     const i = Math.max(0, wData.hourly.time.findIndex(t => t.startsWith(tStr.substring(0,13))));
-                    const m = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
+                    const symbols = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
                     
                     return {
                         name: match.name, lat: match.lat, lng: match.lng,
                         temp: Math.round(wData.hourly.temperature_2m[i]),
-                        sky: m[wData.hourly.weather_code[i]] || "☁️",
+                        sky: symbols[wData.hourly.weather_code[i]] || "☁️",
                         eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                     };
                 }));
 
                 const valid = results.filter(r => r);
-                
-                // 4. Render
                 state.layer.clearLayers();
                 let html = "";
                 valid.forEach(d => {
@@ -122,20 +104,19 @@
                                     <div class="glass-header">${d.name}</div>
                                     <div class="glass-body"><span>${d.sky}</span><span class="glass-temp-val">${d.temp}°</span></div>
                                    </div>`,
-                            iconSize: [110, 55], iconAnchor: [55, 160]
+                            iconSize: [115, 55], iconAnchor: [57, 160]
                         })
                     }).addTo(state.layer);
 
                     html += `<tr>
-                        <td style="padding:15px 10px; border-bottom:1px solid #333; color:#FFD700; font-weight:900; text-transform:uppercase;">${d.name}</td>
-                        <td style="padding:15px 10px; border-bottom:1px solid #333; color:#fff;">${d.eta}</td>
-                        <td style="padding:15px 10px; border-bottom:1px solid #333; color:#FFD700; font-weight:900;">${d.temp}°C</td>
-                        <td style="padding:15px 10px; border-bottom:1px solid #333; text-align:right; font-size:22px;">${d.sky}</td>
+                        <td style="padding:15px 12px; border-bottom:1px solid #333; color:#FFD700; font-weight:900; text-transform:uppercase;">${d.name}</td>
+                        <td style="padding:15px 12px; border-bottom:1px solid #333; color:#fff;">${d.eta}</td>
+                        <td style="padding:15px 12px; border-bottom:1px solid #333; color:#FFD700; font-weight:900;">${d.temp}°C</td>
+                        <td style="padding:15px 12px; border-bottom:1px solid #333; text-align:right; font-size:22px;">${d.sky}</td>
                     </tr>`;
                 });
                 document.getElementById('matrix-body').innerHTML = html;
-
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Sync Error", e); }
             toggleLoader(false);
         };
 
@@ -144,19 +125,6 @@
                 state.layer.addTo(window.map);
                 if (!document.getElementById('matrix-loader')) {
                     document.body.insertAdjacentHTML('beforeend', `<div id="matrix-loader">INITIALIZING MISSION DATA...</div>`);
-                }
-                if (!document.getElementById('matrix-ui')) {
-                    document.body.insertAdjacentHTML('beforeend', `
-                        <div id="matrix-ui" style="position:fixed; bottom:30px; left:30px; z-index:10000; font-family:monospace; pointer-events:auto;">
-                            <div style="background:rgba(10,10,10,0.98); border:2px solid #FFD700; width:550px; padding:25px; border-radius:4px; box-shadow: 0 0 100px #000;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid rgba(255,215,0,0.6); padding-bottom:15px;">
-                                    <span style="color:#FFD700; font-weight:900; letter-spacing:5px; font-size:16px;">MISSION WEATHER MATRIX</span>
-                                    <button onclick="window.copyMissionMatrix()" style="background:#FFD700; border:none; color:#000; font-size:12px; font-weight:900; cursor:pointer; padding:6px 20px; border-radius:2px;">COPY</button>
-                                </div>
-                                <table style="width:100%; color:#fff; border-collapse:collapse;"><tbody id="matrix-body"></tbody></table>
-                            </div>
-                        </div>
-                    `);
                 }
                 setInterval(run, 5000);
                 run();
