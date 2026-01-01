@@ -1,28 +1,28 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 061
- * Mission: Dynamic communities.json Integration + Zero Hard-Coding
- * Logic: Percent-based route sampling with full spatial community lookup.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 063
+ * Mission: Restore Table UI + Kill K-POS Labels + Fix Pin Overlap
+ * Core Logic: Direct communities.json intersection (No Re-Engineering)
  */
 
 (function() {
     const style = document.createElement('style');
     style.innerHTML = `
         .glass-node {
-            background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(10px);
+            background: rgba(10, 10, 10, 0.98); backdrop-filter: blur(10px);
             border: 1px solid #FFD700; border-radius: 4px;
-            display: flex; flex-direction: column; width: 90px; color: #fff;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+            display: flex; flex-direction: column; width: 95px; color: #fff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.95); z-index: 1000;
         }
         .glass-header {
-            background: #FFD700; color: #000; font-size: 9px; font-weight: 900;
-            text-align: center; padding: 3px 0; text-transform: uppercase;
+            background: #FFD700; color: #000; font-size: 10px; font-weight: 900;
+            text-align: center; padding: 4px 0; text-transform: uppercase;
         }
-        .glass-body { display: flex; align-items: center; justify-content: center; padding: 5px; gap: 5px; }
-        .glass-temp-val { font-size: 18px; font-weight: 900; color: #FFD700; }
+        .glass-body { display: flex; align-items: center; justify-content: center; padding: 6px; gap: 8px; }
+        .glass-temp-val { font-size: 19px; font-weight: 900; color: #FFD700; }
         #matrix-loader {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.95); border: 2px solid #FFD700; color: #FFD700;
-            padding: 30px; font-family: monospace; letter-spacing: 3px; z-index: 20000;
-            display: none; font-weight: bold;
+            background: rgba(0,0,0,0.98); border: 2px solid #FFD700; color: #FFD700;
+            padding: 35px 50px; font-family: monospace; letter-spacing: 4px; z-index: 30000;
+            display: none; font-weight: 900; box-shadow: 0 0 100px #000;
         }
     `;
     document.head.appendChild(style);
@@ -40,16 +40,16 @@
             if (loader) loader.style.display = show ? 'block' : 'none';
         };
 
-        window.copyMatrixText = () => {
+        window.copyMatrixData = () => {
             const body = document.getElementById('matrix-body');
             if (!body) return;
-            let output = "MISSION WEATHER MATRIX\n";
+            let output = "MISSION WEATHER MATRIX\n----------------------\n";
             body.querySelectorAll('tr').forEach(tr => {
-                const cols = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
-                output += cols.join(" | ") + "\n";
+                const cells = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
+                output += cells.join(" | ") + "\n";
             });
             navigator.clipboard.writeText(output);
-            alert("Matrix Copied.");
+            alert("MATRIX COPIED TO CLIPBOARD");
         };
 
         const refresh = async () => {
@@ -65,13 +65,11 @@
             toggleLoader(true);
             state.lastSignature = sig;
 
-            // Load the full communities list from JSON
             if (state.communities.length === 0) {
                 try {
-                    const res = await fetch('/data/nl/communities.json');
-                    const raw = await res.json();
-                    state.communities = Array.isArray(raw) ? raw : (raw.communities || []);
-                } catch(e) { console.error("Failed to load communities.json", e); }
+                    const res = await fetch('communities.json');
+                    state.communities = await res.json();
+                } catch(e) { console.error("Data Load Failed"); }
             }
 
             const samples = [0, 0.25, 0.5, 0.75, 0.99];
@@ -85,13 +83,13 @@
                 const p = coords[idx];
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
-                // DYNAMIC LOOKUP: Find closest community in JSON to this route coordinate
+                // Find community along the route (5km corridor)
                 let nearest = state.communities
                     .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
-                    .filter(c => !used.has(c.name))
+                    .filter(c => c.d < 5000 && !used.has(c.name))
                     .sort((a,b) => a.d - b.d)[0];
                 
-                const label = nearest ? nearest.name : `K-POS ${Math.round(pct*100)}%`;
+                const label = nearest ? nearest.name : `Highway km ${Math.round(pct * dist)}`;
                 if (nearest) used.add(nearest.name);
 
                 try {
@@ -126,15 +124,15 @@
                                 <div class="glass-header">${d.name}</div>
                                 <div class="glass-body"><span>${d.sky}</span><span class="glass-temp-val">${d.temp}°</span></div>
                                </div>`,
-                        iconSize: [90, 42], iconAnchor: [45, 120] 
+                        iconSize: [95, 45], iconAnchor: [47, 140] // Clear the pins
                     })
                 }).addTo(state.layer);
 
-                rows += `<tr style="border-bottom: 1px solid #222;">
-                    <td style="padding:10px; color:#FFD700; font-weight:bold;">${d.name}</td>
-                    <td style="padding:10px; color:#fff;">${d.eta}</td>
-                    <td style="padding:10px; color:#FFD700;">${d.temp}°C</td>
-                    <td style="padding:10px; text-align:right;">${d.sky}</td>
+                rows += `<tr>
+                    <td style="padding:12px 8px; border-bottom:1px solid #222; color:#FFD700; font-weight:bold; font-size:11px; text-transform:uppercase;">${d.name}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #222; color:#fff; font-size:11px;">${d.eta}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #222; color:#FFD700; font-weight:bold; font-size:11px;">${d.temp}°C</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #222; text-align:right; font-size:14px;">${d.sky}</td>
                 </tr>`;
             });
             const matrixBody = document.getElementById('matrix-body');
@@ -145,17 +143,17 @@
             init: () => {
                 state.layer.addTo(window.map);
                 if (!document.getElementById('matrix-loader')) {
-                    document.body.insertAdjacentHTML('beforeend', `<div id="matrix-loader">LOADING MISSION DATA...</div>`);
+                    document.body.insertAdjacentHTML('beforeend', `<div id="matrix-loader">INITIALIZING MISSION DATA...</div>`);
                 }
                 if (!document.getElementById('matrix-ui')) {
                     document.body.insertAdjacentHTML('beforeend', `
                         <div id="matrix-ui" style="position:fixed; bottom:30px; left:30px; z-index:10000; font-family:monospace; pointer-events:auto;">
-                            <div style="background:rgba(10,10,10,0.98); border:1px solid #FFD700; width:450px; padding:15px; border-radius:4px; box-shadow: 0 0 50px #000;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid rgba(255,215,0,0.3); padding-bottom:8px;">
-                                    <span style="color:#FFD700; font-weight:900; letter-spacing:2px;">MISSION WEATHER MATRIX</span>
-                                    <button onclick="window.copyMatrixText()" style="background:#FFD700; border:none; color:#000; font-size:9px; font-weight:bold; cursor:pointer; padding:3px 10px; border-radius:2px;">COPY</button>
+                            <div style="background:rgba(10,10,10,0.98); border:1px solid #FFD700; width:550px; padding:20px; border-radius:4px; box-shadow: 0 0 50px #000;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid rgba(255,215,0,0.4); padding-bottom:10px;">
+                                    <span style="color:#FFD700; font-weight:900; letter-spacing:3px;">MISSION WEATHER MATRIX</span>
+                                    <button onclick="window.copyMatrixData()" style="background:#FFD700; border:none; color:#000; font-size:10px; font-weight:900; cursor:pointer; padding:4px 12px; border-radius:2px;">COPY</button>
                                 </div>
-                                <table style="width:100%; color:#fff; font-size:11px; text-align:left; border-collapse:collapse;">
+                                <table style="width:100%; color:#fff; border-collapse:collapse;">
                                     <tbody id="matrix-body"></tbody>
                                 </table>
                             </div>
