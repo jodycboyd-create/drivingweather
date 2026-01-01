@@ -1,6 +1,5 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 013
- * Core Logic: Explicit Origin/Destination Waypoints + Proximity-Weighted Hubs
- * Fix: Reinstates Tabular Matrix and prevents Atlantic drifting.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 045
+ * Integration: Patch 013 UI + Recent 100km Interval Logic
  */
 
 (function() {
@@ -30,74 +29,76 @@
             layer: L.layerGroup(),
             lastSignature: "",
             isSyncing: false,
-            // Permanent Geographic Anchors
-            hubs: [
-                { name: "P.A.B", lat: 47.57, lng: -59.13 },
-                { name: "Stephenville", lat: 48.45, lng: -58.43 },
-                { name: "Corner Brook", lat: 48.95, lng: -57.94 },
-                { name: "Grand Falls", lat: 48.93, lng: -55.65 },
-                { name: "Gander", lat: 48.95, lng: -54.61 },
-                { name: "Clarenville", lat: 48.16, lng: -53.96 },
-                { name: "Whitbourne", lat: 47.42, lng: -53.52 },
-                { name: "St. John's", lat: 47.56, lng: -52.71 }
-            ]
+            communityData: [] // To be filled from your registry
         };
 
         const getSky = (code) => {
-            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️" };
+            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
             return map[code] || "☁️";
         };
 
         const refresh = async () => {
             if (state.isSyncing || !window.map) return;
+
+            // Load community registry if missing
+            if (state.communityData.length === 0) {
+                try {
+                    const res = await fetch('/data/nl/communities.json');
+                    const raw = await res.json();
+                    state.communityData = Array.isArray(raw) ? raw : (raw.communities || []);
+                } catch(e) { return; }
+            }
+
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
-            if (!route) return;
+            if (!route || state.communityData.length === 0) return;
 
             const coords = route.getLatLngs();
-            const speed = window.currentCruisingSpeed || 100;
-            const dist = window.currentRouteDistance || 0;
-            const depTime = window.currentDepartureTime || new Date();
-
-            const signature = `${coords[0].lat}-${coords[coords.length-1].lat}-${speed}-${depTime.getTime()}`;
+            const signature = `${coords[0].lat}-${coords.length}`;
             if (signature === state.lastSignature) return;
 
             state.isSyncing = true;
             state.lastSignature = signature;
 
-            // NEW WAYPOINT STRATEGY: 1. Origin, 2. Mid-1, 3. Mid-2, 4. Mid-3, 5. Destination
-            const samples = [0, 0.25, 0.5, 0.75, 0.99]; 
-            const usedNames = new Set();
+            // 1. NEW 100KM INTERVAL LOGIC
+            let cumulativeDist = 0;
+            let distMap = coords.map((p, i) => {
+                if (i === 0) return 0;
+                cumulativeDist += window.map.distance(coords[i-1], p);
+                return cumulativeDist;
+            });
 
-            let waypoints = await Promise.all(samples.map(async (pct) => {
-                const idx = Math.floor((coords.length - 1) * pct);
-                const p = coords[idx];
-                const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
+            const intervalM = 100000; // 100km
+            let targetPoints = [];
+            for (let d = 0; d <= cumulativeDist; d += intervalM) {
+                let closestIdx = distMap.findIndex(m => m >= d);
+                if (closestIdx !== -1) targetPoints.push({ pt: coords[closestIdx], dist: d });
+            }
+            // Ensure end of route is always included
+            if (cumulativeDist % intervalM > 20000) targetPoints.push({ pt: coords[coords.length-1], dist: cumulativeDist });
 
-                // Find closest hub name for the waypoint, but don't reuse names
-                let closestHub = state.hubs
-                    .map(h => ({ ...h, d: Math.hypot(p.lat - h.lat, p.lng - h.lng) }))
-                    .sort((a,b) => a.d - b.d)
-                    .find(h => !usedNames.has(h.name)) || { name: `WP-${Math.round(pct*100)}` };
+            // 2. REGISTRY SNAPPING
+            let waypoints = await Promise.all(targetPoints.map(async (target) => {
+                let nearest = state.communityData
+                    .map(c => ({ ...c, d: window.map.distance([target.pt.lat, target.pt.lng], [c.lat, c.lng]) }))
+                    .sort((a, b) => a.d - b.d)[0];
                 
-                usedNames.add(closestHub.name);
+                if (!nearest) return null;
 
                 try {
-                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
-                    const data = await res.json();
-                    const i = Math.max(0, data.hourly.time.indexOf(arrival.toISOString().split(':')[0] + ":00"));
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${nearest.lat}&longitude=${nearest.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
+                    const d = await res.json();
                     
                     return {
-                        name: closestHub.name, lat: p.lat, lng: p.lng, order: idx,
-                        temp: Math.round(data.hourly.temperature_2m[i]),
-                        wind: Math.round(data.hourly.wind_speed_10m[i]),
-                        vis: Math.round(data.hourly.visibility[i] / 1000),
-                        sky: getSky(data.hourly.weather_code[i]),
-                        eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                        name: nearest.name, lat: nearest.lat, lng: nearest.lng,
+                        temp: Math.round(d.hourly.temperature_2m[0]),
+                        wind: Math.round(d.hourly.wind_speed_10m[0]),
+                        vis: Math.round(d.hourly.visibility[0] / 1000),
+                        sky: getSky(d.hourly.weather_code[0])
                     };
                 } catch (e) { return null; }
             }));
 
-            render(waypoints.filter(w => w).sort((a,b) => a.order - b.order));
+            render(waypoints.filter(w => w));
             state.isSyncing = false;
         };
 
@@ -121,12 +122,11 @@
                 }).addTo(state.layer);
 
                 rows += `<tr>
-                    <td style="padding:8px; border-bottom:1px solid #333;">${d.name}</td>
-                    <td>${d.eta}</td>
+                    <td style="padding:8px; border-bottom:1px solid #333; font-weight:bold; color:#FFD700;">${d.name}</td>
                     <td style="color:#FFD700; font-weight:bold;">${d.temp}°C</td>
                     <td>${d.wind} km/h</td>
                     <td>${d.vis} km</td>
-                    <td>${d.sky}</td>
+                    <td style="text-align:right;">${d.sky}</td>
                 </tr>`;
             });
             document.getElementById('matrix-body').innerHTML = rows;
@@ -141,14 +141,14 @@
                             <div style="color:#FFD700; font-weight:bold; margin-bottom:10px; letter-spacing:2px; border-bottom:1px solid #FFD700;">MISSION WEATHER MATRIX</div>
                             <table style="width:100%; color:#fff; font-size:11px; text-align:left;">
                                 <thead><tr style="color:#888; text-transform:uppercase; font-size:9px;">
-                                    <th>Hub</th><th>ETA</th><th>Temp</th><th>Wind</th><th>Vis</th><th>Sky</th>
+                                    <th>Hub</th><th>Temp</th><th>Wind</th><th>Vis</th><th style="text-align:right;">Sky</th>
                                 </tr></thead>
                                 <tbody id="matrix-body"></tbody>
                             </table>
                         </div>
                     </div>
                 `);
-                setInterval(refresh, 3000);
+                setInterval(refresh, 5000);
             }
         };
     })();
