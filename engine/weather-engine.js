@@ -1,5 +1,5 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 028
- * Fix: Absolute Community Naming + Mission Sync Status Bar
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 030
+ * Fix: Centralized Loading Status + Absolute Name Snapping
  * Logic: Name = Registry Primary | Weather = Route GPS Truth
  */
 
@@ -9,7 +9,7 @@
         .glass-node {
             background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 215, 0, 0.5); border-radius: 8px;
-            display: flex; flex-direction: column; width: 100px; color: #fff;
+            display: flex; flex-direction: column; width: 105px; color: #fff;
             box-shadow: 0 10px 30px rgba(0,0,0,0.7); overflow: hidden;
         }
         .glass-header {
@@ -20,16 +20,23 @@
         .glass-body { display: flex; align-items: center; justify-content: space-evenly; padding: 8px 2px; }
         .glass-temp-val { font-size: 18px; font-weight: 900; color: #FFD700; }
         
+        #central-sync-overlay {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 20000; background: rgba(0,0,0,0.9); padding: 20px;
+            border: 1px solid #FFD700; border-radius: 10px; width: 300px;
+            text-align: center; display: none; pointer-events: none;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+        }
+        .sync-text { color: #FFD700; font-size: 10px; font-weight: 900; letter-spacing: 2px; margin-bottom: 10px; }
+        .sync-bar-full { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+        #sync-progress-bar { width: 0%; height: 100%; background: #FFD700; transition: width 0.2s ease; }
+
         #matrix-ui-container {
             position: fixed; bottom: 25px; left: 25px; z-index: 10000;
             background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 215, 0, 0.5); border-radius: 12px;
             width: 620px; padding: 20px; pointer-events: auto;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.9);
         }
-        .sync-bar-container { width: 100%; height: 3px; background: rgba(255,255,255,0.1); margin-bottom: 15px; border-radius: 2px; overflow: hidden; }
-        #sync-progress { width: 0%; height: 100%; background: #FFD700; transition: width 0.3s ease; }
-
         .matrix-table { width: 100%; color: #fff; font-size: 11px; text-align: left; border-collapse: collapse; }
         .matrix-table tr:nth-child(even) { background: rgba(255,255,255,0.05); }
         .copy-btn {
@@ -53,7 +60,7 @@
         };
 
         const getSkyText = (code) => {
-            const map = { 0:"CLEAR", 1:"P.CLOUDY", 2:"M.CLOUDY", 3:"OVC", 45:"FOG", 61:"RAIN", 71:"SNOW", 95:"T-STORM" };
+            const map = { 0:"CLEAR", 1:"P.CLOUDY", 2:"M.CLOUDY", 3:"OVC", 45:"FOG", 61:"RAIN", 71:"SNOW", 95:"TSORM" };
             return map[code] || "CLOUDY";
         };
 
@@ -62,9 +69,11 @@
             return dirs[Math.round(deg / 45) % 8];
         };
 
-        const updateSyncBar = (pct) => {
-            const bar = document.getElementById('sync-progress');
-            if(bar) bar.style.width = pct + "%";
+        const updateSyncUI = (pct, show) => {
+            const overlay = document.getElementById('central-sync-overlay');
+            const bar = document.getElementById('sync-progress-bar');
+            if (overlay) overlay.style.display = show ? 'block' : 'none';
+            if (bar) bar.style.width = pct + "%";
         };
 
         const refresh = async () => {
@@ -85,14 +94,13 @@
             const speed = window.currentCruisingSpeed || 100;
             const dist = window.currentRouteDistance || 0;
             const depTime = window.currentDepartureTime || new Date();
-            const zoom = window.map.getZoom();
+            const signature = `${coords[0].lat}-${coords.length}-${speed}`;
 
-            const signature = `${coords[0].lat}-${coords.length}-${speed}-${zoom}`;
             if (signature === state.lastSignature) return;
 
             state.isSyncing = true;
             state.lastSignature = signature;
-            updateSyncBar(10);
+            updateSyncUI(10, true);
 
             const samples = [0.05, 0.25, 0.5, 0.75, 0.95]; 
             const usedNames = new Set();
@@ -103,13 +111,12 @@
                 const roadPoint = coords[idx]; 
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
-                // FORCE COMMUNITY NAME from nearest registry entry
-                let nearest = state.communityData
+                let sorted = state.communityData
                     .map(c => ({ ...c, d: Math.hypot(roadPoint.lat - c.lat, roadPoint.lng - c.lng) }))
-                    .sort((a,b) => a.d - b.d)
-                    .find(c => !usedNames.has(c.name)) || { name: "Newfoundland Coast" };
-
-                usedNames.add(nearest.name);
+                    .sort((a,b) => a.d - b.d);
+                
+                let nearest = sorted.find(c => !usedNames.has(c.name)) || sorted[0];
+                if (nearest) usedNames.add(nearest.name);
 
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${roadPoint.lat}&longitude=${roadPoint.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
@@ -117,10 +124,11 @@
                     const i = Math.max(0, d.hourly.time.indexOf(arrival.toISOString().split(':')[0] + ":00"));
                     
                     completed++;
-                    updateSyncBar(10 + (completed / samples.length) * 90);
+                    updateSyncUI(10 + (completed / samples.length) * 90, true);
 
                     return {
-                        name: nearest.name, lat: roadPoint.lat, lng: roadPoint.lng,
+                        name: nearest ? nearest.name : "STATION",
+                        lat: roadPoint.lat, lng: roadPoint.lng,
                         temp: Math.round(d.hourly.temperature_2m[i]),
                         wind: Math.round(d.hourly.wind_speed_10m[i]),
                         windDir: getWindDir(d.hourly.wind_direction_10m[i]),
@@ -133,7 +141,7 @@
             }));
 
             render(waypoints.filter(w => w));
-            setTimeout(() => updateSyncBar(0), 1000); // Reset bar
+            setTimeout(() => updateSyncUI(0, false), 800);
             state.isSyncing = false;
         };
 
@@ -151,7 +159,7 @@
                                     <span class="glass-temp-val">${d.temp}°</span>
                                 </div>
                                </div>`,
-                        iconSize: [100, 52], iconAnchor: [50, 26]
+                        iconSize: [105, 52], iconAnchor: [52, 26]
                     })
                 }).addTo(state.layer);
 
@@ -167,23 +175,18 @@
             document.getElementById('matrix-body').innerHTML = rows;
         };
 
-        window.copyMatrix = () => {
-            const rows = Array.from(document.querySelectorAll('#matrix-body tr')).map(tr => 
-                Array.from(tr.cells).map(td => td.innerText).join(' | ')
-            ).join('\n');
-            navigator.clipboard.writeText("MISSION WEATHER MATRIX\n" + rows);
-            alert("Copied.");
-        };
-
         return {
             init: () => {
                 state.layer.addTo(window.map);
-                if(!document.getElementById('matrix-ui-container')) {
+                if(!document.getElementById('central-sync-overlay')) {
                     document.body.insertAdjacentHTML('beforeend', `
+                        <div id="central-sync-overlay">
+                            <div class="sync-text">SYNCING MISSION DATA</div>
+                            <div class="sync-bar-full"><div id="sync-progress-bar"></div></div>
+                        </div>
                         <div id="matrix-ui-container">
-                            <button class="copy-btn" onclick="copyMatrix()">Copy</button>
-                            <div style="color:#FFD700; font-size:11px; font-weight:900; margin-bottom:5px; letter-spacing:2px; text-transform:uppercase;">Mission Weather Matrix</div>
-                            <div class="sync-bar-container"><div id="sync-progress"></div></div>
+                            <button class="copy-btn" onclick="WeatherEngine.copy()">Copy</button>
+                            <div style="color:#FFD700; font-size:11px; font-weight:900; margin-bottom:15px; letter-spacing:2px; text-transform:uppercase;">Mission Weather Matrix</div>
                             <table class="matrix-table">
                                 <thead><tr style="color:#666; text-transform:uppercase; font-size:9px; border-bottom:1px solid #444;">
                                     <th style="padding-bottom:10px;">Location</th><th>ETA</th><th>Temp</th><th>Wind</th><th>Vis</th><th>Sky</th>
@@ -194,6 +197,12 @@
                     `);
                 }
                 setInterval(refresh, 5000);
+            },
+            copy: () => {
+                const rows = Array.from(document.querySelectorAll('#matrix-body tr')).map(tr => 
+                    Array.from(tr.cells).map(td => td.innerText).join(' | ')
+                ).join('\n');
+                navigator.clipboard.writeText("MISSION WEATHER MATRIX\n" + rows);
             }
         };
     })();
