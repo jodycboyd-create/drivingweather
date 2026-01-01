@@ -1,110 +1,158 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 071
- * Philosophy: 'If it isn't broken, don't try to fix it.'
- * Logic: Strict Community Mapping + High-Clearance Icons.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 013
+ * Core Logic: Explicit Origin/Destination Waypoints + Proximity-Weighted Hubs
+ * Fix: Reinstates Tabular Matrix and prevents Atlantic drifting.
  */
 
 (function() {
-    const WeatherEngine = {
-        state: { 
-            layer: L.layerGroup(), 
-            lastSig: "", 
-            communities: [] 
-        },
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .glass-node {
+            background: rgba(15, 15, 15, 0.9); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.7); border-radius: 6px;
+            display: flex; flex-direction: column; width: 110px; color: #fff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .glass-header {
+            background: #FFD700; color: #000; font-size: 9px; font-weight: 900;
+            text-align: center; padding: 3px 0; text-transform: uppercase;
+        }
+        .glass-body {
+            display: flex; align-items: center; justify-content: center;
+            padding: 6px; gap: 8px;
+        }
+        .glass-temp-val { font-size: 18px; font-weight: 900; color: #FFD700; }
+        .glass-meta-sub { font-size: 9px; color: #ccc; text-align: center; padding-bottom: 4px; }
+    `;
+    document.head.appendChild(style);
 
-        async refresh() {
-            if (!window.map) return;
+    const WeatherEngine = (function() {
+        const state = {
+            layer: L.layerGroup(),
+            lastSignature: "",
+            isSyncing: false,
+            // Permanent Geographic Anchors
+            hubs: [
+                { name: "P.A.B", lat: 47.57, lng: -59.13 },
+                { name: "Stephenville", lat: 48.45, lng: -58.43 },
+                { name: "Corner Brook", lat: 48.95, lng: -57.94 },
+                { name: "Grand Falls", lat: 48.93, lng: -55.65 },
+                { name: "Gander", lat: 48.95, lng: -54.61 },
+                { name: "Clarenville", lat: 48.16, lng: -53.96 },
+                { name: "Whitbourne", lat: 47.42, lng: -53.52 },
+                { name: "St. John's", lat: 47.56, lng: -52.71 }
+            ]
+        };
 
-            // 1. Identify the active route line
-            let route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 20);
+        const getSky = (code) => {
+            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️" };
+            return map[code] || "☁️";
+        };
+
+        const refresh = async () => {
+            if (state.isSyncing || !window.map) return;
+            const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
             if (!route) return;
 
             const coords = route.getLatLngs();
-            const sig = `${coords.length}-${coords[0].lat}`;
-            if (sig === this.state.lastSig) return;
-
-            // 2. Trigger Loader and Load Data
-            document.getElementById('matrix-loader').style.display = 'block';
-            this.state.lastSig = sig;
-
-            if (this.state.communities.length === 0) {
-                const res = await fetch('communities.json');
-                this.state.communities = await res.json();
-            }
-
-            const pcts = [0, 0.25, 0.5, 0.75, 0.99];
-            const used = new Set();
             const speed = window.currentCruisingSpeed || 100;
             const dist = window.currentRouteDistance || 0;
             const depTime = window.currentDepartureTime || new Date();
 
-            try {
-                const waypoints = await Promise.all(pcts.map(async (pct) => {
-                    const p = coords[Math.floor((coords.length - 1) * pct)];
-                    
-                    // STRICT COMMUNITY MATCHING (25km Corridor)
-                    const match = this.state.communities
-                        .map(c => ({ ...c, d: window.map.distance([p.lat, p.lng], [c.lat, c.lng]) }))
-                        .filter(c => c.d < 25000 && !used.has(c.name))
-                        .sort((a,b) => a.d - b.d)[0];
+            const signature = `${coords[0].lat}-${coords[coords.length-1].lat}-${speed}-${depTime.getTime()}`;
+            if (signature === state.lastSignature) return;
 
-                    if (!match) return null;
-                    used.add(match.name);
+            state.isSyncing = true;
+            state.lastSignature = signature;
 
-                    const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
-                    const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${match.lat}&longitude=${match.lng}&hourly=temperature_2m,weather_code&timezone=auto`);
-                    const wData = await wRes.json();
-                    
-                    const timeStr = arrival.toISOString().split(':')[0] + ":00";
-                    const idx = Math.max(0, wData.hourly.time.findIndex(t => t.startsWith(timeStr.substring(0,13))));
-                    const symbols = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
+            // NEW WAYPOINT STRATEGY: 1. Origin, 2. Mid-1, 3. Mid-2, 4. Mid-3, 5. Destination
+            const samples = [0, 0.25, 0.5, 0.75, 0.99]; 
+            const usedNames = new Set();
+
+            let waypoints = await Promise.all(samples.map(async (pct) => {
+                const idx = Math.floor((coords.length - 1) * pct);
+                const p = coords[idx];
+                const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
+
+                // Find closest hub name for the waypoint, but don't reuse names
+                let closestHub = state.hubs
+                    .map(h => ({ ...h, d: Math.hypot(p.lat - h.lat, p.lng - h.lng) }))
+                    .sort((a,b) => a.d - b.d)
+                    .find(h => !usedNames.has(h.name)) || { name: `WP-${Math.round(pct*100)}` };
+                
+                usedNames.add(closestHub.name);
+
+                try {
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
+                    const data = await res.json();
+                    const i = Math.max(0, data.hourly.time.indexOf(arrival.toISOString().split(':')[0] + ":00"));
                     
                     return {
-                        name: match.name, lat: match.lat, lng: match.lng,
-                        temp: Math.round(wData.hourly.temperature_2m[idx]),
-                        sky: symbols[wData.hourly.weather_code[idx]] || "☁️",
+                        name: closestHub.name, lat: p.lat, lng: p.lng, order: idx,
+                        temp: Math.round(data.hourly.temperature_2m[i]),
+                        wind: Math.round(data.hourly.wind_speed_10m[i]),
+                        vis: Math.round(data.hourly.visibility[i] / 1000),
+                        sky: getSky(data.hourly.weather_code[i]),
                         eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                     };
-                }));
+                } catch (e) { return null; }
+            }));
 
-                // 3. Render Map Icons and Table
-                this.state.layer.clearLayers();
-                let rows = "";
-                
-                waypoints.filter(w => w).forEach(d => {
-                    L.marker([d.lat, d.lng], {
-                        icon: L.divIcon({
-                            className: '',
-                            html: `<div class="glass-node">
-                                    <div class="glass-header">${d.name}</div>
-                                    <div class="glass-body"><span>${d.sky}</span><span class="glass-temp-val">${d.temp}°</span></div>
-                                   </div>`,
-                            iconSize: [110, 55], iconAnchor: [55, 160] // Float clear of labels
-                        })
-                    }).addTo(this.state.layer);
+            render(waypoints.filter(w => w).sort((a,b) => a.order - b.order));
+            state.isSyncing = false;
+        };
 
-                    rows += `<tr>
-                        <td style="padding:15px; border-bottom:1px solid #333; color:#FFD700; font-weight:900;">${d.name}</td>
-                        <td style="padding:15px; border-bottom:1px solid #333; color:#fff;">${d.eta}</td>
-                        <td style="padding:15px; border-bottom:1px solid #333; color:#FFD700; font-weight:900;">${d.temp}°C</td>
-                        <td style="padding:15px; border-bottom:1px solid #333; text-align:right; font-size:20px;">${d.sky}</td>
-                    </tr>`;
-                });
+        const render = (data) => {
+            state.layer.clearLayers();
+            let rows = "";
+            data.forEach(d => {
+                L.marker([d.lat, d.lng], {
+                    icon: L.divIcon({
+                        className: '',
+                        html: `<div class="glass-node">
+                                <div class="glass-header">${d.name}</div>
+                                <div class="glass-body">
+                                    <span>${d.sky}</span>
+                                    <span class="glass-temp-val">${d.temp}°</span>
+                                </div>
+                                <div class="glass-meta-sub">${d.wind}kmh | ${d.vis}km</div>
+                               </div>`,
+                        iconSize: [110, 60], iconAnchor: [55, 30]
+                    })
+                }).addTo(state.layer);
 
-                document.getElementById('matrix-body').innerHTML = rows;
+                rows += `<tr>
+                    <td style="padding:8px; border-bottom:1px solid #333;">${d.name}</td>
+                    <td>${d.eta}</td>
+                    <td style="color:#FFD700; font-weight:bold;">${d.temp}°C</td>
+                    <td>${d.wind} km/h</td>
+                    <td>${d.vis} km</td>
+                    <td>${d.sky}</td>
+                </tr>`;
+            });
+            document.getElementById('matrix-body').innerHTML = rows;
+        };
 
-            } catch (err) {
-                console.error("Matrix Sync Failed", err);
-            } finally {
-                document.getElementById('matrix-loader').style.display = 'none';
+        return {
+            init: () => {
+                state.layer.addTo(window.map);
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div id="matrix-ui" style="position:fixed; bottom:30px; left:30px; z-index:10000; font-family:monospace; pointer-events:none;">
+                        <div style="background:rgba(10,10,10,0.95); border:1px solid #FFD700; width:600px; padding:15px; border-radius:4px; pointer-events:auto;">
+                            <div style="color:#FFD700; font-weight:bold; margin-bottom:10px; letter-spacing:2px; border-bottom:1px solid #FFD700;">MISSION WEATHER MATRIX</div>
+                            <table style="width:100%; color:#fff; font-size:11px; text-align:left;">
+                                <thead><tr style="color:#888; text-transform:uppercase; font-size:9px;">
+                                    <th>Hub</th><th>ETA</th><th>Temp</th><th>Wind</th><th>Vis</th><th>Sky</th>
+                                </tr></thead>
+                                <tbody id="matrix-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                `);
+                setInterval(refresh, 3000);
             }
-        },
+        };
+    })();
 
-        init() {
-            this.state.layer.addTo(window.map);
-            setInterval(() => this.refresh(), 5000);
-            this.refresh();
-        }
-    };
-
+    window.WeatherEngine = WeatherEngine;
     WeatherEngine.init();
 })();
