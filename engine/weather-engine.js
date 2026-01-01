@@ -1,43 +1,36 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 016
- * Core Logic: communities.json Integration + Overlap Prevention
- * UI: Glassmorphism Icons + Rounded Matrix + Wind Direction
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 018
+ * Fix: Corrected data path to /data/nl/communities.json
+ * Logic: Zoom-Dependent Overlap Prevention + Wind Direction
  */
 
 (function() {
     const style = document.createElement('style');
     style.innerHTML = `
         .glass-node {
-            background: rgba(15, 15, 15, 0.85); 
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 215, 0, 0.4); 
-            border-radius: 6px;
+            background: rgba(15, 15, 15, 0.8); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.4); border-radius: 6px;
             display: flex; flex-direction: column; width: 85px; color: #fff;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5); overflow: hidden;
         }
         .glass-header {
             background: #FFD700; color: #000; font-size: 8px; font-weight: 900;
             text-align: center; padding: 2px 4px; text-transform: uppercase;
         }
-        .glass-body {
-            display: flex; align-items: center; justify-content: space-evenly;
-            padding: 5px 2px;
-        }
+        .glass-body { display: flex; align-items: center; justify-content: space-evenly; padding: 5px 2px; }
         .glass-temp-val { font-size: 16px; font-weight: 900; color: #FFD700; }
         
         #matrix-ui-container {
             position: fixed; bottom: 20px; left: 20px; z-index: 10000;
             background: rgba(5,5,5,0.95); backdrop-filter: blur(15px);
             border-left: 4px solid #FFD700; border-radius: 12px;
-            width: 550px; padding: 15px; pointer-events: auto;
+            width: 560px; padding: 15px; pointer-events: auto;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
         .copy-btn {
-            background: #FFD700; color: #000; border: none; padding: 4px 8px;
+            background: #FFD700; color: #000; border: none; padding: 4px 10px;
             border-radius: 4px; font-size: 9px; font-weight: bold; cursor: pointer;
             float: right; text-transform: uppercase;
         }
-        .copy-btn:hover { background: #fff; }
     `;
     document.head.appendChild(style);
 
@@ -54,11 +47,6 @@
             return map[code] || "☁️";
         };
 
-        const getSkyText = (code) => {
-            const map = { 0:"CLEAR", 1:"P.CLOUDY", 2:"M.CLOUDY", 3:"OVC", 45:"FOG", 61:"RAIN", 71:"SNOW" };
-            return map[code] || "CLOUDY";
-        };
-
         const getWindDir = (deg) => {
             const dirs = ['N','NE','E','SE','S','SW','W','NW'];
             return dirs[Math.round(deg / 45) % 8];
@@ -66,11 +54,17 @@
 
         const refresh = async () => {
             if (state.isSyncing || !window.map) return;
+            
+            // CORRECTED PATH: /data/nl/communities.json
             if (state.communityData.length === 0) {
                 try {
-                    const res = await fetch('communities.json');
+                    const res = await fetch('/data/nl/communities.json');
+                    if (!res.ok) throw new Error("Path not found");
                     state.communityData = await res.json();
-                } catch(e) { return; }
+                } catch(e) { 
+                    console.error("WeatherEngine: Failed to load communities from /data/nl/", e);
+                    return; 
+                }
             }
 
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
@@ -80,8 +74,9 @@
             const speed = window.currentCruisingSpeed || 100;
             const dist = window.currentRouteDistance || 0;
             const depTime = window.currentDepartureTime || new Date();
+            const zoom = window.map.getZoom();
 
-            const signature = `${coords[0].lat}-${coords[coords.length-1].lat}-${speed}-${depTime.getTime()}`;
+            const signature = `${coords[0].lat}-${speed}-${depTime.getTime()}-${zoom}`;
             if (signature === state.lastSignature) return;
 
             state.isSyncing = true;
@@ -90,6 +85,9 @@
             const samples = [0, 0.2, 0.4, 0.6, 0.8, 0.99]; 
             const usedNames = new Set();
             const renderedPositions = [];
+            
+            // Threshold decreases as you zoom in (more detail allowed)
+            const overlapThreshold = Math.max(0.04, 1.8 / Math.pow(2, zoom - 5));
 
             let waypoints = await Promise.all(samples.map(async (pct) => {
                 const idx = Math.floor((coords.length - 1) * pct);
@@ -101,9 +99,7 @@
                     .sort((a,b) => a.d - b.d)
                     .find(c => !usedNames.has(c.name)) || { name: `WP-${Math.round(pct*100)}`, lat: p.lat, lng: p.lng };
 
-                // OVERLAP PREVENTION: Check if point is too close to existing markers (simple pixel/coord threshold)
-                const isTooClose = renderedPositions.some(pos => Math.hypot(nearest.lat - pos.lat, nearest.lng - pos.lng) < 0.15);
-                if (isTooClose) return null;
+                if (renderedPositions.some(pos => Math.hypot(nearest.lat - pos.lat, nearest.lng - pos.lng) < overlapThreshold)) return null;
 
                 usedNames.add(nearest.name);
                 renderedPositions.push({lat: nearest.lat, lng: nearest.lng});
@@ -120,7 +116,7 @@
                         windDir: getWindDir(data.hourly.wind_direction_10m[i]),
                         vis: Math.round(data.hourly.visibility[i] / 1000),
                         skyIcon: getSkyIcon(data.hourly.weather_code[i]),
-                        skyText: getSkyText(data.hourly.weather_code[i]),
+                        skyText: (data.hourly.weather_code[i] === 0 ? "CLEAR" : "CLOUDY"),
                         eta: arrival.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})
                     };
                 } catch (e) { return null; }
