@@ -1,24 +1,24 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 025
- * Status: Full Restoration + Route-Centric Logic
- * Logic: Weather coordinates = Exact Route Coordinates. 2km Name Snap.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 026
+ * Fix: Restored Community Names & Clean Icons (No WP/Route-Pt focus)
+ * Core: Detailed Matrix + Minimalist Map Nodes
  */
 
 (function() {
     const style = document.createElement('style');
     style.innerHTML = `
         .glass-node {
-            background: rgba(10, 10, 10, 0.8); backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 215, 0, 0.4); border-radius: 8px;
-            display: flex; flex-direction: column; width: 110px; color: #fff;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.6); overflow: hidden;
+            background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.5); border-radius: 8px;
+            display: flex; flex-direction: column; width: 100px; color: #fff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7); overflow: hidden;
         }
         .glass-header {
             background: #FFD700; color: #000; font-size: 9px; font-weight: 900;
             text-align: center; padding: 4px; text-transform: uppercase;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .glass-body { display: flex; align-items: center; justify-content: space-evenly; padding: 6px 2px; }
+        .glass-body { display: flex; align-items: center; justify-content: space-evenly; padding: 8px 2px; }
         .glass-temp-val { font-size: 18px; font-weight: 900; color: #FFD700; }
-        .glass-sub { font-size: 8px; color: #aaa; text-align: center; padding-bottom: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 3px; }
         
         #matrix-ui-container {
             position: fixed; bottom: 25px; left: 25px; z-index: 10000;
@@ -45,12 +45,12 @@
         };
 
         const getSkyIcon = (code) => {
-            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 51:"🌦️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
+            const map = { 0:"☀️", 1:"🌤️", 2:"⛅", 3:"☁️", 45:"🌫️", 61:"🌧️", 71:"❄️", 95:"⛈️" };
             return map[code] || "☁️";
         };
 
         const getSkyText = (code) => {
-            const map = { 0:"CLEAR", 1:"P.CLOUDY", 2:"M.CLOUDY", 3:"OVC", 45:"FOG", 61:"RAIN", 71:"SNOW", 95:"TSORM" };
+            const map = { 0:"CLEAR", 1:"P.CLOUDY", 2:"M.CLOUDY", 3:"OVC", 45:"FOG", 61:"RAIN", 71:"SNOW", 95:"T-STORM" };
             return map[code] || "CLOUDY";
         };
 
@@ -67,7 +67,7 @@
                     const res = await fetch('/data/nl/communities.json');
                     const raw = await res.json();
                     state.communityData = Array.isArray(raw) ? raw : (raw.communities || []);
-                } catch(e) { console.warn("Registry fallback mode active."); }
+                } catch(e) { return; }
             }
 
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
@@ -87,7 +87,7 @@
 
             const samples = [0.05, 0.25, 0.5, 0.75, 0.95]; 
             const usedNames = new Set();
-            const SNAP_THRESHOLD = 0.02; // 2km limit
+            const SNAP_THRESHOLD = 0.04; // ~4km snap for community detection
 
             let waypoints = await Promise.all(samples.map(async (pct) => {
                 const idx = Math.floor((coords.length - 1) * pct);
@@ -96,9 +96,12 @@
 
                 let nearest = state.communityData
                     .map(c => ({ ...c, d: Math.hypot(roadPoint.lat - c.lat, roadPoint.lng - c.lng) }))
-                    .sort((a,b) => a.d - b.d)[0];
+                    .sort((a,b) => a.d - b.d)
+                    .find(c => !usedNames.has(c.name));
 
+                // If a community is close, use its name, but keep weather on the road
                 const pointName = (nearest && nearest.d < SNAP_THRESHOLD) ? nearest.name : `ROUTE PT ${Math.round(pct*100)}`;
+                if (nearest && nearest.d < SNAP_THRESHOLD) usedNames.add(nearest.name);
 
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${roadPoint.lat}&longitude=${roadPoint.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
@@ -135,9 +138,8 @@
                                     <span>${d.skyIcon}</span>
                                     <span class="glass-temp-val">${d.temp}°</span>
                                 </div>
-                                <div class="glass-sub">${d.windDir} ${d.wind}kmh | ${d.vis}km</div>
                                </div>`,
-                        iconSize: [110, 65], iconAnchor: [55, 32]
+                        iconSize: [100, 52], iconAnchor: [50, 26]
                     })
                 }).addTo(state.layer);
 
@@ -158,6 +160,7 @@
                 Array.from(tr.cells).map(td => td.innerText).join(' | ')
             ).join('\n');
             navigator.clipboard.writeText("MISSION WEATHER MATRIX\n" + rows);
+            alert("Copied.");
         };
 
         return {
