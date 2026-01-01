@@ -1,9 +1,10 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 042
- * Fix: Uncaught TypeError + Empty Matrix Data
- * Logic: 100km Linear Intervals snapped to Registry Communities.
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 043
+ * Fix: Reinstating Icon Rendering + Matrix Population
+ * Logic: 100km Intervals | Registry-Snapping | Full CSS Restoration
  */
 
 (function() {
+    // 1. STYLE BLOCK - FULL RESTORATION
     const style = document.createElement('style');
     style.innerHTML = `
         #central-sync-overlay {
@@ -65,6 +66,7 @@
         const refresh = async (force = false) => {
             if (state.isSyncing || !window.map) return;
 
+            // Load community registry if empty
             if (state.communityData.length === 0) {
                 try {
                     const res = await fetch('/data/nl/communities.json');
@@ -84,7 +86,7 @@
             state.lastSignature = signature;
             updateSyncUI(10, true);
 
-            // 1. Calculate intervals along polyline
+            // 1. Calculate cumulative distance for 100km intervals
             let cumulativeDist = 0;
             let distMap = coords.map((p, i) => {
                 if (i === 0) return 0;
@@ -98,26 +100,29 @@
                 let closestIdx = distMap.findIndex(m => m >= d);
                 if (closestIdx !== -1) targetPoints.push(coords[closestIdx]);
             }
-            if (cumulativeDist % intervalM > 30000) targetPoints.push(coords[coords.length-1]);
+            // Always ensure the end of the route is represented
+            if (cumulativeDist % intervalM > 20000) targetPoints.push(coords[coords.length - 1]);
 
-            // 2. Safe Community Snapping
-            let finalSelection = [];
+            // 2. Snap target points to nearest Registry Community
+            let snappedSelection = [];
             targetPoints.forEach(pt => {
                 let nearest = state.communityData
                     .map(c => ({ ...c, d: window.map.distance([pt.lat, pt.lng], [c.lat, c.lng]) }))
                     .sort((a, b) => a.d - b.d)[0];
                 
-                if (nearest && nearest.name && !finalSelection.some(s => s.name === nearest.name)) {
-                    finalSelection.push(nearest);
+                if (nearest && nearest.name && !snappedSelection.some(s => s.name === nearest.name)) {
+                    snappedSelection.push(nearest);
                 }
             });
 
-            // 3. Weather Fetch
-            let waypoints = await Promise.all(finalSelection.map(async (town, idx) => {
+            // 3. Fetch Data and Render Icons/Matrix
+            let completed = 0;
+            let waypoints = await Promise.all(snappedSelection.map(async (town) => {
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${town.lat}&longitude=${town.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
                     const d = await res.json();
-                    updateSyncUI(15 + (idx / finalSelection.length) * 85, true);
+                    completed++;
+                    updateSyncUI(10 + (completed / snappedSelection.length) * 90, true);
 
                     return {
                         name: town.name, lat: town.lat, lng: town.lng,
@@ -134,7 +139,9 @@
 
             state.layer.clearLayers();
             let rows = "";
-            waypoints.filter(w => w !== null).forEach(d => {
+            
+            waypoints.filter(w => w).forEach(d => {
+                // RENDER MAP MARKERS
                 L.marker([d.lat, d.lng], {
                     icon: L.divIcon({
                         className: '',
@@ -149,6 +156,7 @@
                     })
                 }).addTo(state.layer);
 
+                // RENDER MATRIX ROWS
                 rows += `<tr>
                     <td style="font-weight:900; color:#FFD700;">${d.name}</td>
                     <td style="color:#FFD700;">${d.temp}°C</td>
@@ -157,8 +165,10 @@
                     <td style="text-align:right;">${d.sky}</td>
                 </tr>`;
             });
-            
-            document.getElementById('matrix-body').innerHTML = rows;
+
+            const body = document.getElementById('matrix-body');
+            if (body) body.innerHTML = rows;
+
             setTimeout(() => updateSyncUI(0, false), 800);
             state.isSyncing = false;
         };
