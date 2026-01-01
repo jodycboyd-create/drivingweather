@@ -1,13 +1,14 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Mission: Fix TypeError + Failsafe Icon Recovery
+ * Mission: Fix Broken Icons + Eliminate Ghost Hazards
+ * Logic: Embedded SVG + Strict Precip Gating (0-45 = Green)
  */
 
 (function() {
     const Optimizer = {
-        // Internal Icon Fallback if window.WeatherEngine fails
-        iconMap: { 
-            61: "https://www.weather.gov/images/forecast/icons/ra.png", 63: "https://www.weather.gov/images/forecast/icons/ra.png",
-            71: "https://www.weather.gov/images/forecast/icons/sn.png", 73: "https://www.weather.gov/images/forecast/icons/sn.png"
+        // Embedded SVGs to guarantee 0 broken links
+        svgs: {
+            rain: `<svg viewBox="0 0 30 30" width="20"><path d="M10,12 Q15,5 20,12 T25,18 T15,22 T5,18 T10,12" fill="#00BFFF"/><rect x="12" y="20" width="2" height="4" fill="#00BFFF" rx="1"/></svg>`,
+            snow: `<svg viewBox="0 0 30 30" width="20"><circle cx="15" cy="15" r="2" fill="white"/><path d="M15,5 V25 M5,15 H25 M8,8 L22,22 M22,8 L8,22" stroke="white" stroke-width="2"/></svg>`
         },
 
         async init() {
@@ -24,21 +25,21 @@
                 const d = new Date(now.getTime() + (i * 4) * 3600000);
                 const day = d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
                 const hr = d.getHours();
-                return `<div style="width: calc(100% / 12); text-align:center; border-left:1px solid #333;">
-                            <div style="font-size:7px; color:#555;">${day}</div>
-                            <div style="font-size:9px; color:#999;">${hr % 12 || 12}${hr >= 12 ? 'PM' : 'AM'}</div>
+                return `<div style="width: calc(100% / 12); text-align:center; border-left:1px solid #222;">
+                            <div style="font-size:7px; color:#444;">${day}</div>
+                            <div style="font-size:9px; color:#888;">${hr % 12 || 12}${hr >= 12 ? 'PM' : 'AM'}</div>
                         </div>`;
             }).join('');
 
             const html = `
-                <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #FFD700; padding-bottom:15px; font-family:monospace;">
-                    <div style="display:flex; margin-bottom:5px; background:rgba(0,0,0,0.3); padding:2px 0;">${timeLabels}</div>
-                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:3px; height:32px; background:#111; padding:3px; border:1px solid #444;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center; border:1px solid #222;"></div>`).join('')}
+                <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #FFD700; padding-bottom:10px; font-family:monospace;">
+                    <div style="display:flex; margin-bottom:4px; background:#000;">${timeLabels}</div>
+                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:2px; height:34px; background:#111; padding:3px; border:1px solid #333;">
+                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center;"></div>`).join('')}
                     </div>
-                    <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                        <span style="color:#FFD700; font-weight:900; font-size:10px;">PRECIPITATION SYNC</span>
-                        <span id="opt-status" style="color:#00FF00; font-size:9px;">READY</span>
+                    <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                        <span style="color:#FFD700; font-weight:900; font-size:9px; letter-spacing:1px;">PRECIPITATION LOCK</span>
+                        <span id="opt-status" style="color:#00FF00; font-size:9px;">SYNCED</span>
                     </div>
                 </div>`;
             container.children[0].insertAdjacentHTML('afterbegin', html);
@@ -56,14 +57,14 @@
 
             for (let i = 0; i < 24; i++) {
                 const res = await this.checkPrecip(samples, i * 2);
-                this.applyColor(cells[i], res.level, res.code);
+                this.applyColor(cells[i], res.level, res.isSnow);
             }
-            document.getElementById('opt-status').innerText = "ISLAND SYNC COMPLETE";
+            document.getElementById('opt-status').innerText = "SYSTEM ACTIVE";
         },
 
         async checkPrecip(points, offset) {
             const time = new Date(Date.now() + offset * 3600000).toISOString().split(':')[0];
-            let maxL = 0, trigCode = 0;
+            let maxL = 0, isSnow = false;
             try {
                 const res = await Promise.all(points.map(p => 
                     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=weather_code&timezone=auto`).then(r => r.json())
@@ -72,22 +73,32 @@
                     const idx = d.hourly.time.findIndex(t => t.startsWith(time));
                     if (idx === -1) return;
                     const code = d.hourly.weather_code[idx];
-                    let L = (code === 63 || code === 73) ? 3 : (code === 61 || code === 71) ? 2 : (code >= 51 && code <= 55) ? 1 : 0;
-                    if (L > maxL) { maxL = L; trigCode = code; }
+                    
+                    // STRICT FALLING PRECIPITATION LOGIC ONLY
+                    let L = 0;
+                    if (code === 65 || code === 75 || code >= 95) L = 4;      // RED (Heavy Rain/Snow)
+                    else if (code === 63 || code === 73) L = 3;               // ORANGE (Mod. Rain/Snow)
+                    else if (code === 61 || code === 71) L = 2;               // YELLOW (Light Rain/Snow)
+                    else if (code >= 51 && code <= 55) L = 1;                 // LIME (Drizzle)
+                    // 0-3 and 45 (Fog) stay at L=0 (Neon Green)
+                    
+                    if (L > maxL) { 
+                        maxL = L; 
+                        isSnow = (code >= 71 && code <= 75) || code >= 85; 
+                    }
                 });
-            } catch (e) { return {level: 0, code: 0}; }
-            return {level: maxL, code: trigCode};
+            } catch (e) { return {level: 0, isSnow: false}; }
+            return {level: maxL, isSnow: isSnow};
         },
 
-        applyColor(el, level, code) {
+        applyColor(el, level, isSnow) {
             const neon = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
             el.style.backgroundColor = neon[level];
+            el.style.boxShadow = level > 1 ? `inset 0 0 5px rgba(0,0,0,0.5)` : "none";
+            
+            // Icon logic: Only for Yellow/Orange/Red and guaranteed no broken links
             if (level >= 2) {
-                // Failsafe check to prevent TypeError
-                const url = (window.WeatherEngine && typeof window.WeatherEngine.getIconUrl === 'function') 
-                    ? window.WeatherEngine.getIconUrl(code) 
-                    : this.iconMap[code] || "";
-                el.innerHTML = url ? `<img src="${url}" style="width:18px; height:18px; filter: drop-shadow(0 0 2px #000);">` : "";
+                el.innerHTML = isSnow ? this.svgs.snow : this.svgs.rain;
             } else {
                 el.innerHTML = "";
             }
