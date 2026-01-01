@@ -1,10 +1,9 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 043
- * Fix: Reinstating Icon Rendering + Matrix Population
- * Logic: 100km Intervals | Registry-Snapping | Full CSS Restoration
+/** * Project: [weong-bulletin]
+ * Logic: RESTORED ORIGINAL STABLE SNAPPING
+ * Status: L3 Level 3 Trigger Active
  */
 
 (function() {
-    // 1. STYLE BLOCK - FULL RESTORATION
     const style = document.createElement('style');
     style.innerHTML = `
         #central-sync-overlay {
@@ -66,17 +65,14 @@
         const refresh = async (force = false) => {
             if (state.isSyncing || !window.map) return;
 
-            // Load community registry if empty
             if (state.communityData.length === 0) {
-                try {
-                    const res = await fetch('/data/nl/communities.json');
-                    const raw = await res.json();
-                    state.communityData = Array.isArray(raw) ? raw : (raw.communities || []);
-                } catch(e) { return; }
+                const res = await fetch('/data/nl/communities.json');
+                const raw = await res.json();
+                state.communityData = Array.isArray(raw) ? raw : (raw.communities || []);
             }
 
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
-            if (!route || state.communityData.length === 0) return;
+            if (!route) return;
 
             const coords = route.getLatLngs();
             const signature = `${coords[0].lat}-${coords.length}`;
@@ -86,44 +82,26 @@
             state.lastSignature = signature;
             updateSyncUI(10, true);
 
-            // 1. Calculate cumulative distance for 100km intervals
-            let cumulativeDist = 0;
-            let distMap = coords.map((p, i) => {
-                if (i === 0) return 0;
-                cumulativeDist += window.map.distance(coords[i-1], p);
-                return cumulativeDist;
-            });
-
-            const intervalM = 100000; // 100km
-            let targetPoints = [];
-            for (let d = 0; d <= cumulativeDist; d += intervalM) {
-                let closestIdx = distMap.findIndex(m => m >= d);
-                if (closestIdx !== -1) targetPoints.push(coords[closestIdx]);
-            }
-            // Always ensure the end of the route is represented
-            if (cumulativeDist % intervalM > 20000) targetPoints.push(coords[coords.length - 1]);
-
-            // 2. Snap target points to nearest Registry Community
-            let snappedSelection = [];
-            targetPoints.forEach(pt => {
+            // ORIGINAL SNAP LOGIC: Selection at 75-150km intervals
+            let selectedCommunities = [];
+            const interval = Math.floor(coords.length / 5);
+            
+            for (let i = 0; i < coords.length; i += interval) {
+                let pt = coords[i];
                 let nearest = state.communityData
                     .map(c => ({ ...c, d: window.map.distance([pt.lat, pt.lng], [c.lat, c.lng]) }))
                     .sort((a, b) => a.d - b.d)[0];
                 
-                if (nearest && nearest.name && !snappedSelection.some(s => s.name === nearest.name)) {
-                    snappedSelection.push(nearest);
+                if (nearest && !selectedCommunities.some(s => s.name === nearest.name)) {
+                    selectedCommunities.push(nearest);
                 }
-            });
+            }
 
-            // 3. Fetch Data and Render Icons/Matrix
-            let completed = 0;
-            let waypoints = await Promise.all(snappedSelection.map(async (town) => {
+            let waypoints = await Promise.all(selectedCommunities.map(async (town, idx) => {
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${town.lat}&longitude=${town.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
                     const d = await res.json();
-                    completed++;
-                    updateSyncUI(10 + (completed / snappedSelection.length) * 90, true);
-
+                    updateSyncUI(15 + (idx / selectedCommunities.length) * 85, true);
                     return {
                         name: town.name, lat: town.lat, lng: town.lng,
                         temp: Math.round(d.hourly.temperature_2m[0]),
@@ -139,9 +117,7 @@
 
             state.layer.clearLayers();
             let rows = "";
-            
             waypoints.filter(w => w).forEach(d => {
-                // RENDER MAP MARKERS
                 L.marker([d.lat, d.lng], {
                     icon: L.divIcon({
                         className: '',
@@ -156,7 +132,6 @@
                     })
                 }).addTo(state.layer);
 
-                // RENDER MATRIX ROWS
                 rows += `<tr>
                     <td style="font-weight:900; color:#FFD700;">${d.name}</td>
                     <td style="color:#FFD700;">${d.temp}°C</td>
@@ -166,9 +141,7 @@
                 </tr>`;
             });
 
-            const body = document.getElementById('matrix-body');
-            if (body) body.innerHTML = rows;
-
+            document.getElementById('matrix-body').innerHTML = rows;
             setTimeout(() => updateSyncUI(0, false), 800);
             state.isSyncing = false;
         };
@@ -176,7 +149,7 @@
         return {
             init: () => {
                 state.layer.addTo(window.map);
-                if(!document.getElementById('central-sync-overlay')) {
+                if(!document.getElementById('matrix-ui-container')) {
                     document.body.insertAdjacentHTML('beforeend', `
                         <div id="central-sync-overlay">
                             <div class="sync-text">SYNCING MISSION DATA</div>
@@ -194,7 +167,6 @@
                         </div>
                     `);
                 }
-                window.map.on('dragstart', () => updateSyncUI(10, true));
                 window.map.on('moveend', () => refresh(true));
                 refresh();
             },
@@ -206,7 +178,5 @@
             }
         };
     })();
-
-    window.WeatherEngine = WeatherEngine;
     WeatherEngine.init();
 })();
