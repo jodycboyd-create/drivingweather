@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 026
- * Fix: Restored Community Names & Clean Icons (No WP/Route-Pt focus)
- * Core: Detailed Matrix + Minimalist Map Nodes
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 027
+ * Fix: Absolute Name Snapping (Eliminated ROUTE PT labels)
+ * Logic: Name = Closest Registry Town | Weather = Exact Route GPS
  */
 
 (function() {
@@ -87,21 +87,19 @@
 
             const samples = [0.05, 0.25, 0.5, 0.75, 0.95]; 
             const usedNames = new Set();
-            const SNAP_THRESHOLD = 0.04; // ~4km snap for community detection
 
             let waypoints = await Promise.all(samples.map(async (pct) => {
                 const idx = Math.floor((coords.length - 1) * pct);
                 const roadPoint = coords[idx]; 
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
+                // ABSOLUTE NEAREST: No threshold, forces community names
                 let nearest = state.communityData
                     .map(c => ({ ...c, d: Math.hypot(roadPoint.lat - c.lat, roadPoint.lng - c.lng) }))
                     .sort((a,b) => a.d - b.d)
-                    .find(c => !usedNames.has(c.name));
+                    .find(c => !usedNames.has(c.name)) || { name: "Route Center" };
 
-                // If a community is close, use its name, but keep weather on the road
-                const pointName = (nearest && nearest.d < SNAP_THRESHOLD) ? nearest.name : `ROUTE PT ${Math.round(pct*100)}`;
-                if (nearest && nearest.d < SNAP_THRESHOLD) usedNames.add(nearest.name);
+                usedNames.add(nearest.name);
 
                 try {
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${roadPoint.lat}&longitude=${roadPoint.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
@@ -109,7 +107,7 @@
                     const i = Math.max(0, d.hourly.time.indexOf(arrival.toISOString().split(':')[0] + ":00"));
                     
                     return {
-                        name: pointName, lat: roadPoint.lat, lng: roadPoint.lng,
+                        name: nearest.name, lat: roadPoint.lat, lng: roadPoint.lng,
                         temp: Math.round(d.hourly.temperature_2m[i]),
                         wind: Math.round(d.hourly.wind_speed_10m[i]),
                         windDir: getWindDir(d.hourly.wind_direction_10m[i]),
