@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Mission: High-Brightness Gradient + Click Stability
- * Logic: Event Delegation + Neon HEX Scale (Precip-Only)
+ * Mission: Time Scale Header + Stabilized Precipitation Triggers
+ * Logic: Event Delegation + Neon Scale (Strictly 0-3/45 = Green)
  */
 
 (function() {
@@ -9,29 +9,35 @@
             const container = document.getElementById('matrix-ui');
             const route = Object.values(window.map?._layers || {}).find(l => l._latlngs && l._latlngs.length > 20);
             if (!container || !route) return setTimeout(() => this.init(), 1000);
-            
-            if (!document.getElementById('opt-heat-map')) {
-                this.injectUI(container);
-            }
+            if (!document.getElementById('opt-heat-map')) this.injectUI(container);
             this.runScan(route);
         },
 
         injectUI(container) {
+            const now = new Date();
+            const timeLabels = Array(12).fill(0).map((_, i) => {
+                const d = new Date(now.getTime() + (i * 4) * 3600000);
+                const hour = d.getHours();
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                return `<span style="width: calc(100% / 12); text-align:center;">${hour % 12 || 12}${ampm}</span>`;
+            }).join('');
+
             const html = `
-                <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #FFD700; padding-bottom:15px;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                        <span style="color:#FFD700; font-weight:900; font-size:11px; letter-spacing:2px;">48H PRECIPITATION INDEX</span>
-                        <span id="opt-status" style="color:#FFF; font-size:10px; font-family:monospace; text-shadow: 0 0 5px #000;">STABILIZING...</span>
+                <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #FFD700; padding-bottom:15px; font-family:monospace;">
+                    <div id="time-scale" style="display:flex; color:#AAA; font-size:9px; margin-bottom:5px; font-weight:bold;">
+                        ${timeLabels}
                     </div>
-                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:20px; background:#000; padding:2px; border:1px solid #333;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#00FF00; cursor:pointer; transition: background 0.3s; border-radius:1px;"></div>`).join('')}
+                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:22px; background:#000; padding:2px; border:1px solid #444;">
+                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#00FF00; cursor:pointer; transition: 0.3s; border-radius:1px;"></div>`).join('')}
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">DEPARTURE PRECIPITATION INDEX</span>
+                        <span id="opt-status" style="color:#00FF00; font-size:9px;">SYNCED</span>
                     </div>
                 </div>`;
             container.children[0].insertAdjacentHTML('afterbegin', html);
             
-            // Event Delegation: Fixes the 'broken' click issue
-            const grid = document.getElementById('heat-grid');
-            grid.onclick = (e) => {
+            document.getElementById('heat-grid').onclick = (e) => {
                 const cell = e.target.closest('.heat-cell');
                 if (cell) this.shiftTime(cell.dataset.h, cell);
             };
@@ -43,11 +49,9 @@
             const cells = document.querySelectorAll('.heat-cell');
 
             for (let i = 0; i < 24; i++) {
-                const hourOffset = i * 2;
-                const level = await this.checkPrecip(samples, hourOffset);
+                const level = await this.checkPrecip(samples, i * 2);
                 this.applyColor(cells[i], level);
             }
-            document.getElementById('opt-status').innerText = "SCAN COMPLETE";
         },
 
         async checkPrecip(points, offset) {
@@ -61,11 +65,13 @@
                     const idx = d.hourly.time.findIndex(t => t.startsWith(time));
                     if (idx === -1) return;
                     const code = d.hourly.weather_code[idx];
+                    
+                    // STRICT PRECIPITATION MAPPING (Ignore codes 0, 1, 2, 3, 45)
                     let L = 0;
-                    if (code === 65 || code === 75 || code >= 95) L = 4; // RED
-                    else if (code === 63 || code === 73) L = Math.max(L, 3); // ORANGE
-                    else if (code === 61 || code === 71 || code === 55) L = Math.max(L, 2); // YELLOW
-                    else if (code === 51 || code === 53) L = Math.max(L, 1); // LIME
+                    if (code === 65 || code === 75 || code >= 95) L = 4; // RED: Heavy
+                    else if (code === 63 || code === 73) L = Math.max(L, 3); // ORANGE: Moderate
+                    else if (code === 61 || code === 71 || code === 55) L = Math.max(L, 2); // YELLOW: Light
+                    else if (code === 51 || code === 53) L = Math.max(L, 1); // LIME: Drizzle
                     if (L > max) max = L;
                 });
             } catch (e) { return 0; }
@@ -73,10 +79,9 @@
         },
 
         applyColor(el, level) {
-            // HIGH BRIGHTNESS NEON SCALE
-            const neonColors = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
-            el.style.backgroundColor = neonColors[level];
-            el.style.boxShadow = `0 0 5px ${neonColors[level]}`; // Adds glow
+            const neon = ["#00FF00", "#AAFF00", "#FFFF00", "#FF8C00", "#FF0000"];
+            el.style.backgroundColor = neon[level];
+            el.style.boxShadow = level > 0 ? `0 0 8px ${neon[level]}` : 'none';
         },
 
         shiftTime(hours, target) {
