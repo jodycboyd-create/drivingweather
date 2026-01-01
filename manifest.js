@@ -11,7 +11,8 @@ var manifestData = {
             "engine/weather-engine.js",
             "engine/optimize.js",
             "engine/radar.js",
-            "engine/rwis.js"
+            "engine/rwis.js",
+            "engine/metro-logic.js"
         ]
     }]
 };
