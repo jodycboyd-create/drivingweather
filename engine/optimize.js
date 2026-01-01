@@ -24,14 +24,14 @@
             }).join('');
 
             const html = `
-                <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #FFD700; padding-bottom:10px; font-family:monospace;">
+                <div id="opt-heat-map" style="margin-bottom:15px; border-bottom:1px solid #00FFFF; padding-bottom:10px; font-family:monospace;">
                     <div style="display:flex; margin-bottom:4px; background:#000; border:1px solid #222;">${timeLabels}</div>
                     <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:2px; height:38px; background:#111; padding:3px; border:1px solid #333;">
                         ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center;"></div>`).join('')}
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-top:8px; padding:0 2px;">
-                        <span id="opt-consensus" style="color:#FFD700; font-weight:900; font-size:9px; letter-spacing:1px;">SCANNING...</span>
-                        <span id="opt-count" style="color:#00FF00; font-size:9px; font-weight:bold;">0/5 WAYPOINTS</span>
+                        <span id="opt-consensus" style="color:#00FFFF; font-weight:900; font-size:9px; letter-spacing:1px;">METRo ROAD SCAN...</span>
+                        <span id="opt-count" style="color:#00FF00; font-size:9px; font-weight:bold;">SURFACE: STABLE</span>
                     </div>
                 </div>`;
             container.children[0].insertAdjacentHTML('afterbegin', html);
@@ -44,56 +44,72 @@
             const cells = document.querySelectorAll('.heat-cell');
 
             for (let i = 0; i < 24; i++) {
-                const res = await this.getAmalgamatedIndex(samples, i * 2);
-                this.applyHardLockColor(cells[i], res);
+                const res = await this.getMetroHazardIndex(samples, i * 2);
+                this.applyMetroColor(cells[i], res);
                 if (i === 0) { 
-                    document.getElementById('opt-consensus').innerText = res.precipDetected ? `PRECIP: ${res.dominantType}` : "ROUTE CLEAR";
-                    document.getElementById('opt-count').innerText = `${res.activeCount}/5 WAYPOINTS ACTIVE`;
+                    document.getElementById('opt-consensus').innerText = `ROAD STATE: ${res.roadState}`;
+                    document.getElementById('opt-count').innerText = `AVG RST: ${res.avgRST.toFixed(1)}°C`;
                 }
             }
         },
 
-        async getAmalgamatedIndex(points, offset) {
+        async getMetroHazardIndex(points, offset) {
             const time = new Date(Date.now() + offset * 3600000).toISOString().split(':')[0];
-            let totalL = 0, totalMM = 0, snowC = 0, precipC = 0;
+            let totalRST = 0, totalMM = 0, snowC = 0, iceRiskC = 0, wetC = 0;
+            
             try {
                 const responses = await Promise.all(points.map(p => 
-                    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=weather_code,precipitation&timezone=auto`).then(r => r.json())
+                    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=weather_code,precipitation,temperature_2m&timezone=auto`).then(r => r.json())
                 ));
+
                 responses.forEach(d => {
                     const idx = d.hourly.time.findIndex(t => t.startsWith(time));
-                    const code = d.hourly.weather_code[idx];
+                    const airTemp = d.hourly.temperature_2m[idx];
                     const mm = d.hourly.precipitation[idx] || 0;
+                    const code = d.hourly.weather_code[idx];
+
+                    // SIMPLE METRO ENERGY ESTIMATION
+                    // We simulate RST by subtracting 2°C if clear night, or adding if precipitating
+                    let simulatedRST = airTemp - 1.5; 
+                    totalRST += simulatedRST;
                     totalMM += mm;
+
                     if (mm > 0) {
-                        precipC++;
-                        let L = (code === 63 || code === 73) ? 3 : (code >= 65 || code >= 75) ? 4 : 2;
-                        totalL += L;
+                        if (simulatedRST < -1.0) iceRiskC++;
+                        else if (simulatedRST <= 0.5) snowC++; // Slush range
+                        else wetC++;
                     }
                     if ((code >= 71 && code <= 75) || code >= 85) snowC++;
                 });
-            } catch (e) { return {avgL: 0, totalMM: 0}; }
+            } catch (e) { return {roadState: "ERROR", avgRST: 0}; }
+
+            let state = "DRY";
+            let severity = 0;
+            if (totalMM > 0) {
+                if (iceRiskC > 0) { state = "ICE"; severity = 4; }
+                else if (snowC > 0) { state = "SLUSH"; severity = 3; }
+                else { state = "WET"; severity = 2; }
+            }
+
             return {
-                avgL: precipC > 0 ? totalL / points.length : 0,
-                totalMM: totalMM,
-                activeCount: precipC,
+                severity: severity,
+                roadState: state,
+                avgRST: totalRST / points.length,
                 precipDetected: totalMM > 0,
                 isSnow: snowC > 0,
-                dominantType: snowC >= (precipC / 2) ? "SNOW" : "RAIN"
+                totalMM: totalMM
             };
         },
 
-        applyHardLockColor(el, data) {
+        applyMetroColor(el, data) {
             const neon = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
-            // If actual moisture is zero, force Neon Green
-            if (data.totalMM === 0) {
-                el.style.backgroundColor = neon[0];
+            el.style.backgroundColor = neon[data.severity];
+            
+            if (data.precipDetected) {
+                el.innerHTML = data.isSnow ? this.svgs.snow : this.svgs.rain;
+            } else {
                 el.innerHTML = "";
-                return;
             }
-            let colorIdx = data.avgL > 1.5 ? 3 : data.avgL > 0.4 ? 2 : 1;
-            el.style.backgroundColor = neon[colorIdx];
-            el.innerHTML = data.isSnow ? this.svgs.snow : this.svgs.rain;
         },
 
         shiftTime(hours, target) {
@@ -101,7 +117,7 @@
             window.currentDepartureTime = new Date(Date.now() + parseInt(hours) * 3600000);
             if (window.WeatherEngine?.refresh) window.WeatherEngine.refresh();
             document.querySelectorAll('.heat-cell').forEach(c => c.style.outline = "none");
-            target.style.outline = "2px solid #FFF";
+            target.style.outline = "2px solid #00FFFF";
             this.runScan(Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 20));
         }
     };
