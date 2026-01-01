@@ -170,3 +170,36 @@
             init: () => {
                 state.layer.addTo(window.map);
                 if(!document.getElementById('central-sync-overlay')) {
+                    document.body.insertAdjacentHTML('beforeend', `
+                        <div id="central-sync-overlay">
+                            <div class="sync-text">SYNCING MISSION DATA</div>
+                            <div class="sync-bar-full"><div id="sync-progress-bar"></div></div>
+                        </div>
+                        <div id="matrix-ui-container">
+                            <button class="copy-btn" onclick="WeatherEngine.copy()">Copy Matrix</button>
+                            <div style="color:#FFD700; font-size:12px; font-weight:900; margin-bottom:20px; letter-spacing:3px; text-transform:uppercase;">Mission Weather Matrix</div>
+                            <table class="matrix-table">
+                                <thead><tr>
+                                    <th>Location</th><th>Temp</th><th>Wind</th><th>Vis</th><th style="text-align:right;">Sky</th>
+                                </tr></thead>
+                                <tbody id="matrix-body"></tbody>
+                            </table>
+                        </div>
+                    `);
+                }
+                window.map.on('dragstart', () => updateSyncUI(10, true));
+                window.map.on('moveend', () => refresh(true));
+                refresh();
+            },
+            copy: () => {
+                const rows = Array.from(document.querySelectorAll('#matrix-body tr')).map(tr => 
+                    Array.from(tr.cells).map(td => td.innerText).join(' | ')
+                ).join('\n');
+                navigator.clipboard.writeText("MISSION WEATHER MATRIX\n" + rows);
+            }
+        };
+    })();
+
+    window.WeatherEngine = WeatherEngine;
+    WeatherEngine.init();
+})();
