@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 035
- * Fix: Equal Spacing + 10km Strict Snap + TCH Milestone Fallback
- * Logic: Name = Nearest Road-Neighbor | No Major Center Preference
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 037
+ * Fix: Pure Community Waypoints (No Milestones/Fallbacks)
+ * Logic: Select 5 most representative communities found along the route path.
  */
 
 (function() {
@@ -8,7 +8,7 @@
     style.innerHTML = `
         #central-sync-overlay {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            z-index: 99999; background: rgba(0,0,0,0.95); padding: 30px;
+            z-index: 99999; background: rgba(0,0,0,0.98); padding: 30px;
             border: 2px solid #FFD700; border-radius: 12px; width: 340px;
             text-align: center; display: none; pointer-events: none;
             box-shadow: 0 0 80px rgba(0,0,0,1);
@@ -26,7 +26,6 @@
         .glass-header {
             background: #FFD700; color: #000; font-size: 10px; font-weight: 900;
             text-align: center; padding: 7px; text-transform: uppercase;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .glass-body { display: flex; align-items: center; justify-content: space-evenly; padding: 12px 6px; }
         .glass-temp-val { font-size: 24px; font-weight: 900; color: #FFD700; }
@@ -65,13 +64,12 @@
         const refresh = async (force = false) => {
             if (state.isSyncing || !window.map) return;
 
-            // Load Registry if missing
             if (state.communityData.length === 0) {
                 try {
                     const res = await fetch('/data/nl/communities.json');
                     const raw = await res.json();
                     state.communityData = Array.isArray(raw) ? raw : (raw.communities || []);
-                } catch(e) { console.warn("Registry 404 - Please verify file path."); }
+                } catch(e) { return; }
             }
 
             const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
@@ -85,36 +83,40 @@
             state.lastSignature = signature;
             updateSyncUI(10, true);
 
-            // EQUAL SPACING: 5 Points distributed evenly along the road
-            const samples = [0.05, 0.25, 0.50, 0.75, 0.95]; 
-            const usedNames = new Set();
-            let completed = 0;
+            // 1. Find all communities from registry within 5km of the route polyline
+            let availableAlongRoute = state.communityData.filter(c => {
+                return coords.some((p, i) => i % 10 === 0 && window.map.distance([p.lat, p.lng], [c.lat, c.lng]) < 5000);
+            });
 
-            let waypoints = await Promise.all(samples.map(async (pct) => {
-                const idx = Math.floor((coords.length - 1) * pct);
-                const roadPoint = coords[idx]; 
+            // 2. Sort them by their progress along the route
+            availableAlongRoute.forEach(c => {
+                let minDist = Infinity;
+                coords.forEach((p, idx) => {
+                    let d = window.map.distance([p.lat, p.lng], [c.lat, c.lng]);
+                    if (d < minDist) { minDist = d; c.routeIndex = idx; }
+                });
+            });
+            availableAlongRoute.sort((a, b) => a.routeIndex - b.routeIndex);
 
-                // STRICT SNAP LOGIC (10km threshold)
-                let nearest = state.communityData
-                    .map(c => ({ ...c, d: window.map.distance([roadPoint.lat, roadPoint.lng], [c.lat, c.lng]) }))
-                    .sort((a,b) => a.d - b.d)[0];
-                
-                let displayName = "TCH Milestone";
-                if (nearest && nearest.d < 10000) { // Only snap if within 10km
-                    displayName = nearest.name;
-                } else {
-                    displayName = `ROUTE PT ${Math.round(pct * 100)}`;
+            // 3. Pick 5 representative towns (Start, Mid-segments, End)
+            let selectedTowns = [];
+            if (availableAlongRoute.length > 0) {
+                const count = Math.min(5, availableAlongRoute.length);
+                for (let i = 0; i < count; i++) {
+                    selectedTowns.push(availableAlongRoute[Math.floor(i * (availableAlongRoute.length / count))]);
                 }
+            }
 
+            let completed = 0;
+            let waypoints = await Promise.all(selectedTowns.map(async (town) => {
                 try {
-                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${roadPoint.lat}&longitude=${roadPoint.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${town.lat}&longitude=${town.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
                     const d = await res.json();
-                    
                     completed++;
-                    updateSyncUI(10 + (completed / samples.length) * 90, true);
+                    updateSyncUI(10 + (completed / selectedTowns.length) * 90, true);
 
                     return {
-                        name: displayName, lat: roadPoint.lat, lng: roadPoint.lng,
+                        name: town.name, lat: town.lat, lng: town.lng,
                         temp: Math.round(d.hourly.temperature_2m[0]),
                         wind: Math.round(d.hourly.wind_speed_10m[0]),
                         vis: Math.round(d.hourly.visibility[0] / 1000),
