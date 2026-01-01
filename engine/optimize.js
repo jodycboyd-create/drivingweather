@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Mission: Black-init + Day/Date Scale + Strict Orange Logic
- * Logic: Strictly codes 61-99 trigger color. 0-45 = Neon Green.
+ * Mission: Black-Init + Day/Date Scale + Dynamic Precipitation Icons
+ * Logic: Icons appear ONLY for Level 2 (Yellow) and Level 3 (Orange).
  */
 
 (function() {
@@ -31,11 +31,11 @@
                     <div id="time-scale" style="display:flex; margin-bottom:5px; font-weight:bold; border-bottom:1px solid #222; padding-bottom:4px;">
                         ${timeLabels}
                     </div>
-                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:24px; background:#000; padding:3px; border:1px solid #444;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; transition: 0.2s; border:1px solid #111;"></div>`).join('')}
+                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:4px; height:28px; background:#000; padding:3px; border:1px solid #444;">
+                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#000; cursor:pointer; display:flex; align-items:center; justify-content:center; transition: 0.2s; border:1px solid #111; font-size:14px;"></div>`).join('')}
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">HAZARD: PRECIPITATION</span>
+                        <span style="color:#FFD700; font-weight:900; font-size:10px; letter-spacing:1px;">DEPARTURE HAZARD INDEX</span>
                         <span id="opt-status" style="color:#AAA; font-size:9px;">INITIALIZING SCAN...</span>
                     </div>
                 </div>`;
@@ -53,15 +53,16 @@
             const cells = document.querySelectorAll('.heat-cell');
 
             for (let i = 0; i < 24; i++) {
-                const level = await this.checkPrecip(samples, i * 2);
-                this.applyColor(cells[i], level);
+                const result = await this.checkPrecip(samples, i * 2);
+                this.applyColor(cells[i], result.level, result.isSnow);
             }
-            document.getElementById('opt-status').innerText = "ISLAND SCAN COMPLETE";
+            document.getElementById('opt-status').innerText = "SYSTEM SYNCED";
         },
 
         async checkPrecip(points, offset) {
             const time = new Date(Date.now() + offset * 3600000).toISOString().split(':')[0];
             let max = 0;
+            let isSnow = false;
             try {
                 const res = await Promise.all(points.map(p => 
                     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=weather_code&timezone=auto`).then(r => r.json())
@@ -70,24 +71,32 @@
                     const idx = d.hourly.time.findIndex(t => t.startsWith(time));
                     if (idx === -1) return;
                     const code = d.hourly.weather_code[idx];
-                    
                     let L = 0;
-                    if (code === 65 || code === 75 || code >= 95) L = 4; // VIVID RED (Heavy)
-                    else if (code === 63 || code === 73) L = Math.max(L, 3); // VIVID ORANGE (Moderate)
-                    else if (code === 61 || code === 71) L = Math.max(L, 2); // VIVID YELLOW (Light)
-                    else if (code === 51 || code === 53 || code === 55) L = Math.max(L, 1); // VIVID LIME (Drizzle)
-                    // Codes 0-3 (Clear/Overcast) & 45 (Fog) stay Neon Green (L=0)
-                    if (L > max) max = L;
+                    if (code === 65 || code === 75 || code >= 95) L = 4; // RED
+                    else if (code === 63 || code === 73) L = 3; // ORANGE
+                    else if (code === 61 || code === 71) L = 2; // YELLOW
+                    else if (code >= 51 && code <= 55) L = 1; // LIME
+                    
+                    if (L > max) {
+                        max = L;
+                        isSnow = (code >= 71 && code <= 75) || code >= 85;
+                    }
                 });
-            } catch (e) { return 0; }
-            return max;
+            } catch (e) { return {level: 0, isSnow: false}; }
+            return {level: max, isSnow: isSnow};
         },
 
-        applyColor(el, level) {
+        applyColor(el, level, isSnow) {
             const neon = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
             el.style.backgroundColor = neon[level];
-            el.style.boxShadow = `0 0 10px ${neon[level]}`; 
-            el.style.border = `1px solid rgba(255,255,255,0.2)`;
+            el.style.boxShadow = `0 0 10px ${neon[level]}55`;
+            
+            // Icon Logic for Yellow (2) and Orange (3)
+            if (level === 2 || level === 3) {
+                el.innerHTML = isSnow ? "❄️" : "🌧️";
+            } else {
+                el.innerHTML = "";
+            }
         },
 
         shiftTime(hours, target) {
