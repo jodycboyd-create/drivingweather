@@ -9,7 +9,11 @@
             const container = document.getElementById('matrix-ui');
             const route = Object.values(window.map?._layers || {}).find(l => l._latlngs && l._latlngs.length > 20);
             if (!container || !route) return setTimeout(() => this.init(), 1000);
-            if (!document.getElementById('opt-heat-map')) this.injectUI(container);
+            
+            // Fix: Check for existence to prevent UI collapse/re-injection
+            if (!document.getElementById('opt-heat-map')) {
+                this.injectUI(container);
+            }
             this.runScan(route);
         },
 
@@ -34,8 +38,12 @@
                         <span id="opt-count" style="color:#00FF00; font-size:9px; font-weight:bold;">SURFACE: STABLE</span>
                     </div>
                 </div>`;
-            container.children[0].insertAdjacentHTML('afterbegin', html);
-            document.getElementById('heat-grid').onclick = (e) => this.shiftTime(e.target.closest('.heat-cell')?.dataset.h, e.target.closest('.heat-cell'));
+            // Ensure we insert into the top of the matrix container without overwriting
+            container.insertAdjacentHTML('afterbegin', html);
+            document.getElementById('heat-grid').onclick = (e) => {
+                const cell = e.target.closest('.heat-cell');
+                if (cell) this.shiftTime(cell.dataset.h, cell);
+            };
         },
 
         async runScan(route) {
@@ -68,15 +76,13 @@
                     const mm = d.hourly.precipitation[idx] || 0;
                     const code = d.hourly.weather_code[idx];
 
-                    // SIMPLE METRO ENERGY ESTIMATION
-                    // We simulate RST by subtracting 2°C if clear night, or adding if precipitating
                     let simulatedRST = airTemp - 1.5; 
                     totalRST += simulatedRST;
                     totalMM += mm;
 
                     if (mm > 0) {
                         if (simulatedRST < -1.0) iceRiskC++;
-                        else if (simulatedRST <= 0.5) snowC++; // Slush range
+                        else if (simulatedRST <= 0.5) snowC++;
                         else wetC++;
                     }
                     if ((code >= 71 && code <= 75) || code >= 85) snowC++;
@@ -92,34 +98,46 @@
             }
 
             return {
-                severity: severity,
-                roadState: state,
+                severity: severity, roadState: state,
                 avgRST: totalRST / points.length,
                 precipDetected: totalMM > 0,
-                isSnow: snowC > 0,
-                totalMM: totalMM
+                isSnow: snowC > 0, totalMM: totalMM
             };
         },
 
         applyMetroColor(el, data) {
             const neon = ["#00FF00", "#CCFF00", "#FFFF00", "#FF8C00", "#FF0000"];
             el.style.backgroundColor = neon[data.severity];
-            
-            if (data.precipDetected) {
-                el.innerHTML = data.isSnow ? this.svgs.snow : this.svgs.rain;
-            } else {
-                el.innerHTML = "";
-            }
+            el.innerHTML = data.precipDetected ? (data.isSnow ? this.svgs.snow : this.svgs.rain) : "";
         },
 
         shiftTime(hours, target) {
-            if (!hours) return;
-            window.currentDepartureTime = new Date(Date.now() + parseInt(hours) * 3600000);
+            if (hours === undefined) return;
+            const offset = parseInt(hours);
+
+            // 1. Sync Map Time for main Weather Engine
+            window.currentDepartureTime = new Date(Date.now() + offset * 3600000);
             if (window.WeatherEngine?.refresh) window.WeatherEngine.refresh();
+
+            // 2. UI Highlight
             document.querySelectorAll('.heat-cell').forEach(c => c.style.outline = "none");
             target.style.outline = "2px solid #00FFFF";
-            this.runScan(Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 20));
+
+            // 3. Sync RWIS Icons (Forecasted Pills)
+            if (window.RWIS && typeof RWIS.updatePills === 'function') {
+                RWIS.updatePills(offset);
+            }
+
+            // 4. Sync METRo Table
+            if (window.MetroTable && typeof MetroTable.updateTable === 'function') {
+                MetroTable.updateTable(offset);
+            }
+
+            // 5. Refresh Route Analysis (Icons on Map)
+            const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 20);
+            if (route) this.runScan(route);
         }
     };
     Optimizer.init();
+    window.Optimizer = Optimizer; // Expose to global scope for module sync
 })();
