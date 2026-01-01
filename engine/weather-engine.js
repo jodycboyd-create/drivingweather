@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] | L3 STABILITY PATCH 027
- * Fix: Absolute Name Snapping (Eliminated ROUTE PT labels)
- * Logic: Name = Closest Registry Town | Weather = Exact Route GPS
+/** * Project: [weong-bulletin] | L3 STABILITY PATCH 028
+ * Fix: Absolute Community Naming + Mission Sync Status Bar
+ * Logic: Name = Registry Primary | Weather = Route GPS Truth
  */
 
 (function() {
@@ -27,6 +27,9 @@
             width: 620px; padding: 20px; pointer-events: auto;
             box-shadow: 0 20px 60px rgba(0,0,0,0.9);
         }
+        .sync-bar-container { width: 100%; height: 3px; background: rgba(255,255,255,0.1); margin-bottom: 15px; border-radius: 2px; overflow: hidden; }
+        #sync-progress { width: 0%; height: 100%; background: #FFD700; transition: width 0.3s ease; }
+
         .matrix-table { width: 100%; color: #fff; font-size: 11px; text-align: left; border-collapse: collapse; }
         .matrix-table tr:nth-child(even) { background: rgba(255,255,255,0.05); }
         .copy-btn {
@@ -59,6 +62,11 @@
             return dirs[Math.round(deg / 45) % 8];
         };
 
+        const updateSyncBar = (pct) => {
+            const bar = document.getElementById('sync-progress');
+            if(bar) bar.style.width = pct + "%";
+        };
+
         const refresh = async () => {
             if (state.isSyncing || !window.map) return;
 
@@ -84,20 +92,22 @@
 
             state.isSyncing = true;
             state.lastSignature = signature;
+            updateSyncBar(10);
 
             const samples = [0.05, 0.25, 0.5, 0.75, 0.95]; 
             const usedNames = new Set();
+            let completed = 0;
 
             let waypoints = await Promise.all(samples.map(async (pct) => {
                 const idx = Math.floor((coords.length - 1) * pct);
                 const roadPoint = coords[idx]; 
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
-                // ABSOLUTE NEAREST: No threshold, forces community names
+                // FORCE COMMUNITY NAME from nearest registry entry
                 let nearest = state.communityData
                     .map(c => ({ ...c, d: Math.hypot(roadPoint.lat - c.lat, roadPoint.lng - c.lng) }))
                     .sort((a,b) => a.d - b.d)
-                    .find(c => !usedNames.has(c.name)) || { name: "Route Center" };
+                    .find(c => !usedNames.has(c.name)) || { name: "Newfoundland Coast" };
 
                 usedNames.add(nearest.name);
 
@@ -106,6 +116,9 @@
                     const d = await res.json();
                     const i = Math.max(0, d.hourly.time.indexOf(arrival.toISOString().split(':')[0] + ":00"));
                     
+                    completed++;
+                    updateSyncBar(10 + (completed / samples.length) * 90);
+
                     return {
                         name: nearest.name, lat: roadPoint.lat, lng: roadPoint.lng,
                         temp: Math.round(d.hourly.temperature_2m[i]),
@@ -120,6 +133,7 @@
             }));
 
             render(waypoints.filter(w => w));
+            setTimeout(() => updateSyncBar(0), 1000); // Reset bar
             state.isSyncing = false;
         };
 
@@ -168,7 +182,8 @@
                     document.body.insertAdjacentHTML('beforeend', `
                         <div id="matrix-ui-container">
                             <button class="copy-btn" onclick="copyMatrix()">Copy</button>
-                            <div style="color:#FFD700; font-size:11px; font-weight:900; margin-bottom:15px; letter-spacing:2px; text-transform:uppercase;">Mission Weather Matrix</div>
+                            <div style="color:#FFD700; font-size:11px; font-weight:900; margin-bottom:5px; letter-spacing:2px; text-transform:uppercase;">Mission Weather Matrix</div>
+                            <div class="sync-bar-container"><div id="sync-progress"></div></div>
                             <table class="matrix-table">
                                 <thead><tr style="color:#666; text-transform:uppercase; font-size:9px; border-bottom:1px solid #444;">
                                     <th style="padding-bottom:10px;">Location</th><th>ETA</th><th>Temp</th><th>Wind</th><th>Vis</th><th>Sky</th>
