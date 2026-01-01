@@ -12,7 +12,8 @@ var manifestData = {
             "engine/optimize.js",
             "engine/radar.js",
             "engine/rwis.js",
-            "engine/metro-logic.js"
+            "engine/metro-logic.js",
+            "engine/sync-clock.js"
         ]
     }]
 };
