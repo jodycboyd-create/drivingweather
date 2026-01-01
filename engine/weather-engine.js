@@ -1,19 +1,27 @@
-/** * Project: [weong-bulletin] | L3 HYPER-SYNC PATCH 010
- * Focus: Glassmorph UI Reinstatement + Detailed Tabular Forecast
- * Features: Sky Text, Wind Direction, Temporal Sync
+/** * Project: [weong-bulletin] | L3 HYPER-SYNC PATCH 011
+ * Fix: Distance-Based Sorting (Ensures West -> East sequencing)
+ * Improvement: Waypoint Names integrated into Glassmorph Icons
  */
 
 (function() {
     const style = document.createElement('style');
     style.innerHTML = `
         .glass-node {
-            background: rgba(15, 15, 15, 0.8); backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 215, 0, 0.5); border-radius: 12px;
-            display: flex; align-items: center; justify-content: space-around;
-            width: 80px; height: 45px; color: #fff;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.6); border-radius: 8px;
+            display: flex; flex-direction: column; width: 100px; color: #fff;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.7); overflow: hidden;
         }
-        .glass-sky-icon { font-size: 20px; }
+        .glass-header {
+            background: rgba(255, 215, 0, 0.9); color: #000;
+            font-size: 8px; font-weight: bold; text-align: center;
+            padding: 2px 0; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .glass-body {
+            display: flex; align-items: center; justify-content: space-around;
+            padding: 4px; height: 35px;
+        }
+        .glass-sky-icon { font-size: 18px; }
         .glass-temp-val { font-size: 16px; font-weight: 900; color: #FFD700; }
         
         #weong-loading-overlay {
@@ -50,8 +58,7 @@
                 3: { icon: "☁️", txt: "Overcast" },
                 45: { icon: "🌫️", txt: "Fog" },
                 61: { icon: "🌧️", txt: "Light Rain" },
-                71: { icon: "❄️", txt: "Light Snow" },
-                95: { icon: "⛈️", txt: "Storm" }
+                71: { icon: "❄️", txt: "Light Snow" }
             };
             return map[code] || { icon: "☁️", txt: "Cloudy" };
         };
@@ -68,11 +75,12 @@
             if (!route) return;
 
             const coords = route.getLatLngs();
+            const startPt = coords[0];
             const speed = window.currentCruisingSpeed || 100;
             const dist = window.currentRouteDistance || 0;
             const depTime = window.currentDepartureTime || new Date();
 
-            const signature = `${coords[0].lat.toFixed(3)}-${speed}-${dist}-${depTime.getTime()}`;
+            const signature = `${startPt.lat.toFixed(3)}-${speed}-${dist}-${depTime.getTime()}`;
             if (signature === state.lastSignature) return;
 
             state.isSyncing = true;
@@ -82,8 +90,9 @@
             const usedNames = new Set();
             const partitions = [0.05, 0.25, 0.50, 0.75, 0.95];
 
-            const waypoints = await Promise.all(partitions.map(async (pct) => {
-                const p = coords[Math.floor((coords.length - 1) * pct)];
+            let waypoints = await Promise.all(partitions.map(async (pct) => {
+                const idx = Math.floor((coords.length - 1) * pct);
+                const p = coords[idx];
                 const arrival = new Date(depTime.getTime() + ((pct * dist) / speed) * 3600000);
 
                 let pool = [...state.hubs].sort((a, b) => Math.hypot(p.lat - a.lat, p.lng - a.lng) - Math.hypot(p.lat - b.lat, p.lng - b.lng));
@@ -94,11 +103,12 @@
                     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,visibility&wind_speed_unit=kmh&timezone=auto`);
                     const data = await res.json();
                     const i = Math.max(0, data.hourly.time.indexOf(arrival.toISOString().split(':')[0] + ":00"));
-
                     const sky = getSkyData(data.hourly.weather_code[i]);
 
                     return {
                         name: choice.name, lat: p.lat, lng: p.lng,
+                        // Fix: Calculate distance from start for sorting
+                        distFromStart: startPt.distanceTo(p),
                         temp: Math.round(data.hourly.temperature_2m[i]),
                         windSpd: Math.round(data.hourly.wind_speed_10m[i]),
                         windDir: getWindDir(data.hourly.wind_direction_10m[i]),
@@ -110,7 +120,10 @@
                 } catch (e) { return null; }
             }));
 
-            render(waypoints.filter(w => w));
+            // CRITICAL FIX: Sort results by distance from start to ensure Gander is before St. John's
+            waypoints = waypoints.filter(w => w).sort((a, b) => a.distFromStart - b.distFromStart);
+
+            render(waypoints);
             document.getElementById('weong-loading-overlay').style.display = 'none';
             state.isSyncing = false;
         };
@@ -123,10 +136,13 @@
                     icon: L.divIcon({
                         className: '',
                         html: `<div class="glass-node">
-                                <span class="glass-sky-icon">${d.skyIcon}</span>
-                                <span class="glass-temp-val">${d.temp}°</span>
+                                <div class="glass-header">${d.name}</div>
+                                <div class="glass-body">
+                                    <span class="glass-sky-icon">${d.skyIcon}</span>
+                                    <span class="glass-temp-val">${d.temp}°</span>
+                                </div>
                                </div>`,
-                        iconSize: [80, 45], iconAnchor: [40, 22]
+                        iconSize: [100, 50], iconAnchor: [50, 25]
                     })
                 }).addTo(state.layer);
 
@@ -144,7 +160,7 @@
             init: () => {
                 state.layer.addTo(window.map);
                 document.body.insertAdjacentHTML('beforeend', `
-                    <div id="weong-loading-overlay">SYNCING TEMPORAL DATA...</div>
+                    <div id="weong-loading-overlay">SORTING MISSION WAYPOINTS...</div>
                     <div id="bulletin-ui" style="position:fixed; bottom:20px; left:20px; z-index:100000; font-family:monospace;">
                         <div style="background:rgba(10,10,10,0.95); border:1px solid #FFD700; width:650px; padding:15px; border-radius:4px; box-shadow: 0 10px 40px #000;">
                             <div style="color:#FFD700; border-bottom:1px solid #FFD700; padding-bottom:5px; margin-bottom:10px; font-weight:bold; letter-spacing:1px; font-size:12px;">MISSION WEATHER MATRIX</div>
