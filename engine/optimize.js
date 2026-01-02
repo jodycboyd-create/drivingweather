@@ -1,68 +1,43 @@
-/** * Project: [weong-route] | RECOVERY BUILD: 2026.01.01
- * Feature: Restored Click Logic & Throttled Fetching
+/** * Project: [weong-route] | MODULE: optimize.js
+ * Feature: Unified Temporal Broadcast (Fixes Weather Matrix & Icons)
  */
 
-(function() {
-    const RecoveryOptimizer = {
-        activeOffset: 0,
-        
-        async init() {
-            console.log("SYSTEM: Initializing Recovery Protocol...");
-            const container = document.getElementById('matrix-ui');
-            const route = Object.values(window.map?._layers || {}).find(l => l._latlngs && l._latlngs.length > 20);
-            
-            if (!container || !route) return setTimeout(() => this.init(), 1000);
-            
-            this.injectUI(container);
-            this.runScan(route);
-        },
+Optimizer.shiftTime = function(hours, target) {
+    if (hours === undefined || hours === null) return;
+    const offset = parseInt(hours);
+    
+    // 1. UI Synchronization
+    document.querySelectorAll('.heat-cell').forEach(c => c.style.outline = "none");
+    if (target) target.style.outline = "2px solid #00FFFF";
 
-        injectUI(container) {
-            // Fix: Increased margin-top to 110px to clear the header
-            const html = `
-                <div id="opt-heat-map" style="margin-top:110px; margin-bottom:20px; z-index:10000; position:relative; pointer-events:auto; background:rgba(0,0,0,0.85); padding:10px; border:1px solid #00FFFF;">
-                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:2px; height:40px; cursor:pointer;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#222; border:1px solid #111; pointer-events:all;"></div>`).join('')}
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-top:8px; color:#00FFFF; font-family:monospace; font-size:10px;">
-                        <span id="opt-consensus">NEWFOUNDLAND_BASELINE: OK</span>
-                        <span id="opt-count">STABLE</span>
-                    </div>
-                </div>`;
-            
-            if (document.getElementById('opt-heat-map')) document.getElementById('opt-heat-map').remove();
-            container.children[0].insertAdjacentHTML('afterbegin', html);
+    // 2. Global State Update
+    window.currentDepartureTime = new Date(Date.now() + offset * 3600000);
 
-            // Restore Click Interactivity
-            document.getElementById('heat-grid').addEventListener('click', (e) => {
-                e.stopPropagation();
-                const cell = e.target.closest('.heat-cell');
-                if (cell) this.shiftTime(cell.dataset.h, cell);
-            }, true);
-        },
+    // 3. Trigger Synchronized Module Updates
+    
+    // Update the Road Analytics Table (METRo)
+    if (window.MetroTable && typeof MetroTable.updateTable === 'function') {
+        MetroTable.updateTable(offset);
+    }
 
-        async runScan(route) {
-            const cells = document.querySelectorAll('.heat-cell');
-            // Throttled Loop: Only fetches the 24-hour baseline once
-            for (let i = 0; i < 24; i++) {
-                const color = i < 5 ? "#00FF00" : i < 15 ? "#FFFF00" : "#FF8C00";
-                cells[i].style.backgroundColor = color;
-                // Add a small delay to simulate data transfer without triggering 429 errors
-                await new Promise(r => setTimeout(r, 20));
-            }
-        },
+    // Update the Mission Weather Matrix (Atmospheric)
+    if (window.WeatherEngine && typeof WeatherEngine.updateMatrix === 'function') {
+        WeatherEngine.updateMatrix(offset);
+    }
 
-        shiftTime(hours, target) {
-            this.activeOffset = parseInt(hours);
-            document.querySelectorAll('.heat-cell').forEach(c => c.style.outline = "none");
-            target.style.outline = "2px solid #FFF";
-            
-            // Sync with other modules if they exist
-            if (window.MasterClock) window.MasterClock.update(this.activeOffset);
-            if (window.MetroTable) window.MetroTable.updateTable(this.activeOffset);
-        }
-    };
+    // Update Map Hub Icons (The Yellow Labels)
+    if (window.HubManager && typeof HubManager.refreshIcons === 'function') {
+        HubManager.refreshIcons(offset);
+    }
 
-    window.Optimizer = RecoveryOptimizer;
-    RecoveryOptimizer.init();
-})();
+    // Update Global Master Clock HUD
+    if (window.MasterClock) {
+        MasterClock.update(offset);
+    }
+
+    // 4. Intensity Re-Scan (Refreshes Heatmap Icons)
+    const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 20);
+    if (route) this.runScan(route); 
+
+    console.log(`SYSTEM: Global Lead-Time Sync to +${offset}H Successful.`);
+};
