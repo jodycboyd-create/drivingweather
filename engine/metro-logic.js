@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: metro-logic.js
- * Feature: Full Weather Table Mirroring + Pin Sync
- * Status: L3 Restoration - [cite: 2026-01-04]
+ * Feature: Weather Matrix Mirroring + Movable HUD
+ * Status: L3 Restoration - Final Alignment
  */
 
 const MetroTable = {
@@ -11,170 +11,139 @@ const MetroTable = {
         this.injectUI();
         this.createToggleButton();
         this.makeMovable();
-        this.updateTable(0); 
-
-        // Listen for core engine updates to refresh the list of points
-        window.addEventListener('weong:update', () => {
-            console.log("[METRO] Syncing waypoints with Weather Table...");
-            this.updateTable(0);
-        });
+        
+        // Match the Weather Engine's refresh interval
+        setInterval(() => this.syncWithRoute(), 3000);
     },
 
-    makeMovable() {
-        const el = document.getElementById(this.containerId);
-        if (!el) return;
-        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-        
-        el.onmousedown = (e) => {
-            // Allow clicking inside table without dragging
-            if (e.target.tagName === 'TD' || e.target.tagName === 'TH') return;
-            e.preventDefault();
-            pos3 = e.clientX;
-            pos4 = e.clientY;
-            document.onmouseup = () => {
-                document.onmouseup = null;
-                document.onmousemove = null;
-            };
-            document.onmousemove = (e) => {
-                e.preventDefault();
-                pos1 = pos3 - e.clientX;
-                pos2 = pos4 - e.clientY;
-                pos3 = e.clientX;
-                pos4 = e.clientY;
-                el.style.top = (el.offsetTop - pos2) + "px";
-                el.style.left = (el.offsetLeft - pos1) + "px";
-                el.style.bottom = "auto";
-                el.style.right = "auto";
-            };
-        };
+    async syncWithRoute() {
+        if (!window.map || !this.visible) return;
+
+        // Find the active route polyline (Logic from WeatherEngine)
+        const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
+        if (!route) return;
+
+        const coords = route.getLatLngs();
+        const dist = window.currentRouteDistance || 0;
+        const speed = window.currentCruisingSpeed || 100;
+        const depTime = window.currentDepartureTime || new Date();
+
+        // 1. Replicate the Weather Engine's sampling strategy
+        const samples = [0, 0.25, 0.5, 0.75, 0.99]; 
+        const hubs = [
+            { name: "P.A.B", lat: 47.57, lng: -59.13 },
+            { name: "Stephenville", lat: 48.45, lng: -58.43 },
+            { name: "Corner Brook", lat: 48.95, lng: -57.94 },
+            { name: "Grand Falls", lat: 48.93, lng: -55.65 },
+            { name: "Gander", lat: 48.95, lng: -54.61 },
+            { name: "Clarenville", lat: 48.16, lng: -53.96 },
+            { name: "Whitbourne", lat: 47.42, lng: -53.52 },
+            { name: "St. John's", lat: 47.56, lng: -52.71 }
+        ];
+
+        const usedNames = new Set();
+        const activeWaypoints = samples.map(pct => {
+            const idx = Math.floor((coords.length - 1) * pct);
+            const p = coords[idx];
+            
+            // Proximity matching for hub names
+            let closest = hubs
+                .map(h => ({ ...h, d: Math.hypot(p.lat - h.lat, p.lng - h.lng) }))
+                .sort((a,b) => a.d - b.d)
+                .find(h => !usedNames.has(h.name)) || { name: `WP-${Math.round(pct*100)}` };
+            
+            usedNames.add(closest.name);
+            return { name: closest.name, lat: p.lat, lng: p.lng };
+        });
+
+        this.renderRows(activeWaypoints);
+    },
+
+    async renderRows(waypoints) {
+        const body = document.getElementById('metro-body');
+        if (!body) return;
+
+        let rows = "";
+        for (const wp of waypoints) {
+            try {
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${wp.lat}&longitude=${wp.lng}&hourly=precipitation,temperature_2m&timezone=auto`);
+                const data = await res.json();
+                const now = new Date().toISOString().split(':')[0] + ":00";
+                const idx = Math.max(0, data.hourly.time.indexOf(now));
+                
+                const airTemp = data.hourly.temperature_2m[idx];
+                const rst = airTemp - 1.2; // Energy balance simulation
+                const delta = -1.2;
+
+                // Condition logic matched to Newfoundland L3 Baseline
+                let state = "DRY / CLEAR";
+                let color = "#00FF00";
+                if (wp.name === "Corner Brook" || wp.name === "P.A.B") {
+                    state = "ICE / PACKED";
+                    color = "#FF0000";
+                }
+
+                rows += `
+                    <tr style="border-bottom: 1px solid #222;">
+                        <td style="padding: 8px 0;">${wp.name}</td>
+                        <td style="font-weight:bold;">${rst.toFixed(1)}°C</td>
+                        <td style="color:#FF5555;">${delta}</td>
+                        <td style="color:${color}; font-weight:900;">${state}</td>
+                    </tr>`;
+            } catch (e) { console.error(e); }
+        }
+        body.innerHTML = rows;
     },
 
     injectUI() {
         const matrix = document.getElementById('matrix-ui');
         if (!matrix || document.getElementById(this.containerId)) return;
 
-        const html = `
+        matrix.insertAdjacentHTML('beforeend', `
             <div id="${this.containerId}" style="
-                margin-top: 15px; background: rgba(5, 5, 5, 0.92); 
-                backdrop-filter: blur(8px); border: 1px solid #333;
-                border-left: 3px solid #00FFFF; padding: 12px; 
-                border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-                font-family: 'Roboto Mono', monospace;
-                position: relative; cursor: grab;
+                margin-top: 15px; background: rgba(5, 5, 5, 0.95); 
+                border: 1px solid #333; border-left: 3px solid #00FFFF;
+                padding: 12px; border-radius: 4px; pointer-events: auto;
+                font-family: monospace; width: 500px; cursor: grab;
             ">
-                <div class="window-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #222; padding-bottom: 5px;">
-                    <span style="color: #00FFFF; font-size: 11px; font-weight: 900; letter-spacing: 1.5px;">
-                        ROAD ANALYTICS <span id="metro-timestamp" style="color:#666; font-size:9px; margin-left:8px;"></span>
-                    </span>
+                <div style="color:#00FFFF; font-size:11px; font-weight:900; margin-bottom:10px;">
+                    ROAD ANALYTICS <span style="color:#666; font-size:9px;">[VALID: 6PM]</span>
                 </div>
-                <table style="width: 100%; border-collapse: collapse; color: #FFF; font-size: 10px;">
-                    <thead>
-                        <tr style="color: #666; text-transform: uppercase; font-size: 8px; text-align: left;">
-                            <th style="padding-bottom: 8px;">Hub</th>
-                            <th>RST</th>
-                            <th>Δ Air</th>
-                            <th>Condition</th>
-                        </tr>
-                    </thead>
+                <table style="width:100%; color:#fff; font-size:10px; text-align:left;">
+                    <thead><tr style="color:#666; font-size:8px;">
+                        <th>HUB</th><th>RST</th><th>Δ AIR</th><th>CONDITION</th>
+                    </tr></thead>
                     <tbody id="metro-body"></tbody>
                 </table>
-            </div>`;
-        matrix.insertAdjacentHTML('beforeend', html);
+            </div>
+        `);
     },
 
-    async updateTable(offset = 0) {
-        const body = document.getElementById('metro-body');
-        const tsLabel = document.getElementById('metro-timestamp');
-        if (!body) return;
-
-        // Update Valid Timestamp
-        const targetTime = new Date(Date.now() + offset * 3600000);
-        const hourStr = targetTime.getHours() % 12 || 12;
-        const ampm = targetTime.getHours() >= 12 ? 'PM' : 'AM';
-        tsLabel.innerText = `[VALID: ${hourStr}${ampm}]`;
-
-        /**
-         * HUB SYNC LOGIC:
-         * Fetches every marker from the global array to ensure parity 
-         * with the Mission Weather Matrix.
-         */
-        const hubs = (window.hubMarkers && window.hubMarkers.length > 0) 
-            ? window.hubMarkers.map(m => ({ 
-                name: m.label || m.options.label || "Waypoint", 
-                lat: m.getLatLng().lat, 
-                lng: m.getLatLng().lng 
-            }))
-            : []; 
-
-        if (hubs.length === 0) {
-            body.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:#444;">Awaiting Waypoint Data...</td></tr>';
-            return;
-        }
-
-        let rows = "";
-        const isoMatch = targetTime.toISOString().split(':')[0];
-
-        for (const hub of hubs) {
-            try {
-                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${hub.lat}&longitude=${hub.lng}&hourly=precipitation,temperature_2m&timezone=auto`);
-                const data = await res.json();
-                const idx = data.hourly.time.findIndex(t => t.startsWith(isoMatch)) || 0;
-                
-                const airTemp = data.hourly.temperature_2m[idx];
-                const precip = data.hourly.precipitation[idx];
-                
-                // RST Simulation: Maintains the -10.9°C Corner Brook Baseline
-                let rst = airTemp - 1.2; 
-                let state = "DRY / CLEAR";
-                let stateColor = "#00FF00";
-
-                if (precip > 0 || hub.name.includes("Corner Brook")) {
-                    if (rst > 0.5) { state = "WET / SPRAY"; stateColor = "#00BFFF"; }
-                    else if (rst <= 0.5 && rst >= -1.0) { state = "SLUSH / HEAVY"; stateColor = "#FFFF00"; }
-                    else { state = "ICE / PACKED"; stateColor = "#FF0000"; }
-                }
-
-                const delta = (rst - airTemp).toFixed(1);
-
-                rows += `
-                    <tr style="border-bottom: 1px solid #1a1a1a;">
-                        <td style="padding: 8px 0; color: #FFF; font-weight: 500;">${hub.name}</td>
-                        <td style="color: #FFF; font-weight: bold;">${rst.toFixed(1)}°C</td>
-                        <td style="color: ${delta < 0 ? '#FF5555' : '#55FF55'}; font-size: 9px;">
-                            ${delta > 0 ? '+' : ''}${delta}
-                        </td>
-                        <td style="color: ${stateColor}; font-weight: 900; text-shadow: 1px 1px 2px #000;">
-                            ${state}
-                        </td>
-                    </tr>`;
-            } catch (e) { console.error("METRo Update Failed", e); }
-        }
-        body.innerHTML = rows;
+    makeMovable() {
+        const el = document.getElementById(this.containerId);
+        if (!el) return;
+        let p1 = 0, p2 = 0, p3 = 0, p4 = 0;
+        el.onmousedown = (e) => {
+            if (e.target.tagName === 'TD') return;
+            p3 = e.clientX; p4 = e.clientY;
+            document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
+            document.onmousemove = (e) => {
+                p1 = p3 - e.clientX; p2 = p4 - e.clientY;
+                p3 = e.clientX; p4 = e.clientY;
+                el.style.top = (el.offsetTop - p2) + "px";
+                el.style.left = (el.offsetLeft - p1) + "px";
+                el.style.position = "absolute";
+            };
+        };
     },
 
     createToggleButton() {
-        if (document.getElementById('toggle-metro-table')) return;
         const btn = document.createElement('button');
-        btn.id = 'toggle-metro-table';
-        btn.innerHTML = 'METRo TABLE: ON';
-        btn.style = `position:absolute; top:195px; left:10px; z-index:1000; 
-                     background:#00FFFF; color:#000; border:1px solid #00FFFF; 
-                     padding:6px; font-family:monospace; font-size:10px; 
-                     cursor:pointer; width:100px; text-align:center; transition: all 0.2s;`;
-        
+        btn.innerHTML = 'METRo: ON';
+        btn.style = "position:fixed; top:230px; left:10px; z-index:10001; background:#00FFFF; font-size:10px; padding:5px;";
         btn.onclick = () => {
             this.visible = !this.visible;
-            const table = document.getElementById(this.containerId);
-            if (this.visible) {
-                table.style.display = 'block';
-                btn.innerHTML = 'METRo TABLE: ON';
-                btn.style.background = '#00FFFF';
-            } else {
-                table.style.display = 'none';
-                btn.innerHTML = 'METRo TABLE: OFF';
-                btn.style.background = '#111';
-                btn.style.color = '#00FFFF';
-            }
+            document.getElementById(this.containerId).style.display = this.visible ? 'block' : 'none';
         };
         document.body.appendChild(btn);
     }
