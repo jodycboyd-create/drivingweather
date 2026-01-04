@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Version: L3_MEAN_STABILIZE_V2
- * Feature: Weighted Mean Stabilization + Direct Table Binding
+ * Version: L3_STABILIZED_CORE_V3
+ * Feature: Fail-Safe Weighted Mean + Data Mapping Fix
  */
 
 (function() {
@@ -17,7 +17,8 @@
             if (!document.getElementById('opt-heat-map')) {
                 this.injectUI(container);
             }
-            this.runScan();
+            // Small delay to ensure table data is registered in the window object
+            setTimeout(() => this.runScan(), 500);
         },
 
         injectUI(container) {
@@ -35,7 +36,7 @@
                     width: 100%;
                     max-width: 500px;
                     border: 1px solid #00FFFF; 
-                    background: rgba(10,10,10,0.98);
+                    background: #050505;
                     padding: 2px 6px; 
                     font-family: monospace;
                     pointer-events: auto;
@@ -45,11 +46,11 @@
                         ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#1a1a1a; display:flex; align-items:center; justify-content:center;"></div>`).join('')}
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-                        <span id="opt-consensus" style="color:#00FFFF; font-weight:900; font-size:8px;">ROUTE_MEAN: SYNC</span>
+                        <span id="opt-consensus" style="color:#00FFFF; font-weight:900; font-size:8px;">ROUTE_SCAN: ACTIVE</span>
                         <div style="display:flex; gap:5px; font-size:7px; font-weight:900;">
                             <span style="color:#00FF00;">DRY</span><span style="color:#FFFF00;">FRST</span><span style="color:#FF8C00;">SLSH</span><span style="color:#FF0000;">ICE</span>
                         </div>
-                        <span id="opt-count" style="color:#00FF00; font-size:8px;">L3_ACTIVE</span>
+                        <span id="opt-count" style="color:#00FF00; font-size:8px;">L3_STABLE</span>
                     </div>
                 </div>`;
 
@@ -62,31 +63,29 @@
 
         runScan() {
             const cells = document.querySelectorAll('.heat-cell');
-            const currentTableData = window.MetroTable?.currentData || [];
-
-            if (!currentTableData.length) {
-                return setTimeout(() => this.runScan(), 500);
-            }
+            // Check for both possible data locations to avoid nulls
+            const currentTableData = window.MetroTable?.currentData || window.currentWeatherData || [];
 
             cells.forEach((cell) => {
                 const hourOffset = parseInt(cell.dataset.h);
                 const result = this.calculateWeightedMean(currentTableData, hourOffset);
                 
-                // Palette mapping based on weighted average
+                // FIXED PALETTE: No more undefined colors
                 const neonPalette = ["#00FF00", "#ADFF2F", "#FFFF00", "#FF8C00", "#FF0000"];
+                const colorIdx = Math.round(result.meanSeverity);
+                const safeColor = neonPalette[colorIdx] || "#00FF00"; // Default to Green if logic fails
                 
-                // Ensure index is a valid integer between 0-4
-                const colorIdx = Math.max(0, Math.min(4, Math.round(result.meanSeverity)));
-                
-                cell.style.backgroundColor = neonPalette[colorIdx];
+                cell.style.backgroundColor = safeColor;
                 cell.innerHTML = result.avgPrecip > 0.1 ? (result.isSnow ? this.svgs.snow : this.svgs.rain) : "";
             });
         },
 
         calculateWeightedMean(timeline, offset) {
-            // Filter timeline for current hour offset or use visible table rows
-            const dataSet = timeline.filter(d => parseInt(d.hourOffset || 0) === offset);
-            const activeSet = dataSet.length ? dataSet : timeline;
+            // Filter by hourOffset, but if timeline is empty, return baseline Green
+            if (!timeline || timeline.length === 0) return { meanSeverity: 0, avgPrecip: 0, isSnow: false };
+
+            const dataSet = timeline.filter(d => parseInt(d.hourOffset) === offset);
+            const activeSet = dataSet.length ? dataSet : [timeline[0]];
 
             let totalSeverity = 0;
             let totalPrecip = 0;
@@ -94,25 +93,20 @@
 
             activeSet.forEach(data => {
                 let sev = 0;
-                const cond = (data.condition || "").toUpperCase();
+                // Standardize inputs: Check 'condition', 'cond', 'temp', or 'air'
+                const cond = (data.condition || data.cond || "").toUpperCase();
                 const air = parseFloat(data.temp || data.air || 0);
                 const rst = air - 1.2;
+                const precip = parseFloat(data.precip || 0);
 
-                // Severity Logic synchronized with Road Analytics
-                if (cond.includes("ICE") || cond.includes("PACKED") || rst < -7.0) {
-                    sev = 4; // RED
-                } else if (cond.includes("SLUSH") || cond.includes("SNOW")) {
-                    sev = 3; // ORANGE
-                } else if (rst <= 0 && cond.includes("WET")) {
-                    sev = 2; // YELLOW
-                } else if (cond.includes("WET") || parseFloat(data.precip || 0) > 0.1) {
-                    sev = 1; // LIGHT GREEN
-                } else {
-                    sev = 0; // DRY/CLEAR
-                }
+                if (cond.includes("ICE") || cond.includes("PACKED") || rst < -7.0) sev = 4;
+                else if (cond.includes("SLUSH") || cond.includes("SNOW")) sev = 3;
+                else if (rst <= 0 && (cond.includes("WET") || precip > 0)) sev = 2;
+                else if (cond.includes("WET") || precip > 0) sev = 1;
+                else sev = 0; // DRY / CLEAR
 
                 totalSeverity += sev;
-                totalPrecip += parseFloat(data.precip || 0);
+                totalPrecip += precip;
                 if (rst < 0) snowPoints++;
             });
 
@@ -127,23 +121,14 @@
             const offset = parseInt(hours);
             window.currentDepartureTime = new Date(Date.now() + offset * 3600000);
             
-            document.querySelectorAll('.heat-cell').forEach(c => {
-                c.style.outline = "none";
-                c.style.boxShadow = "none";
-            });
+            document.querySelectorAll('.heat-cell').forEach(c => c.style.outline = "none");
+            target.style.outline = "1px solid #FFF";
 
-            target.style.outline = "1px solid #00FFFF";
-            target.style.boxShadow = "inset 0 0 5px #00FFFF";
-
-            // Sync all engines
             window.MasterClock?.update(offset);
             window.MetroTable?.updateTable?.(offset);
             window.WeatherMatrix?.update?.(offset);
-            window.RWIS?.updatePills?.(offset);
             
-            document.getElementById('opt-consensus').innerText = `T+${offset}H MEAN`;
-            
-            // Re-trigger scan to ensure colors update to reflect the new time slice
+            document.getElementById('opt-consensus').innerText = `+${offset}H MEAN`;
             this.runScan();
         }
     };
