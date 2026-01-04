@@ -1,8 +1,7 @@
 /**
  * PROJECT: [weong-route]
- * FILE: optimize.js
- * FEATURE: 48-Hour Linear Timeline (Single Row)
- * STATUS: System Master Control - Jan 4 Sync
+ * MODULE: optimize.js | L3 STABILITY PATCH 014
+ * Feature: 48H Single-Row Matrix + Hit-Box Fix
  */
 
 const OptimizeEngine = {
@@ -10,7 +9,6 @@ const OptimizeEngine = {
     currentOffset: 0,
 
     init() {
-        console.log("[OPTIMIZE] 48H Linear Scrubber Initialized.");
         this.injectUI();
         this.makeMovable();
         this.updateTimeline();
@@ -20,17 +18,20 @@ const OptimizeEngine = {
     injectUI() {
         if (document.getElementById(this.containerId)) return;
         
-        // Using width: 850px to fit all 24 boxes in one row comfortably
         const html = `
             <div id="${this.containerId}" style="
-                position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-                background: rgba(5, 5, 5, 0.95); border: 1px solid #333;
-                border-top: 3px solid #00FFFF; padding: 10px 15px; 
-                border-radius: 4px; box-shadow: 0 10px 50px rgba(0,0,0,0.9);
-                font-family: 'Roboto Mono', monospace; z-index: 20000;
-                width: 900px; pointer-events: auto; cursor: grab;
+                position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+                background: rgba(10, 10, 10, 0.98); border: 1px solid #333;
+                border-top: 3px solid #00FFFF; padding: 0; 
+                border-radius: 4px; box-shadow: 0 15px 50px rgba(0,0,0,0.9);
+                font-family: 'Roboto Mono', monospace; z-index: 25000;
+                width: 920px; pointer-events: auto;
             ">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div id="temp-drag-handle" style="
+                    cursor: grab; padding: 10px 15px; 
+                    display: flex; justify-content: space-between; align-items: center;
+                    background: rgba(20,20,20,0.5);
+                ">
                     <span style="color: #00FFFF; font-size: 10px; font-weight: 900; letter-spacing: 2px;">
                         48H TEMPORAL PREDICTIVE MATRIX
                     </span>
@@ -39,12 +40,14 @@ const OptimizeEngine = {
                     </span>
                 </div>
                 
-                <div id="timeline-grid" style="
-                    display: grid; 
-                    grid-template-columns: repeat(24, 1fr); 
-                    gap: 3px; 
-                    pointer-events: auto;
-                "></div>
+                <div style="padding: 0 15px 15px 15px;">
+                    <div id="timeline-grid" style="
+                        display: grid; 
+                        grid-template-columns: repeat(24, 1fr); 
+                        gap: 4px; 
+                        pointer-events: auto;
+                    "></div>
+                </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', html);
     },
@@ -58,25 +61,23 @@ const OptimizeEngine = {
             const leadTime = i * 2;
             const isSelected = this.currentOffset === leadTime;
             
-            // Heat scale matching the Jan 4 storm profile
-            let heatColor = "#2ecc71"; // Clear
-            if (leadTime <= 8) heatColor = "#e74c3c"; // Icing Alert (-10.9°C)
-            else if (leadTime <= 18) heatColor = "#f1c40f"; // Slush/Caution
+            // Replicating the Jan 4 Storm Profile color scale
+            let heatColor = "#1B4332"; // Dark Green (Clear)
+            if (leadTime <= 8) heatColor = "#78291c"; // Dark Red (Icing/Hazard)
+            else if (leadTime <= 18) heatColor = "#7a6211"; // Mustard (Caution)
 
-            // Fix: Explicitly setting z-index and pointer-events on each block 
-            // to ensure they aren't blocked by the parent's drag listener.
+            if (isSelected) heatColor = (leadTime <= 8) ? "#e74c3c" : (leadTime <= 18) ? "#f1c40f" : "#2ecc71";
+
             boxes += `
-                <div onclick="event.stopPropagation(); OptimizeEngine.setTime(${leadTime})" style="
-                    height: 32px; background: ${heatColor}; 
-                    border: ${isSelected ? '2px solid #fff' : '1px solid rgba(255,255,255,0.1)'};
-                    opacity: ${isSelected ? '1' : '0.4'};
+                <div onclick="OptimizeEngine.setTime(${leadTime})" style="
+                    height: 35px; background: ${heatColor}; 
+                    border: ${isSelected ? '2px solid #fff' : '1px solid rgba(255,255,255,0.05)'};
+                    opacity: ${isSelected ? '1' : '0.6'};
                     cursor: pointer; display: flex; align-items: center; 
-                    justify-content: center; font-size: 9px; font-weight: 900;
-                    color: #000; transition: all 0.15s ease;
+                    justify-content: center; font-size: 10px; font-weight: 900;
+                    color: ${isSelected ? '#000' : '#fff'}; transition: all 0.1s;
                     pointer-events: auto;
-                    position: relative;
-                    z-index: 20001;
-                " class="timeline-block">
+                ">
                     ${leadTime}
                 </div>`;
         }
@@ -87,37 +88,26 @@ const OptimizeEngine = {
     setTime(hours) {
         this.currentOffset = hours;
         window.currentTemporalOffset = hours; 
-        
         this.updateTimeline();
 
-        // 1. Refresh Road Analytics (MetroTable)
-        if (window.MetroTable && typeof window.MetroTable.updateTable === 'function') {
-            window.MetroTable.updateTable(hours);
-        }
-
-        // 2. Refresh Weather Engine (Map Pins & Mission Matrix)
-        window.dispatchEvent(new CustomEvent('weong:update', { 
-            detail: { offset: hours } 
-        }));
-        
-        console.log(`[SYSTEM] Temporal Sync: T+${hours} activated.`);
+        // Broadcast to Road Analytics and Weather Matrix
+        if (window.MetroTable) window.MetroTable.updateTable(hours);
+        window.dispatchEvent(new CustomEvent('weong:update', { detail: { offset: hours } }));
     },
 
     makeMovable() {
         const el = document.getElementById(this.containerId);
+        const handle = document.getElementById("temp-drag-handle");
         let p1 = 0, p2 = 0, p3 = 0, p4 = 0;
         
-        el.onmousedown = (e) => {
-            // Prevent dragging if clicking a timeline block
-            if (e.target.classList.contains('timeline-block')) return;
-            
+        handle.onmousedown = (e) => {
             p3 = e.clientX; p4 = e.clientY;
             document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
             document.onmousemove = (e) => {
                 p1 = p3 - e.clientX; p2 = p4 - e.clientY;
                 p3 = e.clientX; p4 = e.clientY;
                 el.style.top = (el.offsetTop - p2) + "px";
-                el.style.left = (el.offsetLeft - p1 + (el.offsetWidth/2)) + "px"; // Maintain center-alignment logic
+                el.style.left = (el.offsetLeft - p1 + (el.offsetWidth/2)) + "px";
                 el.style.bottom = "auto";
                 el.style.transform = "translateX(-50%)";
             };
@@ -125,4 +115,4 @@ const OptimizeEngine = {
     }
 };
 
-setTimeout(() => OptimizeEngine.init(), 500);
+OptimizeEngine.init();
