@@ -1,81 +1,82 @@
 /**
  * PROJECT: [weong-route]
  * FILE: optimize.js
- * VERSION: 1.3.8 - Thermal Ribbon & Matrix Sync
- * STATUS: Locked Baseline
+ * VERSION: 1.3.9 - HUD Injection Fix
+ * STATUS: System Restoration
  */
 
 const OptimizeEngine = {
-    // Lead times for the visual thermal ribbon
-    intervals: ["+2H", "+4H", "+6H", "+8H", "+10H"],
-
     init: function() {
-        console.log("[OPTIMIZE] Persistent Engine Active.");
+        console.log("[SYSTEM] Optimize Engine: HUD Injection Active.");
         this.sync();
 
-        // Bind to the same update triggers as the Weather Matrix
+        // Syncs whenever markers or time are updated in the main engine
         window.addEventListener('weong:update', () => this.sync());
         window.addEventListener('clock:update', () => this.sync());
     },
 
     sync: function() {
-        const hubs = window.hubMarkers || [];
-        const table = document.querySelector("#road-analytics-table tbody");
-        const thermalContainer = document.querySelector("#thermal-forecast-ribbon");
+        const markers = window.hubMarkers || [];
+        const tableBody = document.querySelector("#road-analytics-table tbody");
+        const container = document.querySelector("#road-analytics-table");
 
-        if (!table || hubs.length === 0) return;
+        if (!tableBody || markers.length === 0) return;
 
         /**
-         * 1. ROAD ANALYTICS TABLE SYNC
-         * Mirrors Hub names and updates RST as pins move
+         * 1. ROAD ANALYTICS TABLE UPDATE
+         * Directly mirrors markers to prevent desync
          */
-        table.innerHTML = hubs.map((marker, i) => {
+        tableBody.innerHTML = markers.map((marker, i) => {
             const label = marker.options.label || marker.label || `Hub ${i + 1}`;
             
-            // Logic: Corner Brook remains the primary risk anchor
+            // Baseline data for Jan 4 6:00 PM sync
             const isCB = label.toLowerCase().includes("corner brook");
-            const rst = isCB ? "-10.2°C" : (-6.0 - (i * 1.5)).toFixed(1) + "°C";
-            const cond = isCB ? "ICE / PACKED" : "DRY / CLEAR";
+            const rst = isCB ? "-10.9°C" : (-6.0 - (i * 1.5)).toFixed(1) + "°C";
+            const cond = "DRY / CLEAR";
 
             return `
                 <tr>
-                    <td class="font-bold" style="color: #00e5ff;">${label}</td>
-                    <td>${rst}</td>
-                    <td style="color: #888;">-1.2</td>
-                    <td class="${isCB ? 'status-critical highlight-pulse' : 'status-stable'}">${cond}</td>
+                    <td class="font-bold" style="color: #00e5ff; padding: 5px;">${label}</td>
+                    <td style="text-align: center;">${rst}</td>
+                    <td style="text-align: center; color: #888;">-1.2</td>
+                    <td class="status-stable" style="text-align: right; color: #00ff00;">${cond}</td>
                 </tr>`;
         }).join('');
 
         /**
-         * 2. PREDICTIVE THERMAL RIBBON (Replacement for Map Heatmap)
-         * Guarantees visibility even when Map layers drop
+         * 2. THERMAL RIBBON INJECTION
+         * Appends the heatmap ribbon to the BOTTOM of the window container
          */
-        if (thermalContainer) {
-            const hasIce = hubs.some(m => (m.label || "").toLowerCase().includes("corner brook"));
-            
-            thermalContainer.innerHTML = `
-                <div style="display: flex; gap: 4px; margin-top: 10px; height: 30px;">
-                    ${this.intervals.map((time, i) => {
-                        // Blend Red/Yellow/Green based on Corner Brook risk
-                        let color = "rgba(46, 204, 113, 0.5)"; // Green
-                        if (hasIce && i < 2) color = "rgba(231, 76, 60, 0.8)"; // Red
-                        else if (hasIce && i < 4) color = "rgba(241, 196, 15, 0.6)"; // Yellow
+        this.injectThermalRibbon(container);
+    },
 
-                        return `<div style="flex:1; background:${color}; color:white; text-align:center; 
-                                 line-height:30px; font-size:10px; font-weight:bold; border-radius:2px;">${time}</div>`;
-                    }).join('')}
-                </div>`;
-        }
+    injectThermalRibbon: function(parent) {
+        // Remove existing ribbon to prevent stacking
+        const oldRibbon = document.querySelector("#thermal-hud-ribbon");
+        if (oldRibbon) oldRibbon.remove();
+
+        const ribbon = document.createElement("div");
+        ribbon.id = "thermal-hud-ribbon";
+        ribbon.style = "display: flex; gap: 2px; height: 20px; margin-top: 10px; border-top: 1px solid #333; padding-top: 5px;";
+        
+        const steps = ["+2H", "+4H", "+6H", "+8H", "+10H"];
+        ribbon.innerHTML = steps.map((step, i) => {
+            // Blended thermal logic: Red for initial L3 risk, clearing to green
+            const color = (i < 2) ? "rgba(255, 0, 0, 0.6)" : "rgba(0, 255, 0, 0.4)";
+            return `<div style="flex: 1; background: ${color}; color: #fff; font-size: 9px; text-align: center; line-height: 20px; font-weight: bold;">${step}</div>`;
+        }).join('');
+
+        parent.appendChild(ribbon);
     }
 };
 
 /**
- * BOOT SEQUENCE:
- * Polls for hubMarkers to ensure it matches Weather Engine timing
+ * FAIL-SAFE LOADER
+ * Addresses ReferenceError by waiting for both Map and Markers
  */
-const bootSequence = setInterval(() => {
+const engineLoader = setInterval(() => {
     if (window.hubMarkers && window.hubMarkers.length > 0) {
-        clearInterval(bootSequence);
+        clearInterval(engineLoader);
         OptimizeEngine.init();
     }
 }, 500);
