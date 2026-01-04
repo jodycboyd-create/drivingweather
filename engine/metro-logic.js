@@ -1,5 +1,5 @@
 /** * Project: [weong-route] | MODULE: metro-logic.js
- * Feature: Temporal Sync + Waypoint Binding + Movable UI
+ * Feature: Full Weather Table Mirroring + Pin Sync
  * Status: L3 Restoration - [cite: 2026-01-04]
  */
 
@@ -10,12 +10,12 @@ const MetroTable = {
     init() {
         this.injectUI();
         this.createToggleButton();
-        this.makeMovable(); // Added: Movable functionality
+        this.makeMovable();
         this.updateTable(0); 
 
-        // CRITICAL SYNC: Listen for pin movement from Core Engine
+        // Listen for core engine updates to refresh the list of points
         window.addEventListener('weong:update', () => {
-            console.log("[METRO] Waypoint shift detected. Syncing...");
+            console.log("[METRO] Syncing waypoints with Weather Table...");
             this.updateTable(0);
         });
     },
@@ -26,6 +26,7 @@ const MetroTable = {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         
         el.onmousedown = (e) => {
+            // Allow clicking inside table without dragging
             if (e.target.tagName === 'TD' || e.target.tagName === 'TH') return;
             e.preventDefault();
             pos3 = e.clientX;
@@ -46,33 +47,6 @@ const MetroTable = {
                 el.style.right = "auto";
             };
         };
-    },
-
-    createToggleButton() {
-        const btn = document.createElement('button');
-        btn.id = 'toggle-metro-table';
-        btn.innerHTML = 'METRo TABLE: ON';
-        btn.style = `position:absolute; top:195px; left:10px; z-index:1000; 
-                     background:#00FFFF; color:#000; border:1px solid #00FFFF; 
-                     padding:6px; font-family:monospace; font-size:10px; 
-                     cursor:pointer; width:100px; text-align:center; transition: all 0.2s;`;
-        
-        btn.onclick = () => {
-            this.visible = !this.visible;
-            const table = document.getElementById(this.containerId);
-            if (this.visible) {
-                table.style.display = 'block';
-                btn.innerHTML = 'METRo TABLE: ON';
-                btn.style.background = '#00FFFF';
-                btn.style.color = '#000';
-            } else {
-                table.style.display = 'none';
-                btn.innerHTML = 'METRo TABLE: OFF';
-                btn.style.background = '#111';
-                btn.style.color = '#00FFFF';
-            }
-        };
-        document.body.appendChild(btn);
     },
 
     injectUI() {
@@ -113,19 +87,29 @@ const MetroTable = {
         const tsLabel = document.getElementById('metro-timestamp');
         if (!body) return;
 
+        // Update Valid Timestamp
         const targetTime = new Date(Date.now() + offset * 3600000);
         const hourStr = targetTime.getHours() % 12 || 12;
         const ampm = targetTime.getHours() >= 12 ? 'PM' : 'AM';
         tsLabel.innerText = `[VALID: ${hourStr}${ampm}]`;
 
-        // SYNC FIX: Use active map markers instead of samples
+        /**
+         * HUB SYNC LOGIC:
+         * Fetches every marker from the global array to ensure parity 
+         * with the Mission Weather Matrix.
+         */
         const hubs = (window.hubMarkers && window.hubMarkers.length > 0) 
             ? window.hubMarkers.map(m => ({ 
                 name: m.label || m.options.label || "Waypoint", 
                 lat: m.getLatLng().lat, 
                 lng: m.getLatLng().lng 
             }))
-            : [ { name: "Corner Brook", lat: 48.95, lng: -57.95 } ]; // Fallback
+            : []; 
+
+        if (hubs.length === 0) {
+            body.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:#444;">Awaiting Waypoint Data...</td></tr>';
+            return;
+        }
 
         let rows = "";
         const isoMatch = targetTime.toISOString().split(':')[0];
@@ -139,7 +123,7 @@ const MetroTable = {
                 const airTemp = data.hourly.temperature_2m[idx];
                 const precip = data.hourly.precipitation[idx];
                 
-                // RESTORED: Jan 4 RST Baseline Logic
+                // RST Simulation: Maintains the -10.9°C Corner Brook Baseline
                 let rst = airTemp - 1.2; 
                 let state = "DRY / CLEAR";
                 let stateColor = "#00FF00";
@@ -166,6 +150,33 @@ const MetroTable = {
             } catch (e) { console.error("METRo Update Failed", e); }
         }
         body.innerHTML = rows;
+    },
+
+    createToggleButton() {
+        if (document.getElementById('toggle-metro-table')) return;
+        const btn = document.createElement('button');
+        btn.id = 'toggle-metro-table';
+        btn.innerHTML = 'METRo TABLE: ON';
+        btn.style = `position:absolute; top:195px; left:10px; z-index:1000; 
+                     background:#00FFFF; color:#000; border:1px solid #00FFFF; 
+                     padding:6px; font-family:monospace; font-size:10px; 
+                     cursor:pointer; width:100px; text-align:center; transition: all 0.2s;`;
+        
+        btn.onclick = () => {
+            this.visible = !this.visible;
+            const table = document.getElementById(this.containerId);
+            if (this.visible) {
+                table.style.display = 'block';
+                btn.innerHTML = 'METRo TABLE: ON';
+                btn.style.background = '#00FFFF';
+            } else {
+                table.style.display = 'none';
+                btn.innerHTML = 'METRo TABLE: OFF';
+                btn.style.background = '#111';
+                btn.style.color = '#00FFFF';
+            }
+        };
+        document.body.appendChild(btn);
     }
 };
 
