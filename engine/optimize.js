@@ -1,59 +1,55 @@
 /**
- * PROJECT: [weong-route] / [weong-bulletin]
+ * PROJECT: [weong-route]
  * FILE: optimize.js
- * VERSION: 1.2.4 - Restoration Baseline
- * STATUS: Locked - Newfoundland Deep-Dive
+ * VERSION: 1.2.5 - Direct Injection Baseline
  * ----------------------------------------------------------------
- * RESET LOGIC: 
- * 1. Direct injection on 'tilesloaded' to avoid ReferenceErrors.
- * 2. Hard-coded NL Dataset to match Jan 4 4:00 PM Matrix.
- * 3. Segment 1 & Segment 5 RED state forced for L3 exceptions.
+ * This version is designed to run even if RWIS is active or disabled.
  */
 
 const OptimizeEngine = {
     heatmap: null,
 
-    // Coordinates for primary thermal signatures
+    // Data points locked to Level 3 exceptions
     thermalPoints: [
-        { location: new google.maps.LatLng(48.9515, -57.9453), weight: 15 }, // Corner Brook (ICE)
-        { location: new google.maps.LatLng(47.5615, -52.7126), weight: 10 }  // St. John's (0km VIS)
+        { location: new google.maps.LatLng(48.9515, -57.9453), weight: 15 }, // Corner Brook
+        { location: new google.maps.LatLng(47.5615, -52.7126), weight: 10 }  // St. John's
     ],
 
     init: function() {
-        console.log("[OPTIMIZE] Restoration Engine Active. Applying Jan 4 4:00PM State.");
-        this.syncRoadAnalytics();
-        this.syncRouteScan();
+        console.log("[OPTIMIZE] Initializing Heatmap Window...");
+        this.renderTable();
+        this.renderRouteScan();
         this.injectHeatmap();
     },
 
-    syncRoadAnalytics: function() {
+    renderTable: function() {
         const table = document.querySelector("#road-analytics-table tbody");
         if (!table) return;
 
-        // Dataset synced to Mission Matrix
+        // Dataset matching the Jan 4 4:00 PM deep-dive
         const hubs = [
-            { n: "Corner Brook", r: "-10.0°C", c: "ICE / PACKED", crit: true },
-            { n: "Grand Falls", r: "-12.4°C", c: "DRY / CLEAR", crit: false },
-            { n: "Clarenville", r: "-8.0°C", c: "DRY / CLEAR", crit: false },
-            { n: "Whitbourne", r: "-6.0°C", c: "DRY / CLEAR", crit: false },
-            { n: "St. John's", r: "-5.3°C", c: "DRY / CLEAR", crit: true }
+            { name: "Corner Brook", rst: "-10.0°C", cond: "ICE / PACKED", status: "status-critical" },
+            { name: "Grand Falls", rst: "-12.4°C", cond: "DRY / CLEAR", status: "status-stable" },
+            { name: "Clarenville", rst: "-8.0°C", cond: "DRY / CLEAR", status: "status-stable" },
+            { name: "Whitbourne", rst: "-6.0°C", cond: "DRY / CLEAR", status: "status-stable" },
+            { name: "St. John's", rst: "-5.3°C", cond: "DRY / CLEAR", status: "status-stable" }
         ];
 
-        table.innerHTML = hubs.map(hub => `
+        table.innerHTML = hubs.map(h => `
             <tr>
-                <td class="font-bold">${hub.n}</td>
-                <td>${hub.r}</td>
+                <td class="font-bold">${h.name}</td>
+                <td>${h.rst}</td>
                 <td>-1.2</td>
-                <td class="${hub.crit ? 'status-critical highlight-pulse' : 'status-stable'}">${hub.c}</td>
+                <td class="${h.status}">${h.cond}</td>
             </tr>`).join('');
     },
 
-    syncRouteScan: function() {
+    renderRouteScan: function() {
         const boxes = document.querySelectorAll(".route-box");
-        // Force RED for Corner Brook (Idx 0) and St. John's (Idx 4)
         if (boxes.length > 0) {
+            // Force Segment 1 to RED for Corner Brook ICE
             boxes.forEach((box, i) => {
-                box.className = "route-box " + ((i === 0 || i === 4) ? "bg-red" : "bg-green");
+                box.className = "route-box " + (i === 0 ? "bg-red" : "bg-green");
             });
         }
     },
@@ -61,30 +57,21 @@ const OptimizeEngine = {
     injectHeatmap: function() {
         if (!window.map || !google.maps.visualization) return;
 
-        // Clean re-injection
-        if (this.heatmap) this.heatmap.setMap(null);
-
         this.heatmap = new google.maps.visualization.HeatmapLayer({
             data: this.thermalPoints,
             map: window.map,
-            radius: 45,
-            opacity: 0.85
+            radius: 50,
+            opacity: 0.9
         });
-        
-        console.log("[OPTIMIZE] Heatmap Window Successfully Rendered.");
+        console.log("[OPTIMIZE] Heatmap successfully pushed to map.");
     }
 };
 
-/**
- * RESTORATION LOADER
- * Anchors the engine to the map's internal ready state.
- */
-const anchorEngine = setInterval(() => {
+// Polling loader to avoid "google is not defined"
+const loader = setInterval(() => {
     if (window.map && typeof google !== 'undefined' && google.maps.visualization) {
-        clearInterval(anchorEngine);
-        // Wait for tiles to load once to ensure the window is visible
-        google.maps.event.addListenerOnce(window.map, 'tilesloaded', () => {
-            OptimizeEngine.init();
-        });
+        clearInterval(loader);
+        // Delay by 1 second to ensure rwis.js finish its sync if still active
+        setTimeout(() => OptimizeEngine.init(), 1000);
     }
-}, 1000);
+}, 500);
