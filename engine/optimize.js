@@ -1,84 +1,97 @@
 /**
  * PROJECT: [weong-route]
  * FILE: optimize.js
- * VERSION: 1.3.1 - Event-Linked Restoration
- * LOGIC: Synchronized with Core Routing Engine weong:update
+ * VERSION: 1.3.2 - Waypoint Intercept Build
+ * LOGIC: Directly linked to window.hubMarkers and weong:update
  */
 
 const OptimizeEngine = {
     heatLayer: null,
     
-    // Core data coordinates for Newfoundland Hubs
-    locations: [
-        { name: "Corner Brook", lat: 48.9515, lng: -57.9453, rst: -10.2, cond: "ICE / PACKED" },
-        { name: "Grand Falls", lat: 48.9339, lng: -55.6364, rst: -12.9, cond: "DRY / CLEAR" },
-        { name: "Clarenville", lat: 48.1670, lng: -53.9660, rst: -8.1, cond: "DRY / CLEAR" },
-        { name: "Whitbourne", lat: 47.4260, lng: -53.5300, rst: -6.2, cond: "DRY / CLEAR" },
-        { name: "St. John's", lat: 47.5615, lng: -52.7126, rst: -5.3, cond: "DRY / CLEAR" }
-    ],
+    // Locked Baseline Data for Jan 4 5:00 PM
+    baselineRST: -10.2, 
 
     init: function() {
-        console.log("[OPTIMIZE] Spatial Sync Engine Online.");
-        this.refreshAll();
-        
-        // HOOK: Matches Core Routing Engine behavior
+        console.log("[OPTIMIZE] Intercepting Hub Markers..."); 
+        this.refresh();
+
+        // Listen for the same update trigger as the routing engine
         window.addEventListener('weong:update', () => {
-            console.log("[OPTIMIZE] Movement detected. Re-plotting Heatmap/Analytics...");
-            this.refreshAll();
+            console.log("[OPTIMIZE] Waypoint shift detected. Syncing Analytics...");
+            this.refresh();
         });
     },
 
-    refreshAll: function() {
-        this.updateRoadAnalytics();
-        this.drawPredictiveHeatmap();
+    refresh: function() {
+        // Core Fix: Get data directly from the same source as the map pins
+        const waypoints = window.hubMarkers || [];
+        this.updateRoadAnalytics(waypoints);
+        this.drawPredictiveHeatmap(waypoints);
     },
 
-    updateRoadAnalytics: function() {
+    /**
+     * Updates the table based on the actual markers on the map.
+     * Links RST and Conditions to pin position.
+     */
+    updateRoadAnalytics: function(markers) {
         const tableBody = document.querySelector("#road-analytics-table tbody");
         if (!tableBody) return;
 
-        // Populate table with Jan 4 5:00 PM RST state
-        tableBody.innerHTML = this.locations.map(loc => `
-            <tr>
-                <td class="font-bold">${loc.name}</td>
-                <td>${loc.rst}°C</td>
-                <td>-1.2</td>
-                <td class="${loc.cond.includes('ICE') ? 'status-critical' : 'status-stable'}">${loc.cond}</td>
-            </tr>`).join('');
+        // Map the current map markers to the table rows
+        tableBody.innerHTML = markers.map((marker, i) => {
+            const pos = marker.getLatLng();
+            const hubName = marker.label || `Waypoint ${i + 1}`;
+            
+            // Logic: Corner Brook (Marker 0) remains ICE/PACKED L3
+            const condition = (i === 0) ? "ICE / PACKED" : "DRY / CLEAR";
+            const statusClass = (i === 0) ? "status-critical highlight-pulse" : "status-stable";
+            
+            // Simulated RST shift based on latitude (colder north)
+            const dynamicRST = (this.baselineRST + (pos.lat - 48.95)).toFixed(1);
+
+            return `
+                <tr>
+                    <td class="font-bold">${hubName}</td>
+                    <td>${dynamicRST}°C</td>
+                    <td>-1.2</td>
+                    <td class="${statusClass}">${condition}</td>
+                </tr>`;
+        }).join('');
     },
 
-    drawPredictiveHeatmap: function() {
-        if (!window.map) return;
+    /**
+     * Predictive Heat Map (2-Hour Blended Blocks)
+     * Renders below the table to avoid Map Overlay conflicts.
+     */
+    drawPredictiveHeatmap: function(markers) {
+        const forecastContainer = document.querySelector("#predictive-heat-map-container");
+        if (!forecastContainer) return;
 
-        // Remove old heat layer to prevent stacking
-        if (this.heatLayer) window.map.removeLayer(this.heatLayer);
-
-        /**
-         * GENERATING BLENDED HEAT TILES
-         * Logic: 2-hour forecast blocks as UI overlays
-         */
-        const forecastContainer = document.querySelector("#heat-forecast-ribbon");
-        if (forecastContainer) {
-            const blocks = ["+2H", "+4H", "+6H", "+8H", "+10H"];
-            forecastContainer.innerHTML = blocks.map((time, i) => {
-                // Blend logic: Shifts from green to red based on Corner Brook condition
-                const severity = (i === 0) ? "rgba(255, 0, 0, 0.6)" : "rgba(0, 255, 0, 0.4)";
-                return `<div class="forecast-block" style="background: ${severity};">${time}</div>`;
-            }).join('');
-        }
-
-        // LEAFLET HEATMAP RESTORATION
-        // Using SimpleHeat logic within the Leaflet context
-        const heatPoints = this.locations.map(l => [l.lat, l.lng, 0.8]);
-        this.heatLayer = L.heatLayer(heatPoints, {
-            radius: 35,
-            blur: 15,
-            gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
-        }).addTo(window.map);
+        const timeBlocks = ["+2H", "+4H", "+6H", "+8H", "+10H"];
+        
+        // Logic: Blends the condition of all active waypoints into a route risk color
+        const hasIce = markers.some((_, i) => i === 0); // Is Corner Brook (L3) active?
+        
+        forecastContainer.innerHTML = `
+            <div style="display: flex; gap: 4px; height: 30px; margin-top: 10px;">
+                ${timeBlocks.map((block, i) => {
+                    // +2H block is Red if any marker is L3 (Ice); others fade to Green/Yellow
+                    const r = hasIce && i < 2 ? 220 : 45;
+                    const g = hasIce && i < 2 ? 50 : 180;
+                    return `
+                        <div style="flex: 1; background: rgb(${r}, ${g}, 45); opacity: 0.8; 
+                             border-radius: 2px; text-align: center; font-size: 10px; line-height: 30px; color: white;">
+                            ${block}
+                        </div>`;
+                }).join('')}
+            </div>`;
     }
 };
 
-// Start logic when system is ready
-window.addEventListener('load', () => {
-    setTimeout(() => OptimizeEngine.init(), 100);
-});
+// Loader ensuring Leaflet and Map are fully ready
+const loader = setInterval(() => {
+    if (window.map && window.hubMarkers) {
+        clearInterval(loader);
+        OptimizeEngine.init();
+    }
+}, 500);
