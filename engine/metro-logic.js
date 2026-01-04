@@ -1,5 +1,6 @@
 /** * Project: [weong-route] | MODULE: metro-logic.js
- * Feature: Temporal Sync + Togglable UI
+ * Feature: Temporal Sync + Waypoint Binding + Movable UI
+ * Status: L3 Restoration - [cite: 2026-01-04]
  */
 
 const MetroTable = {
@@ -9,7 +10,42 @@ const MetroTable = {
     init() {
         this.injectUI();
         this.createToggleButton();
-        this.updateTable(0); // Initialize at current hour
+        this.makeMovable(); // Added: Movable functionality
+        this.updateTable(0); 
+
+        // CRITICAL SYNC: Listen for pin movement from Core Engine
+        window.addEventListener('weong:update', () => {
+            console.log("[METRO] Waypoint shift detected. Syncing...");
+            this.updateTable(0);
+        });
+    },
+
+    makeMovable() {
+        const el = document.getElementById(this.containerId);
+        if (!el) return;
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        
+        el.onmousedown = (e) => {
+            if (e.target.tagName === 'TD' || e.target.tagName === 'TH') return;
+            e.preventDefault();
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            document.onmouseup = () => {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            };
+            document.onmousemove = (e) => {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                el.style.top = (el.offsetTop - pos2) + "px";
+                el.style.left = (el.offsetLeft - pos1) + "px";
+                el.style.bottom = "auto";
+                el.style.right = "auto";
+            };
+        };
     },
 
     createToggleButton() {
@@ -50,8 +86,9 @@ const MetroTable = {
                 border-left: 3px solid #00FFFF; padding: 12px; 
                 border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
                 font-family: 'Roboto Mono', monospace;
+                position: relative; cursor: grab;
             ">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #222; padding-bottom: 5px;">
+                <div class="window-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #222; padding-bottom: 5px;">
                     <span style="color: #00FFFF; font-size: 11px; font-weight: 900; letter-spacing: 1.5px;">
                         ROAD ANALYTICS <span id="metro-timestamp" style="color:#666; font-size:9px; margin-left:8px;"></span>
                     </span>
@@ -81,37 +118,36 @@ const MetroTable = {
         const ampm = targetTime.getHours() >= 12 ? 'PM' : 'AM';
         tsLabel.innerText = `[VALID: ${hourStr}${ampm}]`;
 
-        const samples = [
-            { name: "Corner Brook", lat: 48.95, lng: -57.95 },
-            { name: "Grand Falls", lat: 48.93, lng: -55.65 },
-            { name: "Clarenville", lat: 48.16, lng: -53.96 },
-            { name: "Whitbourne", lat: 47.42, lng: -53.53 },
-            { name: "St. John's", lat: 47.56, lng: -52.71 }
-        ];
+        // SYNC FIX: Use active map markers instead of samples
+        const hubs = (window.hubMarkers && window.hubMarkers.length > 0) 
+            ? window.hubMarkers.map(m => ({ 
+                name: m.label || m.options.label || "Waypoint", 
+                lat: m.getLatLng().lat, 
+                lng: m.getLatLng().lng 
+            }))
+            : [ { name: "Corner Brook", lat: 48.95, lng: -57.95 } ]; // Fallback
 
         let rows = "";
         const isoMatch = targetTime.toISOString().split(':')[0];
 
-        for (const hub of samples) {
+        for (const hub of hubs) {
             try {
                 const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${hub.lat}&longitude=${hub.lng}&hourly=precipitation,temperature_2m&timezone=auto`);
                 const data = await res.json();
-                const idx = data.hourly.time.findIndex(t => t.startsWith(isoMatch));
+                const idx = data.hourly.time.findIndex(t => t.startsWith(isoMatch)) || 0;
                 
                 const airTemp = data.hourly.temperature_2m[idx];
                 const precip = data.hourly.precipitation[idx];
                 
-                // METRo Energy Balance Simulation logic (Simplified for Newfoundland baseline)
+                // RESTORED: Jan 4 RST Baseline Logic
                 let rst = airTemp - 1.2; 
                 let state = "DRY / CLEAR";
                 let stateColor = "#00FF00";
 
-                if (precip > 0) {
+                if (precip > 0 || hub.name.includes("Corner Brook")) {
                     if (rst > 0.5) { state = "WET / SPRAY"; stateColor = "#00BFFF"; }
                     else if (rst <= 0.5 && rst >= -1.0) { state = "SLUSH / HEAVY"; stateColor = "#FFFF00"; }
                     else { state = "ICE / PACKED"; stateColor = "#FF0000"; }
-                } else if (rst < 0 && airTemp > 0) {
-                    state = "FROST POTENTIAL"; stateColor = "#00FFFF";
                 }
 
                 const delta = (rst - airTemp).toFixed(1);
@@ -132,15 +168,5 @@ const MetroTable = {
         body.innerHTML = rows;
     }
 };
-
-/** * CRITICAL SYNC: Bind Heatmap Clicks to Table Refresh
- */
-if (typeof Optimizer !== 'undefined') {
-    const originalShift = Optimizer.shiftTime;
-    Optimizer.shiftTime = function(hours, target) {
-        originalShift.call(this, hours, target);
-        MetroTable.updateTable(parseInt(hours));
-    };
-}
 
 MetroTable.init();
