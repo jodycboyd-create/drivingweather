@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Version: L3_WEIGHTED_MEAN_SYNC
- * Feature: Weighted Route Severity + Ultra-Compact UI
+ * Version: L3_MEAN_STABILIZE_V2
+ * Feature: Weighted Mean Stabilization + Direct Table Binding
  */
 
 (function() {
@@ -60,18 +60,23 @@
             });
         },
 
-        async runScan() {
+        runScan() {
             const cells = document.querySelectorAll('.heat-cell');
             const currentTableData = window.MetroTable?.currentData || [];
 
+            if (!currentTableData.length) {
+                return setTimeout(() => this.runScan(), 500);
+            }
+
             cells.forEach((cell) => {
                 const hourOffset = parseInt(cell.dataset.h);
-                // Calculate Mean Severity across all route points
                 const result = this.calculateWeightedMean(currentTableData, hourOffset);
                 
-                // 5-Point Severity Gradient
+                // Palette mapping based on weighted average
                 const neonPalette = ["#00FF00", "#ADFF2F", "#FFFF00", "#FF8C00", "#FF0000"];
-                const colorIdx = Math.round(result.meanSeverity);
+                
+                // Ensure index is a valid integer between 0-4
+                const colorIdx = Math.max(0, Math.min(4, Math.round(result.meanSeverity)));
                 
                 cell.style.backgroundColor = neonPalette[colorIdx];
                 cell.innerHTML = result.avgPrecip > 0.1 ? (result.isSnow ? this.svgs.snow : this.svgs.rain) : "";
@@ -79,26 +84,32 @@
         },
 
         calculateWeightedMean(timeline, offset) {
-            // Get all points matching this hour offset, or fallback to the current visible rows
-            const points = timeline.filter(d => parseInt(d.hourOffset || 0) === offset);
-            const dataSet = points.length ? points : timeline; // Use current table rows if timeline not found
+            // Filter timeline for current hour offset or use visible table rows
+            const dataSet = timeline.filter(d => parseInt(d.hourOffset || 0) === offset);
+            const activeSet = dataSet.length ? dataSet : timeline;
 
             let totalSeverity = 0;
             let totalPrecip = 0;
             let snowPoints = 0;
 
-            dataSet.forEach(data => {
+            activeSet.forEach(data => {
                 let sev = 0;
                 const cond = (data.condition || "").toUpperCase();
-                const air = parseFloat(data.temp || data.air);
+                const air = parseFloat(data.temp || data.air || 0);
                 const rst = air - 1.2;
 
-                // STRIKE LINK Logic:
-                if (cond.includes("ICE") || cond.includes("PACKED") || rst < -7.0) sev = 4;
-                else if (cond.includes("SLUSH") || cond.includes("SNOW")) sev = 3;
-                else if (rst <= 0) sev = 2;
-                else if (cond.includes("WET") || parseFloat(data.precip) > 0) sev = 1;
-                else sev = 0; // DRY / CLEAR
+                // Severity Logic synchronized with Road Analytics
+                if (cond.includes("ICE") || cond.includes("PACKED") || rst < -7.0) {
+                    sev = 4; // RED
+                } else if (cond.includes("SLUSH") || cond.includes("SNOW")) {
+                    sev = 3; // ORANGE
+                } else if (rst <= 0 && cond.includes("WET")) {
+                    sev = 2; // YELLOW
+                } else if (cond.includes("WET") || parseFloat(data.precip || 0) > 0.1) {
+                    sev = 1; // LIGHT GREEN
+                } else {
+                    sev = 0; // DRY/CLEAR
+                }
 
                 totalSeverity += sev;
                 totalPrecip += parseFloat(data.precip || 0);
@@ -106,25 +117,34 @@
             });
 
             return {
-                meanSeverity: totalSeverity / dataSet.length,
-                avgPrecip: totalPrecip / dataSet.length,
-                isSnow: (snowPoints / dataSet.length) > 0.5
+                meanSeverity: totalSeverity / activeSet.length,
+                avgPrecip: totalPrecip / activeSet.length,
+                isSnow: (snowPoints / activeSet.length) > 0.5
             };
         },
 
         shiftTime(hours, target) {
             const offset = parseInt(hours);
             window.currentDepartureTime = new Date(Date.now() + offset * 3600000);
-            document.querySelectorAll('.heat-cell').forEach(c => c.style.outline = "none");
-            target.style.outline = "1px solid #FFF";
+            
+            document.querySelectorAll('.heat-cell').forEach(c => {
+                c.style.outline = "none";
+                c.style.boxShadow = "none";
+            });
 
+            target.style.outline = "1px solid #00FFFF";
+            target.style.boxShadow = "inset 0 0 5px #00FFFF";
+
+            // Sync all engines
             window.MasterClock?.update(offset);
             window.MetroTable?.updateTable?.(offset);
             window.WeatherMatrix?.update?.(offset);
             window.RWIS?.updatePills?.(offset);
             
             document.getElementById('opt-consensus').innerText = `T+${offset}H MEAN`;
-            this.runScan(); // Recalculate colors for the new state
+            
+            // Re-trigger scan to ensure colors update to reflect the new time slice
+            this.runScan();
         }
     };
 
