@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Version: L3_VERTICAL_COMPRESS
- * Feature: Ultra-Compact UI + Docked Positioning
+ * Version: L3_STRICT_SYNC_V1
+ * Feature: Strict Road Analytics Link + Vertical Compression
  */
 
 (function() {
@@ -12,14 +12,12 @@
 
         async init() {
             const container = document.getElementById('matrix-ui');
-            const route = Object.values(window.map?._layers || {}).find(l => l._latlngs && l._latlngs.length > 20);
-            
             if (!container) return setTimeout(() => this.init(), 1000);
             
             if (!document.getElementById('opt-heat-map')) {
                 this.injectUI(container);
             }
-            this.runScan(route);
+            this.runScan();
         },
 
         injectUI(container) {
@@ -33,87 +31,70 @@
 
             const html = `
                 <div id="opt-heat-map" style="
-                    margin-bottom: 5px; 
+                    margin-bottom: 2px; 
                     width: 100%;
                     max-width: 500px;
                     border: 1px solid #00FFFF; 
-                    background: rgba(10,10,10,0.95);
-                    padding: 4px 8px; 
+                    background: rgba(10,10,10,0.98);
+                    padding: 4px 6px; 
                     font-family: monospace;
                     pointer-events: auto;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
                 ">
                     <div style="display:flex; margin-bottom:2px; background:#000;">${timeLabels}</div>
-                    
-                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:1px; height:24px; background:#111; padding:2px; cursor:pointer; border:1px solid #333;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#1a1a1a; display:flex; align-items:center; justify-content:center; pointer-events:all;"></div>`).join('')}
+                    <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:1px; height:20px; background:#111; padding:2px; cursor:pointer; border:1px solid #333;">
+                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#1a1a1a; display:flex; align-items:center; justify-content:center;"></div>`).join('')}
                     </div>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                        <span id="opt-consensus" style="color:#00FFFF; font-weight:900; font-size:8px; letter-spacing:1px;">READY</span>
-                        
-                        <div style="display:flex; gap:8px; font-size:7px; font-weight:900;">
-                            <span style="color:#00FF00;">DRY</span>
-                            <span style="color:#FFFF00;">FRST</span>
-                            <span style="color:#FF8C00;">SLSH</span>
-                            <span style="color:#FF0000;">ICE</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:3px;">
+                        <span id="opt-consensus" style="color:#00FFFF; font-weight:900; font-size:8px;">READY</span>
+                        <div style="display:flex; gap:6px; font-size:7px; font-weight:900;">
+                            <span style="color:#00FF00;">DRY</span><span style="color:#FFFF00;">FRST</span><span style="color:#FF8C00;">SLSH</span><span style="color:#FF0000;">ICE</span>
                         </div>
-
-                        <span id="opt-count" style="color:#00FF00; font-size:8px; font-weight:bold;">12Z_SYNC</span>
+                        <span id="opt-count" style="color:#00FF00; font-size:8px;">12Z_LINK</span>
                     </div>
                 </div>`;
 
-            // Insert at the top of matrix-ui so it sits directly above the table
             container.insertAdjacentHTML('afterbegin', html);
-
             document.getElementById('heat-grid').addEventListener('click', (e) => {
-                e.stopPropagation();
                 const cell = e.target.closest('.heat-cell');
                 if (cell) this.shiftTime(cell.dataset.h, cell);
-            }, true);
+            });
         },
 
-        async runScan(route) {
+        async runScan() {
             const cells = document.querySelectorAll('.heat-cell');
-            const tableData = window.MetroTable?.currentData || [];
-            let timelineData = [];
-
-            if (route && window.DataTransfer) {
-                const samples = [route.getLatLngs()[0]];
-                timelineData = await window.DataTransfer.getUnifiedForecast(samples) || [];
-            }
+            // DIRECT LINK: Get the data currently in use by the Road Analytics table
+            const currentTableData = window.MetroTable?.currentData || [];
 
             cells.forEach((cell) => {
                 const hourOffset = parseInt(cell.dataset.h);
-                const result = this.processHour(timelineData.length ? timelineData : tableData, hourOffset);
+                const result = this.processHour(currentTableData, hourOffset);
                 const neonPalette = ["#00FF00", "#ADFF2F", "#FFFF00", "#FF8C00", "#FF0000"];
                 
                 cell.style.backgroundColor = neonPalette[result.severity];
-                if (result.precip > 0.1) {
-                    cell.innerHTML = result.isSnow ? this.svgs.snow : this.svgs.rain;
-                } else {
-                    cell.innerHTML = "";
-                }
+                cell.innerHTML = result.precip > 0.1 ? (result.isSnow ? this.svgs.snow : this.svgs.rain) : "";
             });
         },
 
         processHour(timeline, offset) {
-            const data = timeline.find(d => parseInt(d.hourOffset || 0) === offset) || timeline[0] || { temp: -10, precip: 0 };
-            let severity = 0; 
-            const airTemp = parseFloat(data.temp || data.air);
-            const rst = airTemp - 1.2; // NL Baseline
-            const precip = parseFloat(data.precip) || 0;
+            // Find data for this offset, or fallback to the current live data
+            const data = timeline.find(d => parseInt(d.hourOffset || 0) === offset) || timeline[0] || { temp: 0, precip: 0 };
+            
+            let severity = 0;
+            const cond = (data.condition || "").toUpperCase();
+            const rst = parseFloat(data.temp || data.air) - 1.2;
 
-            if (precip > 0.1) {
-                if (rst <= -1.0) severity = 4;
-                else if (rst <= 1.0) severity = 3;
-                else severity = 1;
-            } else {
-                if (rst <= -7.0) severity = 4; // Corner Brook -9.4C logic
-                else if (rst <= 0) severity = 2;
-                else severity = 0;
+            // STRIKE LINK: If Road Analytics says DRY/CLEAR, it MUST be severity 0 (Green)
+            if (cond.includes("DRY") || cond.includes("CLEAR")) {
+                severity = 0;
+            } else if (cond.includes("ICE") || cond.includes("PACKED") || rst < -7.0) {
+                severity = 4;
+            } else if (cond.includes("SLUSH") || cond.includes("SNOW")) {
+                severity = 3;
+            } else if (rst <= 0) {
+                severity = 2;
             }
-            return { severity, precip, isSnow: (rst < 0) };
+
+            return { severity, precip: parseFloat(data.precip || 0), isSnow: rst < 0 };
         },
 
         shiftTime(hours, target) {
@@ -128,6 +109,8 @@
             window.RWIS?.updatePills?.(offset);
             
             document.getElementById('opt-consensus').innerText = `+${offset}H WINDOW`;
+            // Trigger a re-scan to update colors based on the new time slice
+            this.runScan();
         }
     };
 
