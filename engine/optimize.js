@@ -1,97 +1,90 @@
 /**
  * PROJECT: [weong-route] / [weong-bulletin]
  * FILE: optimize.js
- * VERSION: 1.2.3 - Passive Overlay Reset
+ * VERSION: 1.2.4 - Restoration Baseline
  * STATUS: Locked - Newfoundland Deep-Dive
- * * CORE LOGIC:
- * 1. Only initializes when window.map and google.maps are both present.
- * 2. Uses a persistent heartbeat to re-draw if other engines purge overlays.
- * 3. Forces Route Scan and Road Analytics to match Level 3 triggers.
+ * ----------------------------------------------------------------
+ * RESET LOGIC: 
+ * 1. Direct injection on 'tilesloaded' to avoid ReferenceErrors.
+ * 2. Hard-coded NL Dataset to match Jan 4 4:00 PM Matrix.
+ * 3. Segment 1 & Segment 5 RED state forced for L3 exceptions.
  */
 
 const OptimizeEngine = {
     heatmap: null,
-    
-    // Core data coordinates for Newfoundland Hubs
-    locations: {
-        cornerBrook: { lat: 48.9515, lng: -57.9453 },
-        stJohns: { lat: 47.5615, lng: -52.7126 }
-    },
+
+    // Coordinates for primary thermal signatures
+    thermalPoints: [
+        { location: new google.maps.LatLng(48.9515, -57.9453), weight: 15 }, // Corner Brook (ICE)
+        { location: new google.maps.LatLng(47.5615, -52.7126), weight: 10 }  // St. John's (0km VIS)
+    ],
 
     init: function() {
-        console.log("[OPTIMIZE] Spatial Engine Active. Syncing UI...");
-        this.updateUIState();
-        this.renderHeatmap();
-        
-        // Persistent Heartbeat: Monitors if heatmap is wiped by radar.js
-        setInterval(() => {
-            if (window.map && (!this.heatmap || !this.heatmap.getMap())) {
-                this.renderHeatmap();
-            }
-        }, 5000);
+        console.log("[OPTIMIZE] Restoration Engine Active. Applying Jan 4 4:00PM State.");
+        this.syncRoadAnalytics();
+        this.syncRouteScan();
+        this.injectHeatmap();
     },
 
-    updateUIState: function() {
-        const routeBoxes = document.querySelectorAll(".route-box");
-        const analyticsBody = document.querySelector("#road-analytics-table tbody");
+    syncRoadAnalytics: function() {
+        const table = document.querySelector("#road-analytics-table tbody");
+        if (!table) return;
 
-        // Force Route Scan to match Jan 4 Level 3 exceptions
-        // Segment 1 (Corner Brook) and Segment 5 (St. John's) must be RED
-        if (routeBoxes.length >= 5) {
-            routeBoxes.forEach((box, i) => {
+        // Dataset synced to Mission Matrix
+        const hubs = [
+            { n: "Corner Brook", r: "-10.0°C", c: "ICE / PACKED", crit: true },
+            { n: "Grand Falls", r: "-12.4°C", c: "DRY / CLEAR", crit: false },
+            { n: "Clarenville", r: "-8.0°C", c: "DRY / CLEAR", crit: false },
+            { n: "Whitbourne", r: "-6.0°C", c: "DRY / CLEAR", crit: false },
+            { n: "St. John's", r: "-5.3°C", c: "DRY / CLEAR", crit: true }
+        ];
+
+        table.innerHTML = hubs.map(hub => `
+            <tr>
+                <td class="font-bold">${hub.n}</td>
+                <td>${hub.r}</td>
+                <td>-1.2</td>
+                <td class="${hub.crit ? 'status-critical highlight-pulse' : 'status-stable'}">${hub.c}</td>
+            </tr>`).join('');
+    },
+
+    syncRouteScan: function() {
+        const boxes = document.querySelectorAll(".route-box");
+        // Force RED for Corner Brook (Idx 0) and St. John's (Idx 4)
+        if (boxes.length > 0) {
+            boxes.forEach((box, i) => {
                 box.className = "route-box " + ((i === 0 || i === 4) ? "bg-red" : "bg-green");
             });
         }
-
-        // Populate Table with Newfoundland deep-dive data
-        if (analyticsBody) {
-            const hubs = [
-                { name: "Corner Brook", rst: "-10.0°C", cond: "ICE / PACKED", crit: true },
-                { name: "Grand Falls", rst: "-12.4°C", cond: "DRY / CLEAR", crit: false },
-                { name: "Clarenville", rst: "-8.0°C", cond: "DRY / CLEAR", crit: false },
-                { name: "Whitbourne", rst: "-6.0°C", cond: "DRY / CLEAR", crit: false },
-                { name: "St. John's", rst: "-5.3°C", cond: "DRY / CLEAR", crit: false }
-            ];
-
-            analyticsBody.innerHTML = hubs.map(h => `
-                <tr>
-                    <td class="font-bold">${h.name}</td>
-                    <td>${h.rst}</td>
-                    <td>-1.2</td>
-                    <td class="${h.crit ? 'status-critical' : 'status-stable'}">${h.cond}</td>
-                </tr>`).join('');
-        }
     },
 
-    renderHeatmap: function() {
-        if (typeof google === 'undefined' || !google.maps.visualization || !window.map) return;
+    injectHeatmap: function() {
+        if (!window.map || !google.maps.visualization) return;
 
-        const points = [
-            { location: new google.maps.LatLng(this.locations.cornerBrook.lat, this.locations.cornerBrook.lng), weight: 10 },
-            { location: new google.maps.LatLng(this.locations.stJohns.lat, this.locations.stJohns.lng), weight: 5 }
-        ];
-
+        // Clean re-injection
         if (this.heatmap) this.heatmap.setMap(null);
 
         this.heatmap = new google.maps.visualization.HeatmapLayer({
-            data: points,
+            data: this.thermalPoints,
             map: window.map,
-            radius: 50,
-            opacity: 0.8
+            radius: 45,
+            opacity: 0.85
         });
         
-        console.log("[OPTIMIZE] Heatmap overlay applied to active window.");
+        console.log("[OPTIMIZE] Heatmap Window Successfully Rendered.");
     }
 };
 
 /**
- * FAIL-SAFE LOADER
- * This replaces the "retry" logic with a silent event listener.
- * It waits for the map to be fully loaded before starting optimize.js.
+ * RESTORATION LOADER
+ * Anchors the engine to the map's internal ready state.
  */
-const bootLoader = setInterval(() => {
+const anchorEngine = setInterval(() => {
     if (window.map && typeof google !== 'undefined' && google.maps.visualization) {
-        clearInterval(bootLoader);
-        OptimizeEngine.init();
+        clearInterval(anchorEngine);
+        // Wait for tiles to load once to ensure the window is visible
+        google.maps.event.addListenerOnce(window.map, 'tilesloaded', () => {
+            OptimizeEngine.init();
+        });
     }
 }, 1000);
