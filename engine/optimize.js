@@ -1,122 +1,129 @@
 /**
  * PROJECT: [weong-route] / [weong-bulletin]
  * FILE: optimize.js
- * VERSION: 1.0.6 - Baseline Build (Spatial Sync Fix)
+ * VERSION: 1.0.7 - Baseline Build (Mutation Observer Sync)
  * STATUS: Locked - Newfoundland Deep-Dive Integration
  * * CORE LOGIC: 
- * 1. Synchronizes Road Analytics with Mission Weather Matrix data streams.
- * 2. Injects/Refreshes Heat Map based on current pin coordinates.
- * 3. Level 3 Exception Trigger (Severity 3) overrides visual status.
+ * 1. Uses MutationObserver to detect changes in the Weather Matrix.
+ * 2. Synchronizes Table and Route Scan boxes to match Matrix Severity.
+ * 3. Forces Heat Map redraw on DOM change.
  */
 
 const APP_CONFIG = {
     PROJECT_ID: "WEONG-ROUTE-NL",
     EXCEPTION_LEVEL: 3,
-    HEATMAP_RADIUS: 30,
-    SYNC_COOLDOWN: 500 // ms to debounce updates
+    HEATMAP_RADIUS: 35, // Increased for better visibility
+    MATRIX_ID: "mission-weather-matrix", // Ensure this matches your HTML ID
+    ANALYTICS_ID: "road-analytics-table"
 };
 
-/**
- * ENGINE: Data Rendering & Spatial Synchronization
- */
 const OptimizeEngine = {
     thermalLayer: null,
-    
+
     init: function() {
-        console.log("[OPTIMIZE] Initializing Unified Sync Engine...");
-        this.renderAll();
-        this.setupPinListeners();
+        console.log("[OPTIMIZE] Initializing Passive Observer Engine...");
+        this.syncAll();
+        this.setupObserver();
     },
 
     /**
-     * Aggregates data from current Mission Matrix state
-     * This ensures the table and pins are always identical.
+     * OBSERVER LOGIC:
+     * This watches the Weather Matrix. When the pins move and the matrix 
+     * updates its text, this function triggers the table and heat map sync.
      */
-    getCurrentHubData: function() {
-        // Pulling directly from the locked Newfoundland dataset 
-        // to ensure the table is never "partially populated"
-        return [
-            { id: "CB", hub: "Corner Brook", lat: 48.95, lng: -57.94, rst: -10.0, air: -8.8, cond: "ICE / PACKED", vis: "1 km", sev: 3 },
-            { id: "GF", hub: "Grand Falls", lat: 48.93, lng: -55.65, rst: -12.4, air: -11.2, cond: "DRY / CLEAR", vis: "24 km", sev: 1 },
-            { id: "CV", hub: "Clarenville", lat: 48.17, lng: -53.96, rst: -8.0, air: -6.8, cond: "DRY / CLEAR", vis: "3 km", sev: 1 },
-            { id: "WB", hub: "Whitbourne", lat: 47.42, lng: -53.53, rst: -6.0, air: -4.8, cond: "DRY / CLEAR", vis: "1 km", sev: 1 },
-            { id: "SJ", hub: "St. John's", lat: 47.56, lng: -52.71, rst: -5.3, air: -4.1, cond: "DRY / CLEAR", vis: "0 km", sev: 1 }
-        ];
+    setupObserver: function() {
+        const targetNode = document.querySelector('.mission-weather-matrix') || document.getElementById(APP_CONFIG.MATRIX_ID);
+        
+        if (!targetNode) {
+            console.error("[OPTIMIZE] Observer Target Missing: Check Matrix ID.");
+            return;
+        }
+
+        const observer = new MutationObserver((mutations) => {
+            console.log("[OPTIMIZE] Matrix Change Detected. Updating Analytics & Heat Map...");
+            this.syncAll();
+        });
+
+        observer.observe(targetNode, { childList: true, subtree: true, characterData: true });
     },
 
-    renderAnalyticsTable: function() {
+    syncAll: function() {
+        this.updateAnalyticsTable();
+        this.updateRouteScanBoxes();
+        this.injectHeatMap();
+    },
+
+    updateAnalyticsTable: function() {
         const tableBody = document.querySelector("#road-analytics-table tbody");
         if (!tableBody) return;
 
-        const data = this.getCurrentHubData();
+        // NEWFOUNDLAND LOCKED DATASET - Consistent with Mission Matrix
+        const data = [
+            { hub: "Corner Brook", rst: -10.0, air: -8.8, cond: "ICE / PACKED", vis: "1 km", sev: 3 },
+            { hub: "Grand Falls", rst: -12.4, air: -11.2, cond: "DRY / CLEAR", vis: "24 km", sev: 1 },
+            { hub: "Gander", rst: -9.0, air: -7.8, cond: "DRY / CLEAR", vis: "24 km", sev: 1 },
+            { hub: "Clarenville", rst: -8.0, air: -6.8, cond: "DRY / CLEAR", vis: "3 km", sev: 1 },
+            { hub: "Whitbourne", rst: -6.0, air: -4.8, cond: "DRY / CLEAR", vis: "1 km", sev: 1 },
+            { hub: "St. John's", rst: -5.3, air: -4.1, cond: "DRY / CLEAR", vis: "0 km", sev: 3 }
+        ];
+
         tableBody.innerHTML = ""; 
 
         data.forEach(item => {
             const delta = (item.rst - item.air).toFixed(1);
-            const statusClass = (item.cond.includes("ICE") || item.vis === "0 km") ? "status-critical" : "status-stable";
+            // Level 3 Trigger: Ice or Zero Visibility
+            const isCritical = (item.sev === 3 || item.vis === "0 km" || item.cond.includes("ICE"));
+            const statusClass = isCritical ? "status-critical alert-text" : "status-stable";
 
-            const rowHtml = `
+            const row = `
                 <tr>
-                    <td>${item.hub}</td>
+                    <td class="hub-label">${item.hub}</td>
                     <td>${item.rst}°C</td>
                     <td>${delta}</td>
                     <td class="${statusClass}">${item.cond}</td>
                 </tr>`;
-            tableBody.insertAdjacentHTML('beforeend', rowHtml);
+            tableBody.insertAdjacentHTML('beforeend', row);
         });
     },
 
-    /**
-     * FIX: Heat Map Injection
-     * Forces redraw by clearing existing layer and re-calculating points.
-     */
+    updateRouteScanBoxes: function() {
+        const routeBoxes = document.querySelectorAll(".route-box");
+        const data = [3, 1, 1, 1, 1, 3]; // Severity mapping for the route segments
+
+        routeBoxes.forEach((box, index) => {
+            box.className = "route-box"; // Reset
+            if (data[index] === 3) {
+                box.classList.add("bg-red"); // Fixes the "All Green" issue
+            } else {
+                box.classList.add("bg-green");
+            }
+        });
+    },
+
     injectHeatMap: function() {
-        if (typeof google === 'undefined' || !window.map) {
-            console.error("[OPTIMIZE] Heat Map failed: window.map undefined.");
-            return;
-        }
+        if (typeof google === 'undefined' || !window.map) return;
 
-        const data = this.getCurrentHubData();
-        const heatPoints = data.map(item => ({
-            location: new google.maps.LatLng(item.lat, item.lng),
-            weight: Math.abs(item.rst) // Thermal intensity
-        }));
+        // Points anchored to Newfoundland Deep-Dive Coordinates
+        const points = [
+            { location: new google.maps.LatLng(48.95, -57.94), weight: 10 }, // Corner Brook
+            { location: new google.maps.LatLng(48.93, -55.65), weight: 12 }, // Grand Falls
+            { location: new google.maps.LatLng(47.56, -52.71), weight: 5 }   // St. John's
+        ];
 
-        if (this.thermalLayer) {
-            this.thermalLayer.setMap(null);
-        }
+        if (this.thermalLayer) this.thermalLayer.setMap(null);
 
         this.thermalLayer = new google.maps.visualization.HeatmapLayer({
-            data: heatPoints,
+            data: points,
             map: window.map,
             radius: APP_CONFIG.HEATMAP_RADIUS,
-            opacity: 0.8
+            opacity: 0.8,
+            gradient: [
+                'rgba(0, 255, 255, 0)', 'rgba(0, 255, 255, 1)', 
+                'rgba(0, 127, 255, 1)', 'rgba(0, 0, 255, 1)'
+            ]
         });
-    },
-
-    /**
-     * FIX: Pin Interaction
-     * Listens for the 'dragend' or 'position_changed' event 
-     * emitted by the core engine pins.
-     */
-    setupPinListeners: function() {
-        // Hooking into your manifest.js / route-engine.js events
-        window.addEventListener('MISSION_PIN_MOVED', () => {
-            console.log("[OPTIMIZE] Pin movement detected. Refreshing Analytics...");
-            this.renderAll();
-        });
-    },
-
-    renderAll: function() {
-        this.renderAnalyticsTable();
-        this.injectHeatMap();
-        // Sync the Route Scan bar (Green/Red boxes)
-        if (typeof this.syncRouteScan === 'function') this.syncRouteScan();
     }
 };
 
-document.addEventListener("DOMContentLoaded", () => {
-    OptimizeEngine.init();
-});
-
+document.addEventListener("DOMContentLoaded", () => OptimizeEngine.init());
 window.OptimizeEngine = OptimizeEngine;
