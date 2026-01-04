@@ -12,6 +12,7 @@
 
         async init() {
             const container = document.getElementById('matrix-ui');
+            // Locate the TCH Route layer on the map
             const route = Object.values(window.map?._layers || {}).find(l => l._latlngs && l._latlngs.length > 20);
             
             if (!container || !route) return setTimeout(() => this.init(), 1000);
@@ -32,7 +33,6 @@
                         </div>`;
             }).join('');
 
-            // Added Hazard Legend for visual clarity
             const legend = `
                 <div style="display:flex; justify-content:space-around; margin-top:8px; border-top:1px solid #222; padding-top:5px; font-size:7px; font-weight:900; letter-spacing:0.5px;">
                     <span style="color:#00FF00;">● DRY</span>
@@ -98,16 +98,17 @@
         },
 
         processHour(timeline, offset) {
-            // Find data for this specific time slice
-            const data = timeline.find(d => d.hourOffset === offset) || { temp: 5, precip: 0 };
+            // FIX: Use parseInt to ensure comparison works even if one value is a string
+            // Falls back to index 0 if specific offset is missing to prevent Black Boxes
+            const data = timeline.find(d => parseInt(d.hourOffset) === parseInt(offset)) || timeline[0] || { temp: 5, precip: 0 };
             
             let severity = 0; 
             let isSnow = false;
             
-            // Core Logic for Road Surface Temperature (RST) vs Precip
-            const airTemp = data.temp;
-            const rst = airTemp - 1.5; // Newfoundland baseline offset
-            const precip = data.precip || 0;
+            // Core Logic: Road Surface Temperature (RST) vs Precip
+            const airTemp = parseFloat(data.temp);
+            const rst = airTemp - 1.2; // Sync with Road Analytics Baseline
+            const precip = parseFloat(data.precip) || 0;
 
             if (precip > 0.1) {
                 if (rst <= -1.0) {
@@ -121,7 +122,10 @@
                     isSnow = false;
                 }
             } else {
-                if (rst <= 0 && airTemp > 0) {
+                // Ground Frost / Deep Freeze Logic
+                if (rst <= -5.0 && airTemp < 0) {
+                    severity = 4; // RED: ICE (FROZEN SURFACE)
+                } else if (rst <= 0) {
                     severity = 2; // YELLOW: FROST POTENTIAL
                 } else {
                     severity = 0; // GREEN: DRY/CLEAR
@@ -144,8 +148,10 @@
             if (window.MasterClock) MasterClock.update(offset);
             if (window.MetroTable) MetroTable.updateTable(offset);
             if (window.WeatherMatrix) WeatherMatrix.update(offset);
-            if (window.RWIS) RWIS.updatePills(offset);
-            if (window.HubManager) HubManager.refresh(offset);
+            
+            // Safe calls using optional chaining
+            window.RWIS?.updatePills?.(offset);
+            window.HubManager?.refresh?.(offset);
 
             document.getElementById('opt-consensus').innerText = `SHIFTED: +${offset}H WINDOW`;
         }
