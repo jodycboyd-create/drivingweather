@@ -1,47 +1,33 @@
 /**
  * PROJECT: [weong-route]
  * FILE: optimize.js
- * VERSION: 1.2.0 - Forced Initialization & Persistent Layering
+ * VERSION: 1.2.1 - Event-Driven Initialization
  * STATUS: Locked - Newfoundland Deep-Dive
  */
 
 const OptimizeEngine = {
     heatmap: null,
-    retryCount: 0,
-    maxRetries: 10,
 
+    // Primary entry point called by the map's tilesloaded listener
     init: function() {
-        console.log("[OPTIMIZE] Starting Initialization Sequence...");
-        
-        // Fix for ReferenceError: google is not defined
-        if (typeof google === 'undefined') {
-            if (this.retryCount < this.maxRetries) {
-                this.retryCount++;
-                console.warn(`[OPTIMIZE] Google API not ready. Retry ${this.retryCount}/10...`);
-                setTimeout(() => this.init(), 1000);
-                return;
-            }
-            console.error("[OPTIMIZE] Fatal: Google Maps API failed to load.");
-            return;
-        }
-
+        console.log("[OPTIMIZE] Map ready signal received. Launching spatial engine...");
         this.syncUI();
         this.injectHeatmap();
         this.attachObserver();
         
-        // Persistence Heartbeat: Recovers dropped layers
-        setInterval(() => this.persistenceCheck(), 3000);
+        // Heartbeat to recover from layer wipes by radar.js
+        setInterval(() => this.persistenceCheck(), 4000);
     },
 
     /**
-     * Synchronizes Route Scan and Road Analytics Table
-     * Based on Jan 4, 4:00 PM Data State
+     * Synchronizes UI elements with the Mission Matrix
+     * Fixes "All Green" Route Boxes
      */
     syncUI: function() {
         const tableBody = document.querySelector("#road-analytics-table tbody");
         const routeBoxes = document.querySelectorAll(".route-box");
 
-        // Locked Newfoundland Dataset
+        // Locked Newfoundland Dataset based on 4:00 PM Matrix
         const data = [
             { h: "Corner Brook", rst: -10.0, air: -8.8, c: "ICE / PACKED", l3: true },
             { h: "Grand Falls", rst: -12.4, air: -11.2, c: "DRY / CLEAR", l3: false },
@@ -56,20 +42,14 @@ const OptimizeEngine = {
                     <td class="font-bold">${item.h}</td>
                     <td>${item.rst}°C</td>
                     <td>-1.2</td>
-                    <td class="${item.l3 ? 'status-critical highlight-pulse' : 'status-stable'}">${item.c}</td>
+                    <td class="${item.l3 ? 'status-critical alert-pulse' : 'status-stable'}">${item.c}</td>
                 </tr>`).join('');
         }
 
-        // Fixes "All Green" Route Boxes
+        // Segment 1 (CB) must be RED for ICE / PACKED
         if (routeBoxes.length > 0) {
             routeBoxes.forEach((box, i) => {
-                box.className = "route-box";
-                // Segment 1 (CB) and Segment 5 (SJ) are Level 3
-                if (i === 0 || i === 4) {
-                    box.classList.add("bg-red");
-                } else {
-                    box.classList.add("bg-green");
-                }
+                box.className = "route-box " + ((i === 0 || i === 4) ? "bg-red" : "bg-green");
             });
         }
     },
@@ -77,6 +57,7 @@ const OptimizeEngine = {
     injectHeatmap: function() {
         if (!window.map || !google.maps.visualization) return;
 
+        // Thermal points centered on Corner Brook and St. John's
         const thermalPoints = [
             { location: new google.maps.LatLng(48.9515, -57.9453), weight: 10 },
             { location: new google.maps.LatLng(47.5615, -52.7126), weight: 8 }
@@ -86,16 +67,13 @@ const OptimizeEngine = {
             data: thermalPoints,
             map: window.map,
             radius: 50,
-            opacity: 0.9
+            opacity: 0.8
         });
-        
-        console.log("[OPTIMIZE] Thermal Overlay Injected.");
     },
 
     persistenceCheck: function() {
-        // Recovers if heatmap is purged by radar engine
+        // Force re-injection if radar.js or rwis.js wipes overlays
         if (window.map && (!this.heatmap || !this.heatmap.getMap())) {
-            console.log("[OPTIMIZE] Heat Map dropped. Re-injecting...");
             this.injectHeatmap();
         }
     },
@@ -103,13 +81,27 @@ const OptimizeEngine = {
     attachObserver: function() {
         const matrix = document.querySelector('.mission-weather-matrix');
         if (matrix) {
-            const observer = new MutationObserver(() => this.syncUI());
-            observer.observe(matrix, { childList: true, subtree: true, characterData: true });
+            new MutationObserver(() => this.syncUI()).observe(matrix, { 
+                childList: true, subtree: true, characterData: true 
+            });
         }
     }
 };
 
-// Start logic only after a brief delay for engine stability
-window.addEventListener('load', () => {
-    setTimeout(() => OptimizeEngine.init(), 500);
-});
+/**
+ * FAIL-SAFE INITIALIZATION:
+ * Instead of retrying, we wait for the map object to trigger its first load.
+ */
+function checkMapReady() {
+    if (typeof google !== 'undefined' && window.map) {
+        // Attach to the map's own internal ready event
+        google.maps.event.addListenerOnce(window.map, 'tilesloaded', () => {
+            OptimizeEngine.init();
+        });
+    } else {
+        // Wait 500ms and check for map variable again
+        setTimeout(checkMapReady, 500);
+    }
+}
+
+checkMapReady();
