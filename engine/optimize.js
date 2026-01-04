@@ -1,86 +1,81 @@
 /**
  * PROJECT: [weong-route]
  * FILE: optimize.js
- * VERSION: 1.3.7 - HUD Anchor Build
+ * VERSION: 1.3.8 - Thermal Ribbon & Matrix Sync
+ * STATUS: Locked Baseline
  */
 
 const OptimizeEngine = {
-    init: function() {
-        console.log("[OPTIMIZE] HUD Anchor Active.");
-        this.fullSync();
+    // Lead times for the visual thermal ribbon
+    intervals: ["+2H", "+4H", "+6H", "+8H", "+10H"],
 
-        // Listen for the global update event
-        window.addEventListener('weong:update', () => {
-            console.log("[OPTIMIZE] Syncing Road Data...");
-            this.fullSync();
-        });
+    init: function() {
+        console.log("[OPTIMIZE] Persistent Engine Active.");
+        this.sync();
+
+        // Bind to the same update triggers as the Weather Matrix
+        window.addEventListener('weong:update', () => this.sync());
+        window.addEventListener('clock:update', () => this.sync());
     },
 
-    fullSync: function() {
-        const markers = window.hubMarkers || [];
-        const tableBody = document.querySelector("#road-analytics-table tbody");
-        const heatmapContainer = document.querySelector("#predictive-heat-map-container");
+    sync: function() {
+        const hubs = window.hubMarkers || [];
+        const table = document.querySelector("#road-analytics-table tbody");
+        const thermalContainer = document.querySelector("#thermal-forecast-ribbon");
 
-        if (!tableBody || markers.length === 0) return;
+        if (!table || hubs.length === 0) return;
 
-        // 1. Update Road Analytics Table
-        tableBody.innerHTML = markers.map((marker, i) => {
-            const pos = marker.getLatLng();
+        /**
+         * 1. ROAD ANALYTICS TABLE SYNC
+         * Mirrors Hub names and updates RST as pins move
+         */
+        table.innerHTML = hubs.map((marker, i) => {
             const label = marker.options.label || marker.label || `Hub ${i + 1}`;
             
-            // Sync Logic: Corner Brook (Marker 0) is Level 3 ICE
-            const isIce = (i === 0 || label.toLowerCase().includes("corner brook"));
-            const rst = isIce ? -10.2 : (-4.5 - (i * 1.2)).toFixed(1);
-            const condition = isIce ? "ICE / PACKED" : "DRY / CLEAR";
+            // Logic: Corner Brook remains the primary risk anchor
+            const isCB = label.toLowerCase().includes("corner brook");
+            const rst = isCB ? "-10.2°C" : (-6.0 - (i * 1.5)).toFixed(1) + "°C";
+            const cond = isCB ? "ICE / PACKED" : "DRY / CLEAR";
 
             return `
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td class="font-bold" style="color: #00e5ff; padding: 8px;">${label}</td>
-                    <td style="text-align: center;">${rst}°C</td>
-                    <td style="text-align: center; color: #aaa;">-1.2</td>
-                    <td class="${isIce ? 'status-critical alert-pulse' : 'status-stable'}" style="text-align: right; padding-right: 8px;">
-                        ${condition}
-                    </td>
+                <tr>
+                    <td class="font-bold" style="color: #00e5ff;">${label}</td>
+                    <td>${rst}</td>
+                    <td style="color: #888;">-1.2</td>
+                    <td class="${isCB ? 'status-critical highlight-pulse' : 'status-stable'}">${cond}</td>
                 </tr>`;
         }).join('');
 
-        // 2. Generate Predictve Heat Map (The "HUD Ribbon")
-        if (heatmapContainer) {
-            const timeSteps = ["+2H", "+4H", "+6H", "+8H", "+10H"];
-            const iceActive = markers.some((_, i) => i === 0);
+        /**
+         * 2. PREDICTIVE THERMAL RIBBON (Replacement for Map Heatmap)
+         * Guarantees visibility even when Map layers drop
+         */
+        if (thermalContainer) {
+            const hasIce = hubs.some(m => (m.label || "").toLowerCase().includes("corner brook"));
+            
+            thermalContainer.innerHTML = `
+                <div style="display: flex; gap: 4px; margin-top: 10px; height: 30px;">
+                    ${this.intervals.map((time, i) => {
+                        // Blend Red/Yellow/Green based on Corner Brook risk
+                        let color = "rgba(46, 204, 113, 0.5)"; // Green
+                        if (hasIce && i < 2) color = "rgba(231, 76, 60, 0.8)"; // Red
+                        else if (hasIce && i < 4) color = "rgba(241, 196, 15, 0.6)"; // Yellow
 
-            heatmapContainer.innerHTML = `
-                <div class="heat-ribbon-wrapper" style="margin-top: 15px; padding: 5px; background: #111; border-radius: 4px; border: 1px solid #333;">
-                    <div style="font-size: 9px; color: #888; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px;">Route Thermal Forecast</div>
-                    <div style="display: flex; gap: 3px; height: 24px;">
-                        ${timeSteps.map((time, i) => {
-                            // Blended logic: Red/Yellow/Green based on Corner Brook status
-                            let color = "#2ecc71"; // Clear
-                            if (iceActive && i < 2) color = "#e74c3c"; // Critical
-                            else if (iceActive && i < 4) color = "#f1c40f"; // Warning
-
-                            return `
-                                <div style="flex: 1; background: ${color}; opacity: 0.8; color: #000; 
-                                     text-align: center; font-size: 10px; font-weight: 800; line-height: 24px; border-radius: 2px;">
-                                    ${time}
-                                </div>`;
-                        }).join('')}
-                    </div>
+                        return `<div style="flex:1; background:${color}; color:white; text-align:center; 
+                                 line-height:30px; font-size:10px; font-weight:bold; border-radius:2px;">${time}</div>`;
+                    }).join('')}
                 </div>`;
         }
     }
 };
 
-// Ensure this loads after the core map is initialized
-window.addEventListener('load', () => {
-    let checkCount = 0;
-    const boot = setInterval(() => {
-        checkCount++;
-        if (window.hubMarkers && window.hubMarkers.length > 0) {
-            clearInterval(boot);
-            OptimizeEngine.init();
-        } else if (checkCount > 20) {
-            clearInterval(boot); // Stop after 10s to prevent infinite loop
-        }
-    }, 500);
-});
+/**
+ * BOOT SEQUENCE:
+ * Polls for hubMarkers to ensure it matches Weather Engine timing
+ */
+const bootSequence = setInterval(() => {
+    if (window.hubMarkers && window.hubMarkers.length > 0) {
+        clearInterval(bootSequence);
+        OptimizeEngine.init();
+    }
+}, 500);
