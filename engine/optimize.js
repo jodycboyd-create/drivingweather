@@ -1,7 +1,7 @@
 /**
  * PROJECT: [weong-route]
- * MODULE: optimize.js | L3 STABILITY PATCH 015
- * Feature: Compact Heat Ribbon + Fixed Interaction
+ * MODULE: optimize.js | L3 STABILITY PATCH 016
+ * Feature: Weighted Heat Ribbon + Global Sync + Bottom-Right Anchor
  */
 
 const OptimizeEngine = {
@@ -11,27 +11,29 @@ const OptimizeEngine = {
     init() {
         this.injectUI();
         this.updateTimeline();
+        // Initial sync to lock in T+0 state across all tables
         this.setTime(0);
     },
 
     injectUI() {
         if (document.getElementById(this.containerId)) return;
         
+        // Positioned bottom-right as requested
         const html = `
             <div id="${this.containerId}" style="
-                position: fixed; bottom: 20px; left: 20px;
-                background: rgba(5, 5, 5, 0.9); border: 1px solid #333;
-                border-left: 3px solid #00FFFF; padding: 8px; 
-                border-radius: 2px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-                font-family: 'Roboto Mono', monospace; z-index: 30000;
-                width: 380px; pointer-events: auto;
+                position: fixed; bottom: 30px; right: 30px;
+                background: rgba(5, 5, 5, 0.95); border: 1px solid #333;
+                border-top: 3px solid #00FFFF; padding: 10px; 
+                border-radius: 4px; box-shadow: 0 15px 40px rgba(0,0,0,0.9);
+                font-family: 'Roboto Mono', monospace; z-index: 40000;
+                width: 420px; pointer-events: auto;
             ">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <span style="color: #00FFFF; font-size: 9px; font-weight: 900; letter-spacing: 1px;">
-                        48H PREDICTIVE HEAT RIBBON
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: #00FFFF; font-size: 9px; font-weight: 900; letter-spacing: 1.5px;">
+                        48H PREDICTIVE HEAT ANALYTICS
                     </span>
-                    <span id="active-lead-label" style="color: #FFD700; font-size: 9px; font-weight: bold;">
-                        T+0
+                    <span id="active-lead-label" style="color: #FFD700; font-size: 10px; font-weight: bold; background: rgba(255,215,0,0.1); padding: 2px 6px;">
+                        T+0 HRS
                     </span>
                 </div>
                 
@@ -39,62 +41,86 @@ const OptimizeEngine = {
                     display: grid; 
                     grid-template-columns: repeat(24, 1fr); 
                     gap: 2px; 
-                    height: 18px;
+                    height: 22px;
                 "></div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', html);
+    },
+
+    /**
+     * WEIGHTED COLOR LOGIC
+     * Pure Red = 100% ICE/PACKED | Pure Green = 100% DRY/CLEAR
+     * Interpolates through Orange/Yellow for mixed conditions
+     */
+    getWeightedColor(leadTime) {
+        // Simulated route analysis: Early Jan 4 hours are dominated by icing
+        // 1.0 = Danger (Red), 0.0 = Safe (Green)
+        let riskFactor = 0; 
+        
+        if (leadTime <= 8) riskFactor = 1.0; // Pure Red: System-wide icing
+        else if (leadTime <= 16) riskFactor = 0.6; // Orange: Mixed Slush/Ice
+        else if (leadTime <= 24) riskFactor = 0.3; // Yellow: Cautionary clearing
+        else riskFactor = 0.0; // Pure Green: Clear conditions
+
+        // RGB Interpolation (Green: 46, 204, 113 to Red: 231, 76, 60)
+        const r = Math.floor(46 + (riskFactor * (231 - 46)));
+        const g = Math.floor(204 - (riskFactor * (204 - 76)));
+        const b = Math.floor(113 - (riskFactor * (113 - 60)));
+        
+        return `rgb(${r}, ${g}, ${b})`;
     },
 
     updateTimeline() {
         const grid = document.getElementById("timeline-grid");
         if (!grid) return;
 
-        grid.innerHTML = ""; // Clear for refresh
+        grid.innerHTML = ""; 
 
         for (let i = 0; i < 24; i++) {
             const leadTime = i * 2;
             const isSelected = this.currentOffset === leadTime;
-            
-            // Replicating Jan 4 Heatmap
-            let heatColor = "#1B4332"; // Clear
-            if (leadTime <= 8) heatColor = "#78291c"; // Hazard
-            else if (leadTime <= 18) heatColor = "#7a6211"; // Caution
-
-            if (isSelected) heatColor = (leadTime <= 8) ? "#e74c3c" : (leadTime <= 18) ? "#f1c40f" : "#2ecc71";
+            const heatColor = this.getWeightedColor(leadTime);
 
             const block = document.createElement('div');
             block.style.cssText = `
                 background: ${heatColor}; 
-                border: ${isSelected ? '1px solid #fff' : '1px solid rgba(255,255,255,0.05)'};
-                cursor: pointer; transition: transform 0.1s;
-                opacity: ${isSelected ? '1' : '0.6'};
+                border: ${isSelected ? '2px solid #fff' : '1px solid rgba(0,0,0,0.3)'};
+                cursor: pointer; opacity: ${isSelected ? '1' : '0.5'};
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                ${isSelected ? 'transform: translateY(-2px);' : ''}
             `;
             
-            // FIXED INTERACTION: Direct Event Listener
-            block.addEventListener('click', (e) => {
-                e.preventDefault();
+            // Interaction: Direct logic injection for Lead Time advancement
+            block.onclick = (e) => {
                 e.stopPropagation();
                 this.setTime(leadTime);
-            });
+            };
 
             grid.appendChild(block);
         }
         document.getElementById("active-lead-label").innerText = `T+${this.currentOffset} HRS`;
     },
 
+    /**
+     * FORCED GLOBAL SYNCHRONIZATION
+     * Updates: Road Analytics, Weather Matrix, and Map Icons
+     */
     setTime(hours) {
         this.currentOffset = hours;
         window.currentTemporalOffset = hours; 
         this.updateTimeline();
 
-        // Broadcast to Road Analytics and Weather Matrix
-        if (window.MetroTable) window.MetroTable.updateTable(hours);
-        
+        // 1. Update Road Analytics (MetroTable)
+        if (window.MetroTable && typeof window.MetroTable.updateTable === 'function') {
+            window.MetroTable.updateTable(hours);
+        }
+
+        // 2. Dispatch event for WeatherEngine (Matrix & Map Pins)
         window.dispatchEvent(new CustomEvent('weong:update', { 
-            detail: { offset: hours, timestamp: new Date() } 
+            detail: { offset: hours } 
         }));
         
-        console.log(`[SYSTEM] Temporal Shift: T+${hours} synced.`);
+        console.log(`[CORE] Temporal State Advanced: T+${hours} | Broad-spectrum sync active.`);
     }
 };
 
