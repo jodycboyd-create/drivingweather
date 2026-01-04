@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: optimize.js
- * Version: L3_FULL_RESTORE_003
- * Feature: Full Logic Restore + Hazard Legend
+ * Version: L3_FULL_RESTORE_004
+ * Feature: UI Re-positioning + Data Scan Bridge
  */
 
 (function() {
@@ -12,15 +12,20 @@
 
         async init() {
             const container = document.getElementById('matrix-ui');
-            // Locate the TCH Route layer on the map
             const route = Object.values(window.map?._layers || {}).find(l => l._latlngs && l._latlngs.length > 20);
             
-            if (!container || !route) return setTimeout(() => this.init(), 1000);
+            if (!container) return setTimeout(() => this.init(), 1000);
             
             if (!document.getElementById('opt-heat-map')) {
                 this.injectUI(container);
             }
-            this.runScan(route);
+            
+            // Only scan if route exists, otherwise wait
+            if (route) {
+                this.runScan(route);
+            } else {
+                setTimeout(() => this.init(), 1000);
+            }
         },
 
         injectUI(container) {
@@ -44,29 +49,32 @@
 
             const html = `
                 <div id="opt-heat-map" style="
-                    margin-top: 110px; 
-                    margin-bottom: 15px; 
+                    position: absolute;
+                    top: 10px;
+                    left: 10px;
+                    width: 480px;
+                    z-index: 10001;
                     border: 1px solid #00FFFF; 
                     background: rgba(0,0,0,0.95);
                     padding: 10px; 
                     font-family: monospace;
-                    position: relative;
-                    z-index: 10001;
                     pointer-events: auto;
                     box-shadow: 0 0 20px rgba(0,0,0,0.8);
                 ">
                     <div style="display:flex; margin-bottom:4px; background:#000; border:1px solid #222;">${timeLabels}</div>
                     <div id="heat-grid" style="display:grid; grid-template-columns: repeat(24, 1fr); gap:2px; height:42px; background:#111; padding:3px; cursor:pointer; border:1px solid #333;">
-                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#222; display:flex; align-items:center; justify-content:center; pointer-events:all; transition: background 0.3s;"></div>`).join('')}
+                        ${Array(24).fill(0).map((_, i) => `<div class="heat-cell" data-h="${i*2}" style="background:#1a1a1a; display:flex; align-items:center; justify-content:center; pointer-events:all; transition: background 0.3s;"></div>`).join('')}
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-top:8px; padding:0 2px;">
-                        <span id="opt-consensus" style="color:#00FFFF; font-weight:900; font-size:9px; letter-spacing:1px;">NL_BASELINE: STANDBY</span>
+                        <span id="opt-consensus" style="color:#00FFFF; font-weight:900; font-size:9px; letter-spacing:1px;">NL_BASELINE: READY</span>
                         <span id="opt-count" style="color:#00FF00; font-size:9px; font-weight:bold;">HANDSHAKE: ACTIVE</span>
                     </div>
                     ${legend}
                 </div>`;
 
-            container.children[0].insertAdjacentHTML('afterbegin', html);
+            // Adjusting insertion to ensure it doesn't overlap existing absolute elements
+            container.style.position = 'relative';
+            container.insertAdjacentHTML('afterbegin', html);
 
             document.getElementById('heat-grid').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -80,6 +88,7 @@
             const coords = route.getLatLngs();
             const samples = [0, 0.25, 0.5, 0.75, 0.99].map(p => coords[Math.floor((coords.length - 1) * p)]);
 
+            // DATA BRIDGE: Use the Unified Engine data directly
             const timelineData = await window.DataTransfer?.getUnifiedForecast(samples) || [];
             
             cells.forEach((cell, i) => {
@@ -87,6 +96,8 @@
                 const result = this.processHour(timelineData, hourOffset);
                 
                 const neonPalette = ["#00FF00", "#ADFF2F", "#FFFF00", "#FF8C00", "#FF0000"];
+                
+                // Ensure the background color actually changes
                 cell.style.backgroundColor = neonPalette[result.severity];
                 
                 if (result.precip > 0.1) {
@@ -98,38 +109,26 @@
         },
 
         processHour(timeline, offset) {
-            // FIX: Use parseInt to ensure comparison works even if one value is a string
-            // Falls back to index 0 if specific offset is missing to prevent Black Boxes
-            const data = timeline.find(d => parseInt(d.hourOffset) === parseInt(offset)) || timeline[0] || { temp: 5, precip: 0 };
+            // Find data or fallback to global window data if sampling failed
+            const data = timeline.find(d => parseInt(d.hourOffset) === offset) || 
+                         (window.currentWeatherData ? window.currentWeatherData[0] : null) || 
+                         { temp: -5, precip: 0 };
             
             let severity = 0; 
             let isSnow = false;
             
-            // Core Logic: Road Surface Temperature (RST) vs Precip
             const airTemp = parseFloat(data.temp);
-            const rst = airTemp - 1.2; // Sync with Road Analytics Baseline
+            const rst = airTemp - 1.2; 
             const precip = parseFloat(data.precip) || 0;
 
             if (precip > 0.1) {
-                if (rst <= -1.0) {
-                    severity = 4; // RED: ICE
-                    isSnow = true;
-                } else if (rst <= 1.0) {
-                    severity = 3; // ORANGE: SLUSH/SNOW
-                    isSnow = true;
-                } else {
-                    severity = 1; // LIGHT GREEN: WET
-                    isSnow = false;
-                }
+                if (rst <= -1.0) { severity = 4; isSnow = true; }
+                else if (rst <= 1.0) { severity = 3; isSnow = true; }
+                else { severity = 1; isSnow = false; }
             } else {
-                // Ground Frost / Deep Freeze Logic
-                if (rst <= -5.0 && airTemp < 0) {
-                    severity = 4; // RED: ICE (FROZEN SURFACE)
-                } else if (rst <= 0) {
-                    severity = 2; // YELLOW: FROST POTENTIAL
-                } else {
-                    severity = 0; // GREEN: DRY/CLEAR
-                }
+                if (rst <= -8.0) severity = 4; // Matching Corner Brook Logic
+                else if (rst <= 0) severity = 2;
+                else severity = 0;
             }
 
             return { severity, precip, isSnow };
@@ -138,18 +137,13 @@
         shiftTime(hours, target) {
             if (hours === undefined) return;
             const offset = parseInt(hours);
-
             window.currentDepartureTime = new Date(Date.now() + offset * 3600000);
-
             document.querySelectorAll('.heat-cell').forEach(c => c.style.outline = "none");
             target.style.outline = "2px solid #00FFFF";
 
-            // Broadcasting the Sync to all modules
-            if (window.MasterClock) MasterClock.update(offset);
-            if (window.MetroTable) MetroTable.updateTable(offset);
-            if (window.WeatherMatrix) WeatherMatrix.update(offset);
-            
-            // Safe calls using optional chaining
+            window.MasterClock?.update(offset);
+            window.MetroTable?.updateTable(offset);
+            window.WeatherMatrix?.update(offset);
             window.RWIS?.updatePills?.(offset);
             window.HubManager?.refresh?.(offset);
 
