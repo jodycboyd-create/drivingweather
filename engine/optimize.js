@@ -1,87 +1,84 @@
 /**
  * PROJECT: [weong-route]
  * FILE: optimize.js
- * VERSION: 1.2.1 - Event-Driven Initialization
+ * VERSION: 1.2.2 - Self-Healing Overlay Build
  * STATUS: Locked - Newfoundland Deep-Dive
  */
 
 const OptimizeEngine = {
     heatmap: null,
+    // Coordinates for Level 3 Heat Signature
+    thermalData: [
+        { location: new google.maps.LatLng(48.9515, -57.9453), weight: 12 }, // Corner Brook (ICE)
+        { location: new google.maps.LatLng(47.5615, -52.7126), weight: 8 }   // St. John's (VIS 0)
+    ],
 
-    // Primary entry point called by the map's tilesloaded listener
     init: function() {
-        console.log("[OPTIMIZE] Map ready signal received. Launching spatial engine...");
-        this.syncUI();
-        this.injectHeatmap();
-        this.attachObserver();
-        
-        // Heartbeat to recover from layer wipes by radar.js
-        setInterval(() => this.persistenceCheck(), 4000);
+        console.log("[OPTIMIZE] Spatial Engine Intercept Active.");
+        this.applyLockedState();
+        this.mountPersistentHeatmap();
+        this.setupStateObserver();
     },
 
     /**
-     * Synchronizes UI elements with the Mission Matrix
-     * Fixes "All Green" Route Boxes
+     * Fixes the "All Green" Route Scan error.
+     * Forces Segment 1 (Corner Brook) to RED due to ICE condition.
      */
-    syncUI: function() {
-        const tableBody = document.querySelector("#road-analytics-table tbody");
+    applyLockedState: function() {
         const routeBoxes = document.querySelectorAll(".route-box");
+        const analyticsTable = document.querySelector("#road-analytics-table tbody");
 
-        // Locked Newfoundland Dataset based on 4:00 PM Matrix
-        const data = [
-            { h: "Corner Brook", rst: -10.0, air: -8.8, c: "ICE / PACKED", l3: true },
-            { h: "Grand Falls", rst: -12.4, air: -11.2, c: "DRY / CLEAR", l3: false },
-            { h: "Clarenville", rst: -8.0, air: -6.8, c: "DRY / CLEAR", l3: false },
-            { h: "Whitbourne", rst: -6.0, air: -4.8, c: "DRY / CLEAR", l3: false },
-            { h: "St. John's", rst: -5.3, air: -4.1, c: "DRY / CLEAR", l3: true } // L3 for Visibility
-        ];
-
-        if (tableBody) {
-            tableBody.innerHTML = data.map(item => `
-                <tr>
-                    <td class="font-bold">${item.h}</td>
-                    <td>${item.rst}°C</td>
-                    <td>-1.2</td>
-                    <td class="${item.l3 ? 'status-critical alert-pulse' : 'status-stable'}">${item.c}</td>
-                </tr>`).join('');
-        }
-
-        // Segment 1 (CB) must be RED for ICE / PACKED
+        // Force Route Scan UI to match Analytics
         if (routeBoxes.length > 0) {
             routeBoxes.forEach((box, i) => {
                 box.className = "route-box " + ((i === 0 || i === 4) ? "bg-red" : "bg-green");
             });
         }
-    },
 
-    injectHeatmap: function() {
-        if (!window.map || !google.maps.visualization) return;
-
-        // Thermal points centered on Corner Brook and St. John's
-        const thermalPoints = [
-            { location: new google.maps.LatLng(48.9515, -57.9453), weight: 10 },
-            { location: new google.maps.LatLng(47.5615, -52.7126), weight: 8 }
-        ];
-
-        this.heatmap = new google.maps.visualization.HeatmapLayer({
-            data: thermalPoints,
-            map: window.map,
-            radius: 50,
-            opacity: 0.8
-        });
-    },
-
-    persistenceCheck: function() {
-        // Force re-injection if radar.js or rwis.js wipes overlays
-        if (window.map && (!this.heatmap || !this.heatmap.getMap())) {
-            this.injectHeatmap();
+        // Populate Table with Newfoundland locked dataset
+        if (analyticsTable) {
+            const nlData = [
+                { h: "Corner Brook", rst: "-10.0°C", c: "ICE / PACKED", s: "status-critical" },
+                { h: "Grand Falls", rst: "-12.4°C", c: "DRY / CLEAR", s: "status-stable" },
+                { h: "Clarenville", rst: "-8.0°C", c: "DRY / CLEAR", s: "status-stable" },
+                { h: "Whitbourne", rst: "-6.0°C", c: "DRY / CLEAR", s: "status-stable" },
+                { h: "St. John's", rst: "-5.3°C", c: "DRY / CLEAR", s: "status-stable" }
+            ];
+            analyticsTable.innerHTML = nlData.map(d => `
+                <tr><td class="font-bold">${d.h}</td><td>${d.rst}</td><td>-1.2</td><td class="${d.s}">${d.c}</td></tr>
+            `).join('');
         }
     },
 
-    attachObserver: function() {
+    /**
+     * SELF-HEALING LOGIC: 
+     * Uses a high-frequency interval to ensure the heatmap stays visible 
+     * even if rwis.js or radar.js clears overlays.
+     */
+    mountPersistentHeatmap: function() {
+        const verifyAndInject = () => {
+            if (typeof google !== 'undefined' && window.map && google.maps.visualization) {
+                if (!this.heatmap || !this.heatmap.getMap()) {
+                    console.log("[OPTIMIZE] Re-establishing Thermal Overlay...");
+                    this.heatmap = new google.maps.visualization.HeatmapLayer({
+                        data: this.thermalData,
+                        map: window.map,
+                        radius: 50,
+                        opacity: 0.8
+                    });
+                }
+            }
+        };
+
+        // Immediate attempt + 3s persistence heartbeat
+        verifyAndInject();
+        setInterval(verifyAndInject, 3000);
+    },
+
+    setupStateObserver: function() {
         const matrix = document.querySelector('.mission-weather-matrix');
         if (matrix) {
-            new MutationObserver(() => this.syncUI()).observe(matrix, { 
+            new MutationObserver(() => this.applyLockedState()).observe(matrix, { 
                 childList: true, subtree: true, characterData: true 
             });
         }
@@ -89,19 +86,12 @@ const OptimizeEngine = {
 };
 
 /**
- * FAIL-SAFE INITIALIZATION:
- * Instead of retrying, we wait for the map object to trigger its first load.
+ * STARTUP SEQUENCE:
+ * Waits for the map object to be globally available before mounting.
  */
-function checkMapReady() {
-    if (typeof google !== 'undefined' && window.map) {
-        // Attach to the map's own internal ready event
-        google.maps.event.addListenerOnce(window.map, 'tilesloaded', () => {
-            OptimizeEngine.init();
-        });
-    } else {
-        // Wait 500ms and check for map variable again
-        setTimeout(checkMapReady, 500);
+const engineLoader = setInterval(() => {
+    if (window.map && typeof google !== 'undefined') {
+        clearInterval(engineLoader);
+        OptimizeEngine.init();
     }
-}
-
-checkMapReady();
+}, 500);
