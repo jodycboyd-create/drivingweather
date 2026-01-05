@@ -1,20 +1,30 @@
-/** * Project: [weong-bulletin] 
- * Version: L3_ANCHOR_FINAL
- * Strategy: Passive Sync - Updates globals without breaking sister modules.
+/** * Project: [weong-bulletin]
+ * Version: L3_EXPANDED_RECOVERY_015
+ * Status: Full Object Structure (Non-Condensed)
+ * Fix: Hazard Scale Sync + Condition Alignment
  */
 
 const VelocityWidget = {
     state: {
-        startTime: new Date(), // Locked session start
+        startTime: new Date(),
         currentOffset: 0,
-        // Jan 4 Storm Profile Fallback
-        hazardProfile: [1,1,1,1,1,0.6,0.5,0.5,0.3,0.2,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        // Jan 4-5 Storm Data: Alignment with ICE / PACKED
+        // 1.0 = RED (Ice/Packed), 0.6 = ORANGE (Slush), 0.0 = GREEN (Clear)
+        hazardProfile: [
+            1.0, 1.0, 1.0, 1.0, 1.0, // T+0 to T+8: RED
+            1.0, 1.0, 1.0, 0.6, 0.6, // T+10 to T+18: RED to ORANGE Transition
+            0.6, 0.6, 0.5, 0.4, 0.3, // T+20 to T+28: ORANGE (Slush/Wet)
+            0.2, 0.1, 0.0, 0.0, 0.0, // T+30 to T+38: YELLOW to GREEN
+            0.0, 0.0, 0.0, 0.0        // T+40+ : GREEN (Dry/Clear)
+        ]
     },
 
     init: function() {
-        console.log("[RWIS] Initializing Velocity Widget (Passive Mode)...");
+        console.log("[RWIS] Velocity Widget Initializing...");
         this.createUI();
         this.render();
+        // Initial sync to set T+0 icons
+        this.sync(0);
     },
 
     createUI: function() {
@@ -34,7 +44,7 @@ const VelocityWidget = {
                 <div style="flex: 1.3; border-right: 1px solid #333; padding-right: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-size: 9px; color: #FFD700;">DEPARTURE</span>
-                        <button onclick="VelocityWidget.sync(0)" style="background:#FFD700; color:#000; border:none; padding:2px 5px; font-size:8px; cursor:pointer;">NOW</button>
+                        <button onclick="VelocityWidget.sync(0)" style="background:#FFD700; color:#000; border:none; padding:2px 5px; font-size:8px; cursor:pointer; font-weight:bold;">NOW</button>
                     </div>
                     <div id="v-dep-time" style="font-size: 26px; color: #fff; font-weight: bold;">--:--</div>
                 </div>
@@ -57,18 +67,25 @@ const VelocityWidget = {
     sync: function(lt) {
         this.state.currentOffset = lt;
         
-        // 1. UPDATE GLOBAL DATE
-        // WeatherEngine's interval will pick this up automatically.
+        // 1. GLOBAL TIME SYNC: Used by WeatherEngine for Icon Switching
         const newTime = new Date(this.state.startTime.getTime());
         newTime.setHours(newTime.getHours() + lt);
         window.currentDepartureTime = newTime;
 
-        // 2. ALERT ROAD ANALYTICS
+        // 2. DISPATCH UPDATE: Used by Metro-Logic for Road Condition Sync
         window.dispatchEvent(new CustomEvent('weong:update', { 
             detail: { offset: lt } 
         }));
 
         this.render();
+    },
+
+    getWeightedColor: function(risk) {
+        // Alignment: Forces RED for ICE/PACKED conditions
+        if (risk >= 0.8) return "#FF0000"; // NEON RED
+        if (risk >= 0.5) return "#FF9900"; // NEON ORANGE
+        if (risk >= 0.2) return "#FFFF00"; // NEON YELLOW
+        return "#00FF41";                  // NEON GREEN
     },
 
     render: function() {
@@ -81,25 +98,22 @@ const VelocityWidget = {
             const isSelected = this.state.currentOffset === lt;
             const block = document.createElement('div');
             
-            // Neon Logic
-            let color = "#00FF41"; // Green
-            if (risk >= 0.8) color = "#FF0000"; // Red
-            else if (risk >= 0.5) color = "#FF9900"; // Orange
-            else if (risk >= 0.2) color = "#FFFF00"; // Yellow
-
             block.style.cssText = `
-                background: ${color}; cursor: pointer; height: 100%;
+                background: ${this.getWeightedColor(risk)}; cursor: pointer; height: 100%;
                 border: ${isSelected ? '2px solid #fff' : '1px solid #000'};
                 ${isSelected ? 'transform: scaleY(1.4); z-index: 10;' : 'opacity: 0.7;'}
+                transition: transform 0.1s ease;
             `;
             block.onclick = () => this.sync(lt);
             grid.appendChild(block);
         });
 
-        document.getElementById('v-dep-time').innerText = window.currentDepartureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        document.getElementById('v-lead-label').innerText = `T+${this.state.currentOffset} HRS`;
+        const depEl = document.getElementById('v-dep-time');
+        if (depEl) depEl.innerText = window.currentDepartureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const labelEl = document.getElementById('v-lead-label');
+        if (labelEl) labelEl.innerText = `T+${this.state.currentOffset} HRS`;
     }
 };
 
-// Initialize
 VelocityWidget.init();
