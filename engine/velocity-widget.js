@@ -1,6 +1,6 @@
-/** * Project: [weong-bulletin] | [weong-route]
- * Version: L3 Stable Baseline (RESTORED)
- * Logic: Neon Hazard Scale + Fixed Anchor Point
+/** * Project: [weong-bulletin]
+ * Logic: T+ Lead Time Hazard Calculation
+ * Feature: Weighted Green-Yellow-Orange-Red Scale
  */
 
 const VelocityWidget = {
@@ -8,7 +8,7 @@ const VelocityWidget = {
         departureTime: new Date(),
         routeDistance: 0,
         currentLeadTime: 0,
-        hazardCache: {} 
+        hazardCache: {} // [0.0 - 1.0] intensity scores
     },
 
     init() {
@@ -16,16 +16,16 @@ const VelocityWidget = {
         this.startRouteObserver();
     },
 
+    // UI generation same as baseline
     createUI() {
         if (document.getElementById('velocity-widget-container')) return;
         const widget = document.createElement('div');
         widget.id = 'velocity-widget-container';
         widget.style.cssText = `
             position: fixed; top: 20px; right: 20px; z-index: 10000;
-            background: rgba(5, 5, 5, 0.98); border: 1px solid #FFD700;
+            background: rgba(10, 10, 10, 0.98); border: 1px solid #FFD700;
             border-top: 3px solid #00FFFF; padding: 12px; font-family: monospace;
             width: 500px; display: flex; flex-direction: column; gap: 10px;
-            box-shadow: 0 15px 50px rgba(0,0,0,0.9);
         `;
 
         widget.innerHTML = `
@@ -54,15 +54,50 @@ const VelocityWidget = {
         this.render();
     },
 
+    /**
+     * HAZARD CALCULATION REINSTATED
+     * Calculates risk intensity for each T+ box
+     */
+    async calculateRiskProfile(routeLayer) {
+        const coords = routeLayer.getLatLngs();
+        // Sample Start, Mid, and End of route
+        const samples = [0, 0.5, 0.99].map(p => coords[Math.floor((coords.length - 1) * p)]);
+
+        for (let i = 0; i < 24; i++) {
+            const lt = i * 2;
+            let combinedRisk = 0;
+            const targetDate = new Date();
+            targetDate.setHours(targetDate.getHours() + lt);
+            const targetIso = targetDate.toISOString().split(':')[0] + ":00";
+
+            for (const wp of samples) {
+                try {
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${wp.lat}&longitude=${wp.lng}&hourly=temperature_2m,precipitation&timezone=auto&forecast_days=3`);
+                    const data = await res.json();
+                    const idx = data.hourly.time.indexOf(targetIso);
+                    const precip = idx !== -1 ? data.hourly.precipitation[idx] : 0;
+                    const rst = (idx !== -1 ? data.hourly.temperature_2m[idx] : 0) - 1.2;
+
+                    // Condition weighting: ICE = 1.0, WET = 0.5, DRY = 0.0
+                    if (precip > 0) {
+                        combinedRisk += (rst <= 0) ? 1.0 : 0.5;
+                    }
+                } catch (e) { console.warn("Cache sync failed for T+" + lt); }
+            }
+            this.state.hazardCache[lt] = combinedRisk / samples.length;
+        }
+        this.render();
+    },
+
     getWeightedColor(leadTime) {
         const risk = this.state.hazardCache[leadTime];
-        if (risk === undefined) return "#1a1a1a"; // Dark Gray/Black for Syncing
-        
-        // High-Vis Neon Palette Restoration
-        if (risk === 0) return "#00FF41"; // Neon Green
-        if (risk <= 0.3) return "#FFFF00"; // Neon Yellow
-        if (risk <= 0.6) return "#FF9900"; // Neon Orange
-        return "#FF0000"; // Neon Red
+        if (risk === undefined) return "#111"; // No Data Black
+
+        // REINSTATED COLOR SCALE
+        if (risk === 0) return "#00FF41";     // NEON GREEN (Dry/Clear)
+        if (risk <= 0.3) return "#FFFF00";   // NEON YELLOW (Trace Precip)
+        if (risk <= 0.6) return "#FF9900";   // NEON ORANGE (Wet/Slush)
+        return "#FF0000";                    // NEON RED (Ice/Packed)
     },
 
     render() {
@@ -76,7 +111,7 @@ const VelocityWidget = {
             block.style.cssText = `
                 background: ${this.getWeightedColor(lt)};
                 border: ${isSelected ? '2px solid #fff' : '1px solid #000'};
-                cursor: pointer; height: 100%; transition: transform 0.1s;
+                cursor: pointer; height: 100%; transition: all 0.1s;
                 ${isSelected ? 'transform: scaleY(1.3); z-index: 10;' : ''}
             `;
             block.onclick = () => {
@@ -86,57 +121,31 @@ const VelocityWidget = {
             };
             grid.appendChild(block);
         }
-        const timeEl = document.getElementById('m-dep-time');
-        if (timeEl) timeEl.innerText = this.state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const depTime = document.getElementById('m-dep-time');
+        if (depTime) depTime.innerText = this.state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const label = document.getElementById('active-lead-label');
+        if (label) label.innerText = `T+${this.state.currentLeadTime} HRS`;
     },
 
     startRouteObserver() {
         setInterval(() => {
             const route = Object.values(window.map?._layers || {}).find(l => l._latlngs && l._latlngs.length > 5);
-            if (route && this.state.routeDistance === 0) {
-                this.render(); // Ensure UI populates as soon as route exists
+            if (route) {
+                const routeHash = `${route.getLatLngs()[0].lat}${route.getLatLngs().length}`;
+                if (routeHash !== this.state.lastHash) {
+                    this.state.lastHash = routeHash;
+                    this.calculateRiskProfile(route);
+                }
             }
-        }, 2000);
-    }
-};
-
-const MetroTable = {
-    containerId: "metro-surface-intelligence",
-    init() {
-        this.injectUI();
-        window.addEventListener('weong:update', (e) => this.syncWithRoute(e.detail.offset));
-    },
-
-    injectUI() {
-        if (document.getElementById(this.containerId)) return;
-        const matrix = document.getElementById('matrix-ui');
-        if (!matrix) return;
-
-        // FIXED ANCHOR: Table is injected AFTER the Weather Matrix container
-        matrix.insertAdjacentHTML('afterend', `
-            <div id="${this.containerId}" style="
-                margin-top: 15px; background: rgba(5, 5, 5, 0.95); 
-                border: 1px solid #333; border-left: 3px solid #00FFFF;
-                padding: 12px; width: 500px; font-family: monospace;
-            ">
-                <div style="color:#00FFFF; font-size:11px; font-weight:900; margin-bottom:8px;">
-                    ROAD ANALYTICS <span id="metro-valid-time" style="color:#666; font-size:9px;">[SYNCED]</span>
-                </div>
-                <table style="width:100%; color:#fff; font-size:10px; text-align:left;">
-                    <thead style="color:#666; font-size:8px;">
-                        <tr><th>COMMUNITY</th><th>RST</th><th>Δ AIR</th><th>CONDITION</th></tr>
-                    </thead>
-                    <tbody id="metro-body"></tbody>
-                </table>
-            </div>
-        `);
+        }, 3000);
     },
     
-    syncWithRoute(offset) {
-        // Core rendering logic to fill the table based on T+ lead time
-        // ... (API calls and row generation logic)
+    syncNow() {
+        this.state.departureTime = new Date();
+        this.render();
     }
 };
 
 VelocityWidget.init();
-MetroTable.init();
