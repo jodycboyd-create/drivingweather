@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: metro-logic.js
- * Feature: Reinstated Original Window Treatment & Community Mapping
- * Logic: Restoration of L3 HUD Positioning
+ * Feature: Pure Data-Driven Forecast (All L3 Overrides Removed)
+ * Logic: Restoration of relative window stacking
  */
 
 const MetroTable = {
@@ -16,6 +16,7 @@ const MetroTable = {
             this.syncWithRoute(e.detail.offset || 0);
         });
 
+        // Initial sync
         setTimeout(() => this.syncWithRoute(0), 1000);
     },
 
@@ -62,17 +63,32 @@ const MetroTable = {
 
         for (const wp of waypoints) {
             try {
-                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${wp.lat}&longitude=${wp.lng}&hourly=temperature_2m&timezone=auto&forecast_days=3`);
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${wp.lat}&longitude=${wp.lng}&hourly=temperature_2m,precipitation&timezone=auto&forecast_days=3`);
                 const data = await res.json();
                 const idx = data.hourly.time.indexOf(targetIso);
                 const airTemp = (idx !== -1) ? data.hourly.temperature_2m[idx] : data.hourly.temperature_2m[0];
+                const precip = (idx !== -1) ? data.hourly.precipitation[idx] : 0;
                 
-                const rst = airTemp - 1.2; // Energy balance simulation
+                // Pure Energy Balance (Standardized across all hubs)
+                const rst = airTemp - 1.2;
+                
                 let state = "DRY / CLEAR";
                 let color = "#00FF00";
 
-                if (rst <= 0) { state = "SLUSH / WET"; color = "#FFA500"; }
-                if (rst <= -4 || wp.name === "Corner Brook") { state = "ICE / PACKED"; color = "#FF0000"; }
+                // REVISED DATA-DRY LOGIC: Condition based solely on Precip + Temp
+                if (precip > 0) {
+                    if (rst <= 0) {
+                        state = "ICE / PACKED";
+                        color = "#FF0000";
+                    } else {
+                        state = "WET / SLUSH";
+                        color = "#FFA500";
+                    }
+                } else if (rst <= -2) {
+                    // Simulating residual frost/ice without active storm
+                    state = "FROST / COLD";
+                    color = "#00FFFF";
+                }
 
                 rows += `
                     <tr style="border-bottom: 1px solid #222;">
@@ -84,14 +100,16 @@ const MetroTable = {
             } catch (e) { console.error(e); }
         }
         body.innerHTML = rows;
-        if (document.getElementById('metro-valid-time')) document.getElementById('metro-valid-time').innerText = `[T+${offset} HRS]`;
+        if (document.getElementById('metro-valid-time')) {
+            document.getElementById('metro-valid-time').innerText = `[T+${offset} HRS]`;
+        }
     },
 
     injectUI() {
         const matrix = document.getElementById('matrix-ui');
         if (!matrix || document.getElementById(this.containerId)) return;
 
-        // REINSTATED ORIGINAL WINDOW TREATMENT
+        // Reinstated Original Window Stack
         matrix.insertAdjacentHTML('beforeend', `
             <div id="${this.containerId}" style="
                 margin-top: 15px; background: rgba(5, 5, 5, 0.95); 
@@ -100,7 +118,7 @@ const MetroTable = {
                 font-family: monospace; width: 500px; cursor: grab;
             ">
                 <div style="color:#00FFFF; font-size:11px; font-weight:900; margin-bottom:10px;">
-                    ROAD ANALYTICS <span id="metro-valid-time" style="color:#666; font-size:9px;">[VALID: 6PM]</span>
+                    ROAD ANALYTICS <span id="metro-valid-time" style="color:#666; font-size:9px;">[SYNCING]</span>
                 </div>
                 <table style="width:100%; color:#fff; font-size:10px; text-align:left;">
                     <thead><tr style="color:#666; font-size:8px;">
