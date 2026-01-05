@@ -1,6 +1,6 @@
 /** * Project: [weong-bulletin]
- * Logic: L3 Velocity Calculator + 48H Heat Matrix Bridge
- * Feature: 24-Block Temporal Scrubber
+ * Logic: L3 Velocity Calculator + Reactive Hazard Matrix
+ * Feature: Weighted Average Road Hazard Scale
  */
 
 const VelocityWidget = {
@@ -9,7 +9,8 @@ const VelocityWidget = {
         departureTime: new Date(),
         routeDistance: 0,
         lastRouteHash: "",
-        currentLeadTime: 0 // Tracks selected T+ offset
+        currentLeadTime: 0,
+        hazardCache: {} // Stores [0.0 - 1.0] scores for each lead time
     },
 
     init: function() {
@@ -22,12 +23,8 @@ const VelocityWidget = {
         }, 500);
     },
 
-    /**
-     * UPDATED UI: Added Heat Ribbon Container below main metrics
-     */
     createUI: function() {
         if (document.getElementById('velocity-widget-container')) return;
-
         const widget = document.createElement('div');
         widget.id = 'velocity-widget-container';
         widget.style.cssText = `
@@ -53,13 +50,6 @@ const VelocityWidget = {
                             <button onclick="VelocityWidget.updateTime(15)" style="background:#444; color:#fff; border:none; width:24px; height:24px; cursor:pointer; font-weight:bold;">+</button>
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div id="v-day-display" style="font-size: 13px; color: #FFD700;">Jan 4</div>
-                        <div style="display: flex; gap: 4px;">
-                            <button onclick="VelocityWidget.updateDay(-1)" style="background:#444; color:#fff; border:none; width:24px; height:24px; cursor:pointer;">-</button>
-                            <button onclick="VelocityWidget.updateDay(1)" style="background:#444; color:#fff; border:none; width:24px; height:24px; cursor:pointer;">+</button>
-                        </div>
-                    </div>
                 </div>
 
                 <div style="flex: 1.8; border-right: 1px solid rgba(255,215,0,0.3); padding-right: 10px; display: flex; flex-direction: column; justify-content: center; gap: 6px;">
@@ -70,18 +60,14 @@ const VelocityWidget = {
 
                 <div style="flex: 0.8; text-align: center; display: flex; flex-direction: column; justify-content: center; gap: 4px;">
                     <div style="font-size: 9px; opacity: 0.6;">SPD ADJ</div>
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                        <button onclick="VelocityWidget.updateSpeed(-5)" style="background:none; color:#FFD700; border:1px solid #FFD700; border-radius:50%; width:22px; height:22px; cursor:pointer;">-</button>
-                        <div id="v-speed-off" style="font-size: 20px; color:#fff; font-weight:bold;">+0</div>
-                        <button onclick="VelocityWidget.updateSpeed(5)" style="background:none; color:#FFD700; border:1px solid #FFD700; border-radius:50%; width:22px; height:22px; cursor:pointer;">+</button>
-                    </div>
+                    <div id="v-speed-off" style="font-size: 20px; color:#fff; font-weight:bold;">+0</div>
                     <div style="font-size: 8px; opacity: 0.5;">KM/H</div>
                 </div>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 6px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 8px; color: #00FFFF; font-weight: bold; letter-spacing: 1px;">48H TEMPORAL PREDICTIVE MATRIX</span>
+                    <span style="font-size: 8px; color: #00FFFF; font-weight: bold; letter-spacing: 1px;">48H ROAD HAZARD SCALE</span>
                     <span id="active-lead-label" style="font-size: 9px; color: #FFD700; font-weight: bold;">T+0 HRS</span>
                 </div>
                 <div id="temporal-grid-scrubber" style="display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; height: 16px;"></div>
@@ -93,52 +79,75 @@ const VelocityWidget = {
     },
 
     /**
-     * ADVANCE LEAD TIME
-     * Sets specific T+x departure and triggers global redraw
+     * HAZARD CALCULATION ENGINE
+     * Accesses Metro-Logic parameters without duplicating the API logic.
      */
-    jumpToLeadTime: function(hours) {
-        this.state.currentLeadTime = hours;
-        const now = new Date();
-        // Shift base departure time to future lead
-        this.state.departureTime = new Date(now.getTime() + (hours * 3600000));
+    precalculateHazards: async function(routeLayer) {
+        const coords = routeLayer.getLatLngs();
+        const samples = [0, 0.5, 0.99].map(pct => coords[Math.floor((coords.length - 1) * pct)]);
+        
+        for (let i = 0; i < 24; i++) {
+            const lt = i * 2;
+            let totalHazard = 0;
+            const targetDate = new Date();
+            targetDate.setHours(targetDate.getHours() + lt);
+            const targetIso = targetDate.toISOString().split(':')[0] + ":00";
+
+            for (const wp of samples) {
+                try {
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${wp.lat}&longitude=${wp.lng}&hourly=temperature_2m,precipitation&timezone=auto&forecast_days=3`);
+                    const data = await res.json();
+                    const idx = data.hourly.time.indexOf(targetIso);
+                    const precip = (idx !== -1) ? data.hourly.precipitation[idx] : 0;
+                    const rst = ((idx !== -1) ? data.hourly.temperature_2m[idx] : 0) - 1.2;
+
+                    // Weighted average logic: Precip + Freezing = 1.0 (Red), Precip + Warm = 0.5 (Orange), Dry = 0 (Green)
+                    if (precip > 0) {
+                        totalHazard += (rst <= 0) ? 1.0 : 0.5;
+                    }
+                } catch (e) { console.warn("Hazard Precalc failed", e); }
+            }
+            this.state.hazardCache[lt] = totalHazard / samples.length;
+        }
         this.render();
     },
 
-    /**
-     * WEIGHTED COLOR LOGIC
-     * Interpolates between Green and Red based on Jan 4 storm profile
-     */
     getWeightedColor: function(leadTime) {
-        let risk = 0; 
-        if (leadTime <= 8) risk = 1.0; // PURE RED: Extreme Icing period
-        else if (leadTime <= 18) risk = 0.5; // ORANGE/YELLOW: Mixed conditions
-        else risk = 0.0; // PURE GREEN: Clearing period
-
-        const r = Math.floor(46 + (risk * (231 - 46)));
-        const g = Math.floor(204 - (risk * (204 - 76)));
-        const b = Math.floor(113 - (risk * (113 - 60)));
+        const risk = this.state.hazardCache[leadTime] || 0;
+        
+        // Scale: Green (0.0) -> Yellow (0.25) -> Orange (0.5) -> Red (1.0)
+        let r, g, b;
+        if (risk === 0) { r = 46; g = 204; b = 113; } // Emerald Green
+        else if (risk <= 0.3) { r = 255; g = 215; b = 0; } // Yellow
+        else if (risk <= 0.6) { r = 255; g = 165; b = 0; } // Orange
+        else { r = 231; g = 76; b = 60; } // Alizarin Red
+        
         return `rgb(${r}, ${g}, ${b})`;
     },
 
+    jumpToLeadTime: function(hours) {
+        this.state.currentLeadTime = hours;
+        const now = new Date();
+        this.state.departureTime = new Date(now.getTime() + (hours * 3600000));
+        
+        window.currentTemporalOffset = hours;
+        window.dispatchEvent(new CustomEvent('weong:update', { detail: { offset: hours } }));
+        this.render();
+    },
+
     render: function() {
-        const finalSpeed = this.calculateWeightedSpeed();
         const dist = this.state.routeDistance;
-        const travelHours = finalSpeed > 0 ? dist / finalSpeed : 0;
-        const h = Math.floor(travelHours);
-        const m = Math.round((travelHours - h) * 60);
+        const speed = 100 + this.state.speedAdjustment;
+        const travelHours = speed > 0 ? dist / speed : 0;
         const arrivalDate = new Date(this.state.departureTime.getTime() + (travelHours * 3600000));
 
-        // Update Standard UI
         const updateText = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
         updateText('m-dep-time', this.state.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         updateText('m-arr-time', arrivalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-        updateText('m-travel-dur', `${h}H ${m}M`);
+        updateText('m-travel-dur', `${Math.floor(travelHours)}H ${Math.round((travelHours % 1) * 60)}M`);
         updateText('m-travel-dist', `${dist.toFixed(1)} KM`);
-        updateText('v-speed-off', (this.state.speedAdjustment >= 0 ? "+" : "") + this.state.speedAdjustment);
-        updateText('v-day-display', this.state.departureTime.toLocaleDateString([], { month: 'short', day: 'numeric' }));
         updateText('active-lead-label', `T+${this.state.currentLeadTime} HRS`);
 
-        // Update Scrubber Grid
         const grid = document.getElementById('temporal-grid-scrubber');
         if (grid) {
             grid.innerHTML = "";
@@ -150,42 +159,19 @@ const VelocityWidget = {
                     background: ${this.getWeightedColor(lt)};
                     border: ${isSelected ? '1px solid #fff' : '1px solid rgba(255,255,255,0.05)'};
                     opacity: ${isSelected ? '1' : '0.4'};
-                    cursor: pointer; transition: transform 0.1s;
+                    cursor: pointer; height: 100%; transition: all 0.2s;
                     ${isSelected ? 'transform: scaleY(1.3);' : ''}
                 `;
                 block.onclick = () => this.jumpToLeadTime(lt);
                 grid.appendChild(block);
             }
         }
-
-        // GLOBAL BRIDGE: Forces re-calculation in other L3 modules
-        window.currentCruisingSpeed = finalSpeed;
-        window.currentDepartureTime = this.state.departureTime;
-        window.currentTemporalOffset = this.state.currentLeadTime; // For Road Analytics sync
-        window.currentRouteDistance = dist;
-
-        // Dispatch L3 Sync Event
-        window.dispatchEvent(new CustomEvent('weong:update', { 
-            detail: { offset: this.state.currentLeadTime } 
-        }));
     },
 
-    // ... (rest of original update functions)
-    syncNow: function() { this.state.currentLeadTime = 0; this.state.departureTime = new Date(); this.render(); },
-    updateDay: function(delta) { this.state.departureTime.setDate(this.state.departureTime.getDate() + delta); this.render(); },
-    updateTime: function(mins) { this.state.departureTime = new Date(this.state.departureTime.getTime() + mins * 60000); this.render(); },
-    updateSpeed: function(delta) { this.state.speedAdjustment += delta; this.render(); },
-    calculateWeightedSpeed: function() {
-        const totalKm = this.state.routeDistance;
-        let base = 100;
-        if (totalKm < 50) base = 50;
-        else if (totalKm < 150) base = 80;
-        return base + this.state.speedAdjustment;
-    },
     startRouteObserver: function() {
         setInterval(() => {
             if (!window.map) return;
-            const routeLayer = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5 && l.options.color !== "#FFD700");
+            const routeLayer = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
             if (routeLayer) {
                 const coords = routeLayer.getLatLngs();
                 const routeHash = `${coords[0].lat.toFixed(4)}${coords.length}`;
@@ -194,11 +180,14 @@ const VelocityWidget = {
                     let totalMeters = 0;
                     for (let i = 0; i < coords.length - 1; i++) { totalMeters += coords[i].distanceTo(coords[i+1]); }
                     this.state.routeDistance = totalMeters / 1000;
-                    this.render();
+                    this.precalculateHazards(routeLayer);
                 }
             }
-        }, 1500);
-    }
+        }, 2000);
+    },
+    
+    syncNow: function() { this.jumpToLeadTime(0); },
+    updateTime: function(mins) { this.state.departureTime = new Date(this.state.departureTime.getTime() + mins * 60000); this.render(); }
 };
 
 VelocityWidget.init();
