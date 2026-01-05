@@ -1,6 +1,6 @@
 /** * Project: [weong-route] | MODULE: metro-logic.js
- * Feature: Pure Data-Driven Forecast (All L3 Overrides Removed)
- * Logic: Restoration of relative window stacking
+ * Feature: Pure Precipitation-Based Conditions
+ * Status: L3 Triggers & Frost Logic Removed
  */
 
 const MetroTable = {
@@ -11,12 +11,10 @@ const MetroTable = {
         this.injectUI();
         this.makeMovable();
         
-        // Listen for Velocity Widget lead-time shifts
         window.addEventListener('weong:update', (e) => {
             this.syncWithRoute(e.detail.offset || 0);
         });
 
-        // Initial sync
         setTimeout(() => this.syncWithRoute(0), 1000);
     },
 
@@ -69,13 +67,12 @@ const MetroTable = {
                 const airTemp = (idx !== -1) ? data.hourly.temperature_2m[idx] : data.hourly.temperature_2m[0];
                 const precip = (idx !== -1) ? data.hourly.precipitation[idx] : 0;
                 
-                // Pure Energy Balance (Standardized across all hubs)
-                const rst = airTemp - 1.2;
+                const rst = airTemp - 1.2; 
                 
                 let state = "DRY / CLEAR";
                 let color = "#00FF00";
 
-                // REVISED DATA-DRY LOGIC: Condition based solely on Precip + Temp
+                // Condition logic based on the presence of precipitation
                 if (precip > 0) {
                     if (rst <= 0) {
                         state = "ICE / PACKED";
@@ -84,10 +81,6 @@ const MetroTable = {
                         state = "WET / SLUSH";
                         color = "#FFA500";
                     }
-                } else if (rst <= -2) {
-                    // Simulating residual frost/ice without active storm
-                    state = "FROST / COLD";
-                    color = "#00FFFF";
                 }
 
                 rows += `
@@ -109,7 +102,6 @@ const MetroTable = {
         const matrix = document.getElementById('matrix-ui');
         if (!matrix || document.getElementById(this.containerId)) return;
 
-        // Reinstated Original Window Stack
         matrix.insertAdjacentHTML('beforeend', `
             <div id="${this.containerId}" style="
                 margin-top: 15px; background: rgba(5, 5, 5, 0.95); 
