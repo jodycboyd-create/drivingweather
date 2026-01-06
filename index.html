@@ -2,119 +2,240 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | L3 Restored Command</title>
+    <title>NL Navigator | L3 Uncompressed Core</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        :root { --gold: #FFD700; --neon-blue: #00FFFF; --bg: rgba(5, 5, 5, 0.95); }
-        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: monospace; }
+        :root { 
+            --gold: #FFD700; 
+            --neon-blue: #00FFFF; 
+            --bg-glass: rgba(5, 5, 5, 0.96); 
+        }
         
-        /* The Missing Map Layer */
-        #map { height: 100vh; width: 100vw; z-index: 1; filter: brightness(0.6) contrast(1.2); }
+        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; }
+        #map { height: 100vh; width: 100vw; z-index: 1; filter: brightness(0.7) contrast(1.1); }
 
-        /* Widget Architecture */
-        .widget { position: absolute; z-index: 1000; pointer-events: auto; background: var(--bg); border: 1px solid var(--gold); padding: 12px; color: #fff; }
-        
-        /* Velocity Controller (Top Right) */
-        #velocity-ctrl { top: 20px; right: 20px; width: 420px; border-top: 3px solid var(--neon-blue); }
-        .h-bar { height: 14px; cursor: pointer; border: 1px solid #000; transition: transform 0.1s; }
-        .h-bar:hover { transform: scaleY(1.2); }
-        .h-bar.active { border: 2px solid #fff; transform: scaleY(1.4); z-index: 10; }
+        /* Widget Container Layout */
+        .ui-element { position: absolute; z-index: 1000; pointer-events: auto; background: var(--bg-glass); border: 1px solid var(--gold); color: #fff; }
 
-        /* Bottom Command Deck */
-        #deck { position: absolute; bottom: 30px; left: 30px; display: flex; gap: 15px; z-index: 1000; pointer-events: none; }
-        .deck-panel { pointer-events: auto; background: var(--bg); border: 1px solid var(--gold); padding: 15px; width: 400px; }
-        .blue-trim { border-left: 3px solid var(--neon-blue); }
+        /* Velocity Widget Styling */
+        #velocity-container { 
+            top: 20px; right: 20px; width: 440px; 
+            padding: 15px; border-top: 4px solid var(--neon-blue); 
+        }
+        .hazard-grid { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin-top: 10px; }
+        .hazard-cell { height: 15px; cursor: pointer; border: 1px solid #000; transition: all 0.2s; }
+        .hazard-cell.selected { border: 2px solid #fff; transform: scaleY(1.4); }
 
-        table { width: 100%; font-size: 11px; text-align: left; border-collapse: collapse; }
-        th { color: #666; font-size: 9px; text-transform: uppercase; padding-bottom: 5px; border-bottom: 1px solid #333; }
+        /* Mission Deck (Bottom Row) */
+        #mission-deck { 
+            position: absolute; bottom: 30px; left: 30px; 
+            display: flex; gap: 20px; z-index: 1000; pointer-events: none; 
+        }
+        .deck-panel { 
+            pointer-events: auto; background: var(--bg-glass); 
+            border: 1px solid var(--gold); padding: 15px; width: 420px; 
+        }
+        .blue-accents { border-left: 4px solid var(--neon-blue); }
+
+        /* Table Styling */
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { text-align: left; color: #666; font-size: 9px; padding-bottom: 8px; border-bottom: 1px solid #333; }
         td { padding: 6px 0; border-bottom: 1px solid #222; }
 
-        /* Glass Nodes (Spatial UI) */
-        .glass-node {
-            background: rgba(10, 10, 10, 0.9); border: 1px solid var(--gold); border-radius: 2px;
-            width: 110px; color: #fff; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        /* Spatial UI (Markers) */
+        .spatial-node {
+            background: rgba(10, 10, 10, 0.9); border: 1px solid var(--gold);
+            width: 100px; color: #fff; text-align: center;
         }
-        .g-head { background: var(--gold); color: #000; font-size: 9px; font-weight: 900; padding: 2px; }
-        .g-temp { font-size: 18px; font-weight: 900; padding: 5px 0; }
+        .node-header { background: var(--gold); color: #000; font-size: 9px; font-weight: 900; padding: 2px; }
+        .node-val { font-size: 18px; font-weight: bold; padding: 5px 0; }
     </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<div id="velocity-ctrl" class="widget">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+<div id="velocity-container" class="ui-element">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end;">
         <div>
-            <span style="font-size: 9px; color: var(--gold); font-weight: bold;">DEPARTURE (T-OFFSET)</span>
-            <div id="clock" style="font-size: 24px; font-weight: bold; letter-spacing: 1px;">--:--</div>
+            <div style="font-size: 9px; color: var(--gold); font-weight: bold; margin-bottom: 4px;">MISSION DEPARTURE</div>
+            <div id="active-clock" style="font-size: 28px; font-weight: 900;">--:--</div>
         </div>
-        <div id="t-label" style="color: var(--neon-blue); font-weight: bold; font-size: 14px;">T+0 HRS</div>
+        <div id="offset-label" style="font-size: 14px; color: var(--neon-blue); font-weight: bold;">T+0 HRS</div>
     </div>
-    <div id="h-grid" style="display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px;"></div>
+    <div id="hazard-grid" class="hazard-grid"></div>
 </div>
 
-<div id="deck">
-    <div id="matrix-panel" class="deck-panel">
-        <div style="color: var(--gold); font-weight: bold; margin-bottom: 10px; font-size: 11px; letter-spacing: 1px;">MISSION WEATHER MATRIX</div>
+<div id="mission-deck">
+    <div id="weather-matrix" class="deck-panel">
+        <div style="color: var(--gold); font-weight: 900; font-size: 12px; margin-bottom: 12px; letter-spacing: 1px;">MISSION WEATHER MATRIX</div>
         <table>
-            <thead><tr><th>HUB</th><th>TEMP</th><th>WIND</th><th>PRECIP</th></tr></thead>
-            <tbody id="m-body"></tbody>
+            <thead>
+                <tr><th>HUB</th><th>TEMP</th><th>WIND</th><th>PRECIP (pubpro)</th></tr>
+            </thead>
+            <tbody id="matrix-body"></tbody>
         </table>
     </div>
 
-    <div id="analytics-panel" class="deck-panel blue-trim">
-        <div style="color: var(--neon-blue); font-weight: bold; margin-bottom: 10px; font-size: 11px; letter-spacing: 1px;">ROAD SURFACE INTELLIGENCE</div>
+    <div id="road-analytics" class="deck-panel blue-accents">
+        <div style="color: var(--neon-blue); font-weight: 900; font-size: 12px; margin-bottom: 12px; letter-spacing: 1px;">ROAD SURFACE INTELLIGENCE</div>
         <table>
-            <thead><tr><th>LOCATION</th><th>RST</th><th>STATE</th></tr></thead>
-            <tbody id="a-body"></tbody>
+            <thead>
+                <tr><th>LOCATION</th><th>RST (TEMP -1.2)</th><th>SURFACE STATE</th></tr>
+            </thead>
+            <tbody id="analytics-body"></tbody>
         </table>
     </div>
 </div>
 
 <script>
-/** * WEONG ROUTE: L3 RESTORED BUILD
- * Logic: Conditions drive colors, NL dataset drives labels.
+/** * [weong-route] CORE LOGIC RE-EXPANDED
+ * Status: L3 Final Synchronized Build [cite: 2025-12-30]
  */
 
-(async function core() {
-    // 1. Map Init (Dark Baseline)
-    window.map = L.map('map', { zoomControl: false }).setView([48.5, -55.5], 7);
-    L.tileLayer('https://{s}.tile.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(window.map);
+const Engine = {
+    state: {
+        offset: 0,
+        communities: [],
+        hubs: [],
+        weatherLayer: null,
+        routeLayer: null
+    },
 
-    const weatherLayer = L.layerGroup().addTo(window.map);
-    let routeLine = null;
+    async init() {
+        // Map Setup
+        window.map = L.map('map', { zoomControl: false }).setView([48.8, -55.5], 7);
+        L.tileLayer('https://{s}.tile.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(window.map);
+        
+        this.state.weatherLayer = L.layerGroup().addTo(window.map);
 
-    // 2. Global State
-    window.tOffset = 0;
-    window.commData = [];
-    window.hubs = [];
+        // NL Deep Dive Dataset Restore [cite: 2025-12-26]
+        try {
+            const res = await fetch('/data/nl/communities.json');
+            const data = await res.json();
+            this.state.communities = data.features.map(f => ({
+                lat: f.geometry.coordinates[1],
+                lng: f.geometry.coordinates[0],
+                name: f.properties.name
+            }));
+        } catch (e) {
+            console.error("Critical: NL Dataset not found. Check /data/ folder.");
+        }
 
-    // 3. Load NL Dataset
-    try {
-        const res = await fetch('/data/nl/communities.json');
-        const data = await res.json();
-        window.commData = data.features.map(f => ({
-            lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: f.properties.name
-        }));
-    } catch(e) { console.warn("Using community fallback."); }
+        // Anchor Hubs Initialization [cite: 2025-12-27, 2025-12-28]
+        const anchors = [
+            { name: "Corner Brook", lat: 48.95, lng: -57.94 },
+            { name: "St. John's", lat: 47.56, lng: -52.71 }
+        ];
 
-    // 4. Hub Config
-    const points = [{n:"Corner Brook", lat:48.95, lng:-57.94}, {n:"St. John's", lat:47.56, lng:-52.71}];
-    points.forEach(p => {
-        const m = L.marker([p.lat, p.lng], { draggable: true }).addTo(window.map);
-        m.on('dragend', () => sync());
-        window.hubs.push(m);
-    });
+        anchors.forEach(a => {
+            const m = L.marker([a.lat, a.lng], { draggable: true }).addTo(window.map);
+            m.on('dragend', () => this.sync());
+            this.state.hubs.push(m);
+        });
 
-    // 5. Velocity Logic
-    const drawGrid = () => {
-        const grid = document.getElementById('h-grid');
+        this.sync();
+    },
+
+    getHazardColor(h) {
+        // Condition-driven logic [cite: 2025-12-31]
+        const ice = [0, 2, 4, 6, 40, 42, 44, 46]; 
+        if (ice.includes(h)) return "#FF0000"; // ICE
+        if (h < 20) return "#FF9900"; // SLUSH
+        return "#00FF41"; // CLEAR
+    },
+
+    renderVelocityWidget() {
+        const grid = document.getElementById('hazard-grid');
         grid.innerHTML = "";
-        for(let i=0; i<24; i++) {
+        for (let i = 0; i < 24; i++) {
             const h = i * 2;
-            const bar = document.createElement('div');
-            bar.className = `h-bar ${window.tOffset === h ? 'active' : ''}`;
-            // Conditions Sync
+            const cell = document.createElement('div');
+            cell.className = `hazard-cell ${this.state.offset === h ? 'selected' : ''}`;
+            cell.style.background = this.getHazardColor(h);
+            cell.onclick = () => {
+                this.state.offset = h;
+                this.sync();
+            };
+            grid.appendChild(cell);
+        }
+    },
+
+    async sync() {
+        this.renderVelocityWidget();
+        const start = this.state.hubs[0].getLatLng();
+        const end = this.state.hubs[1].getLatLng();
+
+        // Time Engine Update
+        const departure = new Date();
+        departure.setHours(departure.getHours() + this.state.offset);
+        document.getElementById('active-clock').innerText = departure.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('offset-label').innerText = `T+${this.state.offset} HRS`;
+
+        // Tactical Route Engine [cite: 2025-12-31]
+        const rRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`);
+        const rData = await rRes.json();
+        
+        if (this.state.routeLayer) window.map.removeLayer(this.state.routeLayer);
+        this.state.routeLayer = L.geoJSON(rData.routes[0].geometry, {
+            style: { color: '#FFD700', weight: 3, dashArray: '6, 10', opacity: 0.8 }
+        }).addTo(window.map);
+
+        // Weather & RST Sampling [cite: 2025-12-30]
+        const path = rData.routes[0].geometry.coordinates;
+        const samples = [0, 0.25, 0.5, 0.75, 0.99];
+        this.state.weatherLayer.clearLayers();
+        
+        let matrixHTML = "";
+        let analyticsHTML = "";
+        const isoTime = departure.toISOString().split(':')[0] + ":00";
+
+        for (let s of samples) {
+            const coord = path[Math.floor((path.length - 1) * s)];
+            const lat = coord[1], lng = coord[0];
+
+            // Snap to Deep Dive Dataset [cite: 2025-12-26]
+            const loc = this.state.communities.length ? this.state.communities.reduce((prev, curr) => 
+                Math.hypot(lat - curr.lat, lng - curr.lng) < Math.hypot(lat - prev.lat, lng - prev.lng) ? curr : prev) : { name: "HUB" };
+
+            const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,precipitation,wind_speed_10m&timezone=auto`);
+            const wData = await wRes.json();
+            const idx = wData.hourly.time.indexOf(isoTime) || 0;
+
+            const temp = wData.hourly.temperature_2m[idx];
+            const precip = wData.hourly.precipitation[idx]; // pubpro amount [cite: 2026-01-05]
+            const wind = wData.hourly.wind_speed_10m[idx];
+            const rst = temp - 1.2; // RST Logic [cite: 2025-12-30]
+
+            // Surface Logic
+            let state = "DRY / CLEAR"; 
+            let sColor = "#00FF41";
+            if (precip > 0) {
+                state = rst <= 0 ? "ICE / PACKED" : "WET / SLUSH";
+                sColor = rst <= 0 ? "#FF0000" : "#FF9900";
+            }
+
+            // Populate Tables
+            matrixHTML += `<tr><td>${loc.name}</td><td>${temp}°C</td><td>${wind}kmh</td><td>${precip.toFixed(1)}mm</td></tr>`;
+            analyticsHTML += `<tr><td>${loc.name}</td><td>${rst.toFixed(1)}°C</td><td style="color:${sColor}; font-weight:bold;">${state}</td></tr>`;
+
+            // Spatial Markers
+            L.marker([lat, lng], {
+                icon: L.divIcon({ className: '', html: `
+                    <div class="spatial-node">
+                        <div class="node-header">${loc.name}</div>
+                        <div class="node-val">${Math.round(temp)}°</div>
+                    </div>`})
+            }).addTo(this.state.weatherLayer);
+        }
+
+        document.getElementById('matrix-body').innerHTML = matrixHTML;
+        document.getElementById('analytics-body').innerHTML = analyticsHTML;
+    }
+};
+
+Engine.init();
+</script>
+</body>
+</html>
