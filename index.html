@@ -2,69 +2,193 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NL Navigator | Permanent Build</title>
+    <title>NL Navigator | L3 Unified Command</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #aad3df; font-family: sans-serif; }
-        #map { height: 100vh; width: 100vw; z-index: 1; }
-        #widget-dock { position: absolute; bottom: 30px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 15px; pointer-events: none; }
-        .widget-anchor { pointer-events: auto; }
-        .hub-label { font-weight: bold; background: white; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-size: 14px; color: #000; }
+        :root { --gold: #FFD700; --neon-blue: #00FFFF; --bg-glass: rgba(10, 10, 10, 0.95); }
+        body { margin: 0; padding: 0; overflow: hidden; background: #0b1116; font-family: 'Segoe UI', monospace; }
+        #map { height: 100vh; width: 100vw; z-index: 1; filter: grayscale(0.3) brightness(0.8); }
+
+        /* UI Overlays */
+        #command-shell { position: absolute; inset: 0; pointer-events: none; z-index: 1000; }
+        .interactive { pointer-events: auto; }
+
+        /* Glass Node Styling */
+        .glass-node {
+            background: rgba(15, 15, 15, 0.9); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.7); border-radius: 6px;
+            display: flex; flex-direction: column; width: 110px; color: #fff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .glass-header { background: var(--gold); color: #000; font-size: 9px; font-weight: 900; text-align: center; padding: 3px 0; text-transform: uppercase; }
+        .glass-body { display: flex; align-items: center; justify-content: center; padding: 6px; gap: 8px; }
+        .glass-temp-val { font-size: 18px; font-weight: 900; color: var(--gold); }
+        .glass-meta-sub { font-size: 9px; color: #ccc; text-align: center; padding-bottom: 4px; }
+
+        /* Hub Label */
+        .hub-label { font-weight: bold; background: #fff; border: 2px solid #0070bb; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    <div id="widget-dock">
-        <div id="weather-anchor" class="widget-anchor"></div>
-        <div id="velocity-anchor" class="widget-anchor"></div>
+
+<div id="map"></div>
+
+<div id="command-shell">
     </div>
 
-    <script type="module" src="/manifest.js"></script>
+<script>
+/** * WEONG UNIFIED CORE 
+ * Logic: L3_FINAL_SYNC_001 
+ */
 
-    <script>
-        /** PERMANENT LOGIC - [cite: 2025-12-30] **/
-        (async function boot() {
-            window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.map);
-            window.communityData = [];
-            window.hubMarkers = [];
+window.currentDepartureTime = new Date();
+window.currentCruisingSpeed = 100;
+window.currentRouteDistance = 0;
 
-            // NL Deep Dive Handshake [cite: 2025-12-26]
-            try {
-                const res = await fetch('/data/nl/communities.json');
+(async function initSystem() {
+    // 1. Map Setup
+    window.map = L.map('map', { zoomControl: false }).setView([49.0, -56.0], 7);
+    L.tileLayer('https://{s}.tile.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(window.map);
+
+    // 2. Hub Setup
+    window.communityData = [];
+    window.hubMarkers = [];
+    const hubs = [{name:"Corner Brook", lat:48.9515, lng:-57.9482}, {name:"St. John's", lat:47.5615, lng:-52.7126}];
+
+    hubs.forEach((h, i) => {
+        const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
+        m.bindTooltip(h.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
+        m.on('dragend', () => window.dispatchEvent(new Event('weong:update')));
+        window.hubMarkers.push(m);
+    });
+
+    // 3. Routing Engine
+    let currentRouteLayer = null;
+    function drawTacticalRoute(routeData) {
+        if (currentRouteLayer) window.map.removeLayer(currentRouteLayer);
+        currentRouteLayer = L.layerGroup().addTo(window.map);
+        window.currentRouteDistance = routeData.distance / 1000;
+
+        L.geoJSON(routeData.geometry, { style: { color: '#000', weight: 8, opacity: 0.4 } }).addTo(currentRouteLayer);
+        L.geoJSON(routeData.geometry, { style: { color: '#FFD700', weight: 2, opacity: 1, dashArray: '5, 10' } }).addTo(currentRouteLayer);
+    }
+
+    async function calculateRoute() {
+        const start = window.hubMarkers[0].getLatLng();
+        const end = window.hubMarkers[1].getLatLng();
+        const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.routes[0]) drawTacticalRoute(data.routes[0]);
+        } catch (e) { console.warn("Nav Link Severed."); }
+    }
+
+    // 4. Velocity Widget (Temporal Control)
+    const VelocityWidget = {
+        init() {
+            const widget = document.createElement('div');
+            widget.id = 'velocity-widget-container';
+            widget.className = 'interactive';
+            widget.style.cssText = `position: fixed; top: 20px; right: 20px; background: var(--bg-glass); border: 1px solid var(--gold); border-top: 3px solid var(--neon-blue); padding: 12px; width: 450px; display: flex; flex-direction: column; gap: 10px;`;
+            widget.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; color:#fff;">
+                    <div><span style="font-size:9px; color:var(--gold);">DEPARTURE</span><div id="v-dep-time" style="font-size:20px; font-weight:bold;">--:--</div></div>
+                    <div style="text-align:right;"><span id="v-lead-label" style="font-size:12px; color:var(--neon-blue);">T+0 HRS</span></div>
+                </div>
+                <div id="v-hazard-grid" style="display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; height: 15px;"></div>`;
+            document.body.appendChild(widget);
+            this.render();
+        },
+        render() {
+            const grid = document.getElementById('v-hazard-grid');
+            grid.innerHTML = "";
+            for (let i = 0; i < 24; i++) {
+                const lt = i * 2;
+                const block = document.createElement('div');
+                block.style.cssText = `background: ${this.getColor(lt)}; cursor: pointer; height: 100%; border: 1px solid #000;`;
+                block.onclick = () => {
+                    const newTime = new Date();
+                    newTime.setHours(newTime.getHours() + lt);
+                    window.currentDepartureTime = newTime;
+                    document.getElementById('v-lead-label').innerText = `T+${lt} HRS`;
+                    document.getElementById('v-dep-time').innerText = newTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                    window.dispatchEvent(new CustomEvent('weong:update', { detail: { offset: lt } }));
+                };
+                grid.appendChild(block);
+            }
+        },
+        getColor(offset) {
+            const ice = [0, 2, 4, 6, 40, 42];
+            return ice.includes(offset) ? "#FF0000" : (offset < 20 ? "#FF9900" : "#00FF41");
+        }
+    };
+
+    // 5. Weather & Matrix Engine
+    const WeatherEngine = {
+        state: { layer: L.layerGroup(), hubs: [
+            { name: "P.A.B", lat: 47.57, lng: -59.13 }, { name: "Stephenville", lat: 48.45, lng: -58.43 },
+            { name: "Corner Brook", lat: 48.95, lng: -57.94 }, { name: "Gander", lat: 48.95, lng: -54.61 },
+            { name: "St. John's", lat: 47.56, lng: -52.71 }
+        ]},
+        async sync() {
+            const route = Object.values(window.map._layers).find(l => l._latlngs && l._latlngs.length > 5);
+            if (!route) return;
+            const coords = route.getLatLngs();
+            const samples = [0, 0.25, 0.5, 0.75, 0.99];
+            
+            let dataRows = "";
+            this.state.layer.clearLayers();
+
+            for (let pct of samples) {
+                const p = coords[Math.floor((coords.length -1) * pct)];
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lng}&hourly=temperature_2m,weather_code,wind_speed_10m&timezone=auto`);
                 const data = await res.json();
-                window.communityData = data.features.map(f => ({
-                    lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: f.properties.name
-                }));
-            } catch (e) { console.warn("Dataset fallback active."); }
+                const temp = data.hourly.temperature_2m[0];
+                const hubName = this.state.hubs[Math.floor(pct * (this.state.hubs.length-1))].name;
 
-            const hubs = [{name:"Corner Brook", lat:48.9515, lng:-57.9482}, {name:"St. John's", lat:47.5615, lng:-52.7126}];
-            hubs.forEach(h => {
-                const m = L.marker([h.lat, h.lng], { draggable: true }).addTo(window.map);
-                m.bindTooltip(h.name, { permanent: true, className: 'hub-label', direction: 'top', offset: [0, -10] });
-                
-                m.on('drag', (e) => {
-                    let closest = window.communityData[0] || h;
-                    let minDist = Infinity;
-                    window.communityData.forEach(p => {
-                        const d = window.map.distance(e.target.getLatLng(), [p.lat, p.lng]);
-                        if (d < minDist) { minDist = d; closest = p; }
-                    });
-                    e.target.setLatLng([closest.lat, closest.lng]);
-                    e.target.setTooltipContent(closest.name);
-                });
+                // Map UI Marker
+                L.marker([p.lat, p.lng], {
+                    icon: L.divIcon({
+                        className: '',
+                        html: `<div class="glass-node">
+                                <div class="glass-header">${hubName}</div>
+                                <div class="glass-body"><span>☁️</span><span class="glass-temp-val">${Math.round(temp)}°</span></div>
+                               </div>`
+                    })
+                }).addTo(this.state.layer);
 
-                m.on('dragend', () => window.dispatchEvent(new Event('weong:update')));
-                window.hubMarkers.push(m);
-            });
+                dataRows += `<tr><td style="padding:5px;">${hubName}</td><td>${Math.round(temp)}°C</td><td>${data.hourly.wind_speed_10m[0]}kmh</td><td>DRY</td></tr>`;
+            }
+            document.getElementById('matrix-body').innerHTML = dataRows;
+        }
+    };
 
-            // Handshake synchronization
-            setTimeout(() => {
-                window.dispatchEvent(new Event('weong:ready'));
-                window.dispatchEvent(new Event('weong:update'));
-            }, 200);
-        })();
-    </script>
+    // 6. Final Stitching
+    VelocityWidget.init();
+    WeatherEngine.state.layer.addTo(window.map);
+    
+    document.getElementById('command-shell').insertAdjacentHTML('beforeend', `
+        <div id="matrix-ui" class="interactive" style="position:fixed; bottom:30px; left:30px; background:var(--bg-glass); border:1px solid var(--gold); width:500px; padding:15px; color:#fff; font-size:11px;">
+            <div style="border-bottom:1px solid var(--gold); margin-bottom:10px; font-weight:bold;">MISSION WEATHER MATRIX</div>
+            <table style="width:100%; text-align:left;">
+                <thead><tr style="color:#666;"><th>HUB</th><th>TEMP</th><th>WIND</th><th>SURFACE</th></tr></thead>
+                <tbody id="matrix-body"></tbody>
+            </table>
+        </div>
+    `);
+
+    window.addEventListener('weong:update', () => {
+        calculateRoute();
+        WeatherEngine.sync();
+    });
+
+    // Initial Trigger
+    calculateRoute();
+    setTimeout(() => WeatherEngine.sync(), 1000);
+
+})();
+</script>
 </body>
 </html>
